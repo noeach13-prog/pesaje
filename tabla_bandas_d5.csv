@@ -1,0 +1,8 @@
+sabor,raw,corregido,delta,tipo_justificacion,banda_metodologica,motivo_breve
+DULCE D LECHE,-6315,240,+6555,A - convergencia independiente,CONFIRMADO,P1+P2 convergen: ab normal + cerr 6555 tiene 4 sightings DDL vs 1 DA. Bilateral con DA.
+DULCE AMORES,7235,960,-6275,A - convergencia independiente,CONFIRMADO,P1+P2 convergen: ab normal + cerr 6555 es 1-sighting phantom en DA. Bilateral con DDL.
+VAINILLA,-6360,85,+6445,A - convergencia independiente,CONFIRMADO,P1+P2 convergen: ab descenso normal (-85g) + cerr 6445 persiste 3 turnos post (can real). Entrante no documentado.
+KITKAT,6350,230,-6120,A - convergencia independiente,CONFIRMADO,P1+P2 convergen: ab declive lineal 4905-4630-4400-4395 + cerr 6400 es 1-sighting phantom sin bilateral.
+PISTACHO,1945,1645,-300,C - prototipo historico fuerte,CONFIRMADO,PF1 digit error clasico. Cerr 6330 tiene 3 sightings (D3/D5N/D6D) vs 6630 tiene 1. Ratio 3:1. Patron centena.
+CHOCOLATE,7485,855,-6630,B - reductio / exclusion fisica,FORZADO,P2 prueba no-apertura (cerr 6640 identica). Raw 7485g fisicamente imposible. Fix ent 6530~6630 unico viable pero gap 100g.
+CH C/ALM,1400,1340,-60,D - ajuste plausible menor,ESTIMADO,Solo P2 (cerr 6615 3-sightings vs 6675 1-sighting). Delta 60g. Ambos valores razonables. No discriminante.

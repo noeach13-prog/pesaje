@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Pesaje Web Runner",
+      "runtimeExecutable": "C:/Users/EliteBook/AppData/Local/Programs/Python/Python312/python.exe",
+      "runtimeArgs": ["web_runner.py"],
+      "port": 5000
+    },
+    {
+      "name": "Pesaje v3",
+      "runtimeExecutable": "C:/Users/EliteBook/AppData/Local/Programs/Python/Python312/python.exe",
+      "runtimeArgs": ["-m", "pesaje_v3.web"],
+      "port": 5001
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.pytest_cache/
+.mypy_cache/
+dist/
+build/
+
+# Reportes generados
+Reporte_*.xlsx
+Comparativa_*.xlsx
+Totales_*.xlsx
+*.log
+
+# Basura de sistema/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Datos de entrada (no van al repo)
+*.xlsx
+!tabla_maestra.xlsx
+
+# Temp
+*.tmp
+~$*
