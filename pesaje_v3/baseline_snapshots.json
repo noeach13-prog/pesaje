@@ -711,6 +711,11 @@
         "banda": "CONFIRMADO"
       },
       {
+        "nombre": "CHOCOLATE",
+        "delta": -190,
+        "banda": "CONFIRMADO"
+      },
+      {
         "nombre": "DURAZNO",
         "delta": -60,
         "banda": "ESTIMADO"
@@ -722,7 +727,6 @@
       }
     ],
     "sin_resolver": [
-      "CHOCOLATE",
       "IRLANDESA"
     ]
   },
@@ -1028,11 +1032,15 @@
         "nombre": "GRANIZADO",
         "delta": -40,
         "banda": "ESTIMADO"
+      },
+      {
+        "nombre": "SUPER",
+        "delta": 0,
+        "banda": "CONFIRMADO"
       }
     ],
     "sin_resolver": [
-      "DULCE AMORES",
-      "SUPER"
+      "DULCE AMORES"
     ]
   },
   "27": {
@@ -1706,13 +1714,16 @@
         "banda": "CONFIRMADO"
       },
       {
+        "nombre": "SAMBAYON",
+        "delta": -100,
+        "banda": "CONFIRMADO"
+      },
+      {
         "nombre": "VAINILLA",
         "delta": -60,
         "banda": "ESTIMADO"
       }
     ],
-    "sin_resolver": [
-      "SAMBAYON"
-    ]
+    "sin_resolver": []
   }
 }

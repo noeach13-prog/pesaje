@@ -270,7 +270,8 @@ def _paso2_plano3(nombre: str, datos: DatosDia, timeline: List[Snapshot]) -> Pla
 # PASO 3: Generar TODAS las hipótesis
 # ═══════════════════════════════════════════════════════════════
 
-def _paso3_hipotesis(sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3) -> List[Hipotesis]:
+def _paso3_hipotesis(sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3,
+                     timeline: List[Snapshot] = None) -> List[Hipotesis]:
     hips = []
 
     # --- 3a: Cerradas que DESAPARECEN (en DIA, no en NOCHE) ---
@@ -390,6 +391,55 @@ def _paso3_hipotesis(sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3) -> List[Hipotesi
                     sightings=0,
                 ))
 
+    # --- 3h: Genealogía entrante→cerrada (cruce P2 x P3 x timeline) ---
+    # Una cerrada que aparece sin historia como cerrada pero tiene una entrante
+    # reciente en el timeline con peso cercano (±200g) es probablemente esa
+    # entrante promovida con error de pesaje.
+    # Igualmente, una cerrada que "desaparece" pero tiene una entrante reciente
+    # en su vecindario es sospechosa de ser esa entrante mal pesada.
+    if timeline:
+        # Recolectar entrantes del timeline reciente (turnos previos al DIA)
+        entrantes_recientes = []  # (peso, turno_label)
+        for snap in timeline:
+            # Solo turnos anteriores al DIA actual (contexto previo)
+            for e in snap.entrantes:
+                entrantes_recientes.append((int(e), snap.label))
+
+        if entrantes_recientes:
+            # Para cerradas que DESAPARECEN en DIA (sin match en NOCHE)
+            for peso_d, sightings_d in p2.desaparecen:
+                for ent_peso, ent_turno in entrantes_recientes:
+                    diff = abs(peso_d - ent_peso)
+                    if diff <= 200 and diff > 30:
+                        # Cerrada DIA podría ser la entrante mal pesada
+                        hips.append(Hipotesis(
+                            tipo='GENEALOGIA_ENT_CERR',
+                            peso=peso_d,
+                            accion=f'Cerr DIA {int(peso_d)} es entrante {ent_peso} ({ent_turno}) con error pesaje {int(diff)}g. Corregir a {ent_peso}',
+                            delta_stock=ent_peso - peso_d,  # ajuste por diferencia de peso
+                            delta_latas=0,
+                            sightings=sightings_d,
+                        ))
+                        break  # una sola entrante rival por cerrada
+
+            # Para cerradas que APARECEN en NOCHE (sin match en DIA)
+            for peso_n, sightings_n in p2.aparecen:
+                for ent_peso, ent_turno in entrantes_recientes:
+                    diff = abs(peso_n - ent_peso)
+                    if diff <= 30:
+                        # Cerrada NOCHE es la entrante promovida (peso coherente)
+                        # Esto no necesita corrección por sí solo, pero refuerza
+                        # que la cerrada tiene genealogía legítima
+                        hips.append(Hipotesis(
+                            tipo='GENEALOGIA_ENT_CERR',
+                            peso=peso_n,
+                            accion=f'Cerr NOCHE {int(peso_n)} es entrante {ent_peso} ({ent_turno}) promovida. Genealogia confirmada.',
+                            delta_stock=0,  # sin corrección, solo identidad
+                            delta_latas=0,
+                            sightings=sightings_n,
+                        ))
+                        break
+
     return hips
 
 
@@ -459,6 +509,9 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
         elif h.tipo == 'MISMATCH_LEVE':
             h.planos_neutros.append('P1')
 
+        elif h.tipo == 'GENEALOGIA_ENT_CERR':
+            h.planos_neutros.append('P1')  # P1 no dice nada sobre genealogia
+
         # --- Evaluar P2 ---
         if h.tipo == 'PHANTOM_DIA':
             if h.sightings <= 1:
@@ -494,6 +547,10 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
         elif h.tipo == 'MISMATCH_LEVE':
             h.planos_favor.append('P2')  # solo P2
 
+        elif h.tipo == 'GENEALOGIA_ENT_CERR':
+            # P2: la genealogía explica la cerrada — a favor
+            h.planos_favor.append('P2_GENEALOGIA')
+
         elif h.tipo == 'ENTRANTE_MISMO_CAN':
             h.planos_neutros.append('P2')
 
@@ -510,6 +567,9 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
         elif h.tipo == 'ENTRANTE_MISMO_CAN':
             # P3 a favor: la corrección elimina un entrante fantasma
             h.planos_favor.append('P3')
+        elif h.tipo == 'GENEALOGIA_ENT_CERR':
+            # P3 a favor: hay entrante en timeline que explica la cerrada
+            h.planos_favor.append('P3_GENEALOGIA')
         else:
             h.planos_neutros.append('P3')
 
@@ -544,20 +604,27 @@ def _paso5_seleccionar(hips: List[Hipotesis], sc, p2: PlanoP2
     mejor = viables[0]
 
     # Guardia bilateral: si la mejor es unilateral (PHANTOM/APERTURA) pero
-    # hay un MISMATCH_LEVE viable para OTRO slot del mismo episodio,
-    # el caso requiere resolución conjunta → no resolver unilateralmente.
-    # Condiciones: (1) mismatch no descartado por absurdo (n_contra == 0),
-    # (2) mismatch toca otro slot del mismo bloque causal de cerradas,
-    # (3) la unilateral no explica el cuadro completo sin resto.
+    # hay un MISMATCH_LEVE o GENEALOGIA viable para OTRO slot del mismo episodio,
+    # la unilateral no puede resolverse sola — buscar si hay una GENEALOGIA
+    # que explique mejor el cuadro. Si la hay, usarla. Si no, H0.
     if mejor.tipo in ('PHANTOM_DIA', 'APERTURA_REAL'):
         mismatch_viable = [h for h in hips
-                           if h.tipo == 'MISMATCH_LEVE'
+                           if h.tipo in ('MISMATCH_LEVE', 'GENEALOGIA_ENT_CERR')
                            and h.peso != mejor.peso
                            and h.n_contra == 0]
         if mismatch_viable:
-            # Hay estructura bilateral: un slot desaparece + otro es mismatch
-            # El sistema no tiene derecho a resolver uno sin el otro
-            return None
+            # Hay estructura bilateral. ¿Hay una GENEALOGIA que explique
+            # el slot conflictivo directamente?
+            genealogia_del_mismo_slot = [h for h in viables
+                                         if h.tipo == 'GENEALOGIA_ENT_CERR'
+                                         and h.peso == mejor.peso]
+            if genealogia_del_mismo_slot:
+                # La genealogía explica la cerrada que "desaparece" —
+                # reemplazar la hipótesis unilateral por la genealogía
+                mejor = genealogia_del_mismo_slot[0]
+            else:
+                # Sin genealogía directa → H0
+                return None
 
     # Regla ≥2 planos independientes
     if mejor.independientes < 2:
@@ -573,6 +640,9 @@ def _paso5_seleccionar(hips: List[Hipotesis], sc, p2: PlanoP2
             mejor._tipo_d_override = True
         elif mejor.tipo == 'ENTRANTE_MISMO_CAN':
             # Entrante mismo can con P3 + P1_REDUCTIO o solo P3 -> FORZADO o ESTIMADO
+            mejor._tipo_d_override = True
+        elif mejor.tipo == 'GENEALOGIA_ENT_CERR':
+            # Genealogia con 1 plano -> ESTIMADO
             mejor._tipo_d_override = True
         else:
             return None
@@ -646,7 +716,7 @@ def _resolver_sabor(nombre: str, clasificado: SaborClasificado,
     p3 = _paso2_plano3(nombre, datos, timeline)
 
     # PASO 3
-    hips = _paso3_hipotesis(sc, p1, p2, p3)
+    hips = _paso3_hipotesis(sc, p1, p2, p3, timeline=timeline)
     if not hips:
         return None
 
@@ -680,7 +750,7 @@ def _resolver_sabor(nombre: str, clasificado: SaborClasificado,
     venta_corr = sc.venta_raw + mejor.delta_stock + mejor.delta_latas * 280
 
     tipo_res = TipoResolucion.RESUELTO_INDIVIDUAL
-    if mejor.tipo == 'MISMATCH_LEVE':
+    if mejor.tipo in ('MISMATCH_LEVE', 'CONJUNTO_BILATERAL'):
         tipo_res = TipoResolucion.RESUELTO_CONJUNTO
 
     motivo_planos = f"P_favor={mejor.planos_favor}, P_contra={mejor.planos_contra}"

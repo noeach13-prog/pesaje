@@ -655,24 +655,24 @@ def test_matching_consistencia_c3_c4(dia):
 # E) GUARDIA BILATERAL — Capa 4
 # ===================================================================
 
-def test_bilateral_sambayon_d28_no_resuelve_unilateral():
+def test_bilateral_sambayon_d28_resuelto_por_genealogia():
     """
     CASO CONCRETO: SAMBAYON D28.
     cerr DIA [6450, 6675] -> cerr NOCHE [6575].
-    6675 desaparece (PHANTOM candidato), 6450->6575 es mismatch (125g).
-    El sistema NO debe resolver PHANTOM_DIA unilateral porque existe
-    MISMATCH_LEVE del otro slot en el mismo episodio.
-    Debe caer a H0.
+    La 6675 no tiene historia como entrante, pero la entrante 6575 de D27
+    esta a 100g de distancia. Genealogia entrante->cerrada identifica
+    que 6675 = 6575 + error de pesaje.
+    El sistema DEBE resolver por GENEALOGIA_ENT_CERR con delta=-100g.
     """
     _, cont, c3, c4 = _correr_pipeline(28)
 
-    assert 'SAMBAYON' in c4.sin_resolver, \
-        'SAMBAYON D28 fue resuelto — deberia estar en H0 por estructura bilateral'
-
-    samb = c3.sabores.get('SAMBAYON')
-    assert samb is not None
-    assert samb.prototipo is None, \
-        f'SAMBAYON no deberia tener prototipo C3, tiene {samb.prototipo}'
+    samb_corr = next((c for c in c4.correcciones if c.nombre_norm == 'SAMBAYON'), None)
+    assert samb_corr is not None, \
+        'SAMBAYON D28 no fue resuelto — deberia resolverse por genealogia'
+    assert 'GENEALOGIA_ENT_CERR' in samb_corr.motivo, \
+        f'SAMBAYON D28 resuelto por {samb_corr.motivo[:40]}, esperaba GENEALOGIA_ENT_CERR'
+    assert samb_corr.delta == -100, \
+        f'SAMBAYON D28 delta={samb_corr.delta}, esperaba -100 (correccion 6675->6575)'
 
 
 def test_bilateral_no_veta_phantom_limpio():
