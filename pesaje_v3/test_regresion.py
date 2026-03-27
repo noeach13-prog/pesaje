@@ -610,6 +610,114 @@ def test_arbitro_coherencia_no_filtra_cuando_ambas_razonables():
 
 
 # ===================================================================
+# E) GUARDIA BILATERAL — Capa 4
+# ===================================================================
+
+def test_bilateral_sambayon_d28_no_resuelve_unilateral():
+    """
+    CASO CONCRETO: SAMBAYON D28.
+    cerr DIA [6450, 6675] -> cerr NOCHE [6575].
+    6675 desaparece (PHANTOM candidato), 6450->6575 es mismatch (125g).
+    El sistema NO debe resolver PHANTOM_DIA unilateral porque existe
+    MISMATCH_LEVE del otro slot en el mismo episodio.
+    Debe caer a H0.
+    """
+    _, cont, c3, c4 = _correr_pipeline(28)
+
+    assert 'SAMBAYON' in c4.sin_resolver, \
+        'SAMBAYON D28 fue resuelto — deberia estar en H0 por estructura bilateral'
+
+    samb = c3.sabores.get('SAMBAYON')
+    assert samb is not None
+    assert samb.prototipo is None, \
+        f'SAMBAYON no deberia tener prototipo C3, tiene {samb.prototipo}'
+
+
+def test_bilateral_no_veta_phantom_limpio():
+    """
+    CONTRA-TEST: PHANTOM_DIA limpio (sin mismatch rival del mismo episodio)
+    debe seguir resolviendose normalmente.
+    """
+    from pesaje_v3.capa4_expediente import (
+        Hipotesis, PlanoP2, _paso5_seleccionar,
+    )
+    from pesaje_v3.modelos import SaborContable
+
+    sc = SaborContable(
+        nombre_norm='TEST', nombre_display='Test',
+        total_a=10000, total_b=4000, new_ent_b=0,
+        n_cerr_a=1, n_cerr_b=0, n_latas=1, ajuste_latas=280,
+        venta_raw=5720,
+    )
+    p2 = PlanoP2(
+        cerr_a=[6500], cerr_b=[],
+        desaparecen=[(6500, 1)],
+        aparecen=[],
+        persisten=[],
+    )
+
+    # PHANTOM_DIA con convergencia (P1+P2), sin mismatch rival
+    phantom = Hipotesis(
+        tipo='PHANTOM_DIA', peso=6500,
+        accion='Eliminar cerr 6500', delta_stock=-6500, delta_latas=-1,
+        planos_favor=['P1', 'P2'], planos_contra=[], sightings=1,
+    )
+
+    hips = [phantom]
+    mejor = _paso5_seleccionar(hips, sc, p2)
+
+    assert mejor is not None, 'PHANTOM limpio sin mismatch rival deberia resolverse'
+    assert mejor.tipo == 'PHANTOM_DIA'
+
+
+def test_bilateral_mismatch_incoherente_no_veta():
+    """
+    BORDE: un MISMATCH_LEVE que fue descartado por incoherencia fisica
+    (planos_contra no vacio) NO debe vetar una unilateral valida.
+    La guardia solo aplica para mismatch viable (sin contra).
+    """
+    from pesaje_v3.capa4_expediente import (
+        Hipotesis, PlanoP2, _paso5_seleccionar,
+    )
+    from pesaje_v3.modelos import SaborContable
+
+    sc = SaborContable(
+        nombre_norm='TEST', nombre_display='Test',
+        total_a=15000, total_b=8000, new_ent_b=0,
+        n_cerr_a=2, n_cerr_b=1, n_latas=1, ajuste_latas=280,
+        venta_raw=6720,
+    )
+    p2 = PlanoP2(
+        cerr_a=[6500, 6700], cerr_b=[6600],
+        desaparecen=[(6500, 1), (6700, 3)],
+        aparecen=[(6600, 2)],
+        persisten=[],
+    )
+
+    # PHANTOM_DIA de 6700 con convergencia
+    phantom = Hipotesis(
+        tipo='PHANTOM_DIA', peso=6700,
+        accion='Eliminar cerr 6700', delta_stock=-6700, delta_latas=-1,
+        planos_favor=['P1', 'P2'], planos_contra=[], sightings=1,
+    )
+
+    # MISMATCH_LEVE de 6500->6600 pero CON contra (incoherente)
+    mismatch = Hipotesis(
+        tipo='MISMATCH_LEVE', peso=6500,
+        accion='Ajuste 6500->6600', delta_stock=-100, delta_latas=0,
+        planos_favor=['P2'], planos_contra=['COHERENCIA_HIGH'], sightings=2,
+    )
+
+    hips = [phantom, mismatch]
+    mejor = _paso5_seleccionar(hips, sc, p2)
+
+    # El mismatch tiene contra -> no es viable -> no debe vetar phantom
+    assert mejor is not None, \
+        'PHANTOM deberia resolverse porque el mismatch rival fue descartado por incoherencia'
+    assert mejor.tipo == 'PHANTOM_DIA'
+
+
+# ===================================================================
 # MAIN
 # ===================================================================
 

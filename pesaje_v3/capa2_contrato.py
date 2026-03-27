@@ -82,18 +82,34 @@ def calcular_contabilidad(datos: DatosDia) -> ContabilidadDia:
 
         # Ajuste entrante promovido a cerrada:
         # Si una cerrada NOCHE matchea con un entrante DIA (y NO con cerrada DIA),
-        # es un entrante que se convirtió en cerrada. No es stock nuevo.
-        # Compensar sumando su peso a new_ent_b (equivale a excluirla de total_B).
+        # es un entrante que se convirtió en cerrada.
+        # PERO: total_A ya incluye el entrante y total_B ya incluye la cerrada,
+        # así que la promoción se cancela naturalmente en total_A - total_B.
+        # El ajuste solo aplica cuando el entrante DIA TAMBIÉN persiste en NOCHE
+        # como entrante (no fue consumido). En ese caso, total_B cuenta la cerrada
+        # promovida + el entrante persistente, y necesitamos compensar.
         ajuste_promo = 0
         restantes_ent_a = list(d.entrantes)
         for cn in n.cerradas:
             # Ya matchea con cerrada DIA? -> no es promocion
             if any(abs(cn - cd) <= 200 for cd in d.cerradas):
                 continue
-            # Matchea con entrante DIA? -> es promocion
+            # Matchea con entrante DIA? -> posible promocion
             for i, ea in enumerate(restantes_ent_a):
                 if abs(cn - ea) <= 100:
-                    ajuste_promo += cn
+                    # Solo ajustar si el entrante NO persiste en NOCHE
+                    # (si persiste, total_B ya lo cuenta correctamente)
+                    ent_persiste = any(abs(ea - en) <= 50 for en in n.entrantes)
+                    if not ent_persiste:
+                        # Entrante DIA se convirtió en cerrada NOCHE y desapareció
+                        # como entrante. total_A tiene el ent, total_B tiene la cerr.
+                        # Se cancelan. NO ajustar.
+                        pass
+                    else:
+                        # Entrante DIA persiste en NOCHE como entrante Y apareció
+                        # como cerrada NOCHE. El entrante en total_B resta doble.
+                        # Compensar sumando el peso de la cerrada promovida.
+                        ajuste_promo += cn
                     restantes_ent_a.pop(i)
                     break
 

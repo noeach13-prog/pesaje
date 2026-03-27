@@ -355,22 +355,30 @@ def _paso3_hipotesis(sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3) -> List[Hipotesi
             ))
 
     # --- 3f: Cerradas sin match formal pero con diff moderada (30-200g) ---
-    # Cuando P2 no matcheó (diff>30g) pero son plausiblemente el mismo can
-    if len(p2.desaparecen) == 1 and len(p2.aparecen) == 1:
-        ca_peso, ca_sight = p2.desaparecen[0]
-        cb_peso, cb_sight = p2.aparecen[0]
-        diff = abs(ca_peso - cb_peso)
-        if 30 < diff <= 200:
-            # Hipótesis: mismo can, varianza de pesaje
-            delta = ca_peso - cb_peso  # si DIA>NOCHE -> venta disminuye
+    # Buscar pares plausibles entre desaparecen y aparecen (greedy por menor diff)
+    restantes_aparecen = list(p2.aparecen)
+    for ca_peso, ca_sight in p2.desaparecen:
+        mejor_match = None
+        mejor_diff = 999
+        mejor_idx = -1
+        for i, (cb_peso, cb_sight) in enumerate(restantes_aparecen):
+            diff = abs(ca_peso - cb_peso)
+            if 30 < diff <= 200 and diff < mejor_diff:
+                mejor_match = (cb_peso, cb_sight)
+                mejor_diff = diff
+                mejor_idx = i
+        if mejor_match:
+            cb_peso, cb_sight = mejor_match
+            delta = ca_peso - cb_peso
             hips.append(Hipotesis(
                 tipo='MISMATCH_LEVE',
                 peso=ca_peso,
-                accion=f'Ajuste pesaje cerr {int(ca_peso)}->{int(cb_peso)} ({int(diff)}g)',
+                accion=f'Ajuste pesaje cerr {int(ca_peso)}->{int(cb_peso)} ({int(mejor_diff)}g)',
                 delta_stock=-delta,
                 delta_latas=0,
                 sightings=max(ca_sight, cb_sight),
             ))
+            restantes_aparecen.pop(mejor_idx)
 
     # --- 3g: Entrante mismo can con matching amplio (50-200g) ---
     # Cuando P3 no matcheó dos entrantes que son plausiblemente el mismo
@@ -426,13 +434,31 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
                 h.planos_contra.append('P1')
 
         elif h.tipo == 'APERTURA_REAL':
+            # Guardia: si la cerrada desaparecida tiene competidora mismatch
+            # en NOCHE (30-200g), apertura pierde privilegio de confirmación.
+            tiene_mismatch_competitivo = False
+            for cb_peso, _ in p2.aparecen:
+                if 30 < abs(h.peso - cb_peso) <= 200:
+                    tiene_mismatch_competitivo = True
+                    break
+
             if p1.clasificacion == 'APERTURA_SOPORTADA' and p1.fuente == h.peso:
-                h.planos_favor.append('P1')
+                if tiene_mismatch_competitivo:
+                    # Apertura soportada pero con rival mismatch → neutro, no favor
+                    h.planos_neutros.append('P1')
+                else:
+                    h.planos_favor.append('P1')
             elif p1.clasificacion == 'APERTURA_PLAUSIBLE_NO_CONFIRMADA':
-                h.planos_favor.append('P1')
+                if tiene_mismatch_competitivo:
+                    h.planos_neutros.append('P1')
+                else:
+                    h.planos_favor.append('P1')
             elif sc.n_cerr_a > sc.n_cerr_b:
-                # Ab no sube pero hay menos cerradas → apertura con venta fuerte
-                h.planos_favor.append('P1_CONTEO')
+                if tiene_mismatch_competitivo:
+                    # Apertura por conteo + mismatch rival → contra
+                    h.planos_contra.append('P1_MISMATCH_RIVAL')
+                else:
+                    h.planos_favor.append('P1_CONTEO')
             else:
                 h.planos_neutros.append('P1')
 
@@ -522,6 +548,22 @@ def _paso5_seleccionar(hips: List[Hipotesis], sc, p2: PlanoP2
     viables.sort(key=lambda h: (h.independientes, h.n_favor), reverse=True)
 
     mejor = viables[0]
+
+    # Guardia bilateral: si la mejor es unilateral (PHANTOM/APERTURA) pero
+    # hay un MISMATCH_LEVE viable para OTRO slot del mismo episodio,
+    # el caso requiere resolución conjunta → no resolver unilateralmente.
+    # Condiciones: (1) mismatch no descartado por absurdo (n_contra == 0),
+    # (2) mismatch toca otro slot del mismo bloque causal de cerradas,
+    # (3) la unilateral no explica el cuadro completo sin resto.
+    if mejor.tipo in ('PHANTOM_DIA', 'APERTURA_REAL'):
+        mismatch_viable = [h for h in hips
+                           if h.tipo == 'MISMATCH_LEVE'
+                           and h.peso != mejor.peso
+                           and h.n_contra == 0]
+        if mismatch_viable:
+            # Hay estructura bilateral: un slot desaparece + otro es mismatch
+            # El sistema no tiene derecho a resolver uno sin el otro
+            return None
 
     # Regla ≥2 planos independientes
     if mejor.independientes < 2:

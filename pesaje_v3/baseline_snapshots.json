@@ -1341,16 +1341,13 @@
         "banda": "CONFIRMADO"
       },
       {
-        "nombre": "SAMBAYON",
-        "delta": 0,
-        "banda": "CONFIRMADO"
-      },
-      {
         "nombre": "VAINILLA",
         "delta": -60,
         "banda": "ESTIMADO"
       }
     ],
-    "sin_resolver": []
+    "sin_resolver": [
+      "SAMBAYON"
+    ]
   }
 }
