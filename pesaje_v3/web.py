@@ -49,11 +49,17 @@ def _procesar(path_in: str, filename: str):
         resultado = _armar_resultado(datos, cont, c3, c4)
         resultados.append((datos, cont, c3, c4, resultado))
 
-    # Exportar
+    # Exportar Excel
     stem = Path(filename).stem
     output_name = f"Reporte_{stem}.xlsx"
     tmp_out = os.path.join(tempfile.gettempdir(), output_name)
     exportar_multi(resultados, tmp_out)
+
+    # Exportar PDF
+    from pesaje_v3.export_pdf import generar_pdf
+    pdf_name = f"Reporte_{stem}.pdf"
+    pdf_path = os.path.join(tempfile.gettempdir(), pdf_name)
+    generar_pdf(path_in, pdf_path)
 
     # Stats
     total_dias = len(resultados)
@@ -66,6 +72,8 @@ def _procesar(path_in: str, filename: str):
     return {
         'output_name': output_name,
         'output_path': tmp_out,
+        'pdf_name': pdf_name,
+        'pdf_path': pdf_path,
         'n_dias': total_dias,
         'n_correcciones': total_corr,
         'n_sin_resolver': total_h0,
@@ -216,9 +224,14 @@ _PAGE = """<!DOCTYPE html>
         <td>{{ result.n_sin_resolver }}</td>
       </tr>
     </table>
-    <a class="dl-btn" href="/download/{{ result.output_name }}">
-      Descargar {{ result.output_name }}
-    </a>
+    <div style="display:flex; gap:10px; margin-top:8px;">
+      <a class="dl-btn" href="/download/{{ result.output_name }}" style="flex:1;">
+        Descargar Excel
+      </a>
+      <a class="dl-btn" href="/download/{{ result.pdf_name }}" style="flex:1; background:#1e3a5f;">
+        Descargar PDF
+      </a>
+    </div>
   </div>
   {% endif %}
 
@@ -273,6 +286,7 @@ def index():
                 elapsed = time.time() - t0
 
                 _outputs[stats['output_name']] = stats['output_path']
+                _outputs[stats['pdf_name']] = stats['pdf_path']
                 result = stats
                 result['elapsed'] = f'{elapsed:.1f}s'
                 result['input_name'] = f.filename
