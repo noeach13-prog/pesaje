@@ -200,7 +200,7 @@ def baseline():
     return _cargar_baseline()
 
 
-@pytest.mark.parametrize('dia', [5, 25, 27, 28])
+@pytest.mark.parametrize('dia', [5, 12, 25, 27, 28])
 def test_snapshot_sabores(baseline, dia):
     """Cada sabor debe tener mismo status, venta_final_c3 y prototipo."""
     _, cont, c3, c4 = _correr_pipeline(dia)
@@ -213,7 +213,7 @@ def test_snapshot_sabores(baseline, dia):
         assert act == exp, f'D{dia} {nombre}: actual={act} != esperado={exp}'
 
 
-@pytest.mark.parametrize('dia', [5, 25, 27, 28])
+@pytest.mark.parametrize('dia', [5, 12, 25, 27, 28])
 def test_snapshot_escalados(baseline, dia):
     """Mismo set de escalados con mismo status, flags y prototipo_is_none."""
     _, cont, c3, c4 = _correr_pipeline(dia)
@@ -224,7 +224,7 @@ def test_snapshot_escalados(baseline, dia):
         f'D{dia} escalados differ: actual={list(actual["escalados"].keys())} esperado={list(esperado["escalados"].keys())}'
 
 
-@pytest.mark.parametrize('dia', [5, 25, 27, 28])
+@pytest.mark.parametrize('dia', [5, 12, 25, 27, 28])
 def test_snapshot_correcciones_c4(baseline, dia):
     """Mismas correcciones C4 (nombre, delta, banda)."""
     _, cont, c3, c4 = _correr_pipeline(dia)
@@ -235,7 +235,7 @@ def test_snapshot_correcciones_c4(baseline, dia):
         f'D{dia} correcciones C4 differ'
 
 
-@pytest.mark.parametrize('dia', [5, 25, 27, 28])
+@pytest.mark.parametrize('dia', [5, 12, 25, 27, 28])
 def test_snapshot_totales(baseline, dia):
     """venta_raw_total y vdp_total deben coincidir."""
     _, cont, c3, c4 = _correr_pipeline(dia)
@@ -247,7 +247,7 @@ def test_snapshot_totales(baseline, dia):
     assert actual['vdp_total'] == esperado['vdp_total']
 
 
-@pytest.mark.parametrize('dia', [5, 25, 27, 28])
+@pytest.mark.parametrize('dia', [5, 12, 25, 27, 28])
 def test_integracion_c4_mismos_expedientes(baseline, dia):
     """C4 debe abrir los mismos expedientes (3 ejes de equivalencia)."""
     _, cont, c3, c4 = _correr_pipeline(dia)
@@ -607,6 +607,48 @@ def test_arbitro_coherencia_no_filtra_cuando_ambas_razonables():
     # Ambas razonables, misma confianza, ninguna es PF1 → conflicto genuino → escalar
     assert decision.resolucion == ResolucionC3.ESCALAR_C4, \
         f'El arbitro no escalo ante conflicto genuino. resolucion={decision.resolucion}'
+
+
+# ===================================================================
+# E-bis) MATCHING UNIFICADO — Capa 3 y Capa 4 usan la misma funcion
+# ===================================================================
+
+@pytest.mark.parametrize('dia', [5, 12, 25, 27, 28])
+def test_matching_consistencia_c3_c4(dia):
+    """
+    Capa 3 (_observar) y Capa 4 (_paso2_plano2) deben producir el mismo
+    set de cerradas unmatched, porque ambas usan matching.match_cerradas.
+    """
+    from pesaje_v3.capa1_parser import cargar_dia
+    from pesaje_v3.capa2_contrato import calcular_contabilidad
+    from pesaje_v3.capa3_motor import canonicalizar_nombres, aplicar_canonicalizacion, _observar
+    from pesaje_v3.capa4_expediente import _paso1_timeline, _paso2_plano2
+
+    datos = cargar_dia(EXCEL, dia)
+    canon = canonicalizar_nombres(datos)
+    aplicar_canonicalizacion(datos, canon)
+    cont = calcular_contabilidad(datos)
+
+    for nombre, sc in cont.sabores.items():
+        if sc.solo_dia or sc.solo_noche:
+            continue
+
+        obs = _observar(nombre, sc, datos)
+        timeline = _paso1_timeline(nombre, datos)
+        p2 = _paso2_plano2(nombre, datos, timeline)
+
+        # Extraer pesos unmatched de Capa 3
+        c3_unm_dia = sorted(s.peso for s in obs.cerradas_unmatched_dia)
+        c3_unm_noche = sorted(s.peso for s in obs.cerradas_unmatched_noche)
+
+        # Extraer pesos unmatched de Capa 4
+        c4_unm_dia = sorted(p for p, _ in p2.desaparecen)
+        c4_unm_noche = sorted(p for p, _ in p2.aparecen)
+
+        assert c3_unm_dia == c4_unm_dia, \
+            f'D{dia} {nombre}: unmatched DIA difiere. C3={c3_unm_dia} C4={c4_unm_dia}'
+        assert c3_unm_noche == c4_unm_noche, \
+            f'D{dia} {nombre}: unmatched NOCHE difiere. C3={c3_unm_noche} C4={c4_unm_noche}'
 
 
 # ===================================================================

@@ -207,26 +207,20 @@ def _paso2_plano2(nombre: str, datos: DatosDia, timeline: List[Snapshot]) -> Pla
     if not d or not n:
         return PlanoP2([], [], [], [], [])
 
-    cerr_a = sorted(d.cerradas)
-    cerr_b = sorted(n.cerradas)
+    from .matching import match_cerradas
+    cerr_a = list(d.cerradas)
+    cerr_b = list(n.cerradas)
+    mr = match_cerradas(cerr_a, cerr_b)
 
-    # Match ±30g (greedy best-match)
     matches = []
-    used_b = set()
-    for ca in cerr_a:
-        best_i, best_diff = -1, 9999
-        for i, cb in enumerate(cerr_b):
-            if i not in used_b and abs(ca - cb) < best_diff:
-                best_i, best_diff = i, abs(ca - cb)
-        if best_i >= 0 and best_diff <= 30:
-            s = _count_sightings(ca, timeline)
-            matches.append((ca, cerr_b[best_i], best_diff, s))
-            used_b.add(best_i)
+    for ia, ib, pa, pb, diff in mr.matched:
+        s = _count_sightings(pa, timeline)
+        matches.append((pa, pb, diff, s))
 
-    unmatched_a = [(ca, _count_sightings(ca, timeline))
-                   for ca in cerr_a if not any(ca == m[0] for m in matches)]
-    unmatched_b = [(cerr_b[i], _count_sightings(cerr_b[i], timeline))
-                   for i in range(len(cerr_b)) if i not in used_b]
+    unmatched_a = [(cerr_a[ia], _count_sightings(cerr_a[ia], timeline))
+                   for ia in mr.unmatched_a]
+    unmatched_b = [(cerr_b[ib], _count_sightings(cerr_b[ib], timeline))
+                   for ib in mr.unmatched_b]
 
     all_sightings = {}
     for c in cerr_a + cerr_b:

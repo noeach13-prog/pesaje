@@ -1349,5 +1349,370 @@
     "sin_resolver": [
       "SAMBAYON"
     ]
+  },
+  "12": {
+    "venta_raw_total": 33065,
+    "vdp_total": 0,
+    "sabores": {
+      "AMARGO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1405,
+        "prototipo": null
+      },
+      "AMERICANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 800,
+        "prototipo": null
+      },
+      "ANANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 940,
+        "prototipo": null
+      },
+      "B, SPLIT": {
+        "status": "COMPUESTO",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "BLANCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 380,
+        "prototipo": null
+      },
+      "BOSQUE": {
+        "status": "SENAL",
+        "venta_final_c3": 1410,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 190
+        }
+      },
+      "CABSHA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 620,
+        "prototipo": null
+      },
+      "CADBURY": {
+        "status": "SENAL",
+        "venta_final_c3": 790,
+        "prototipo": {
+          "codigo": "PF1",
+          "delta": -300
+        }
+      },
+      "CEREZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 575,
+        "prototipo": null
+      },
+      "CH AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 545,
+        "prototipo": null
+      },
+      "CH C/ALM": {
+        "status": "LIMPIO",
+        "venta_final_c3": 500,
+        "prototipo": null
+      },
+      "CHOCOLATE": {
+        "status": "COMPUESTO",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "CHOCOLATE DUBAI": {
+        "status": "SENAL",
+        "venta_final_c3": 2225,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 195
+        }
+      },
+      "CIELO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 400,
+        "prototipo": null
+      },
+      "COCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 140,
+        "prototipo": null
+      },
+      "COOKIES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 150,
+        "prototipo": null
+      },
+      "D. GRANIZADO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1095,
+        "prototipo": null
+      },
+      "DOS CORAZONES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 400,
+        "prototipo": null
+      },
+      "DULCE AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1755,
+        "prototipo": null
+      },
+      "DULCE C/NUEZ": {
+        "status": "LIMPIO",
+        "venta_final_c3": 215,
+        "prototipo": null
+      },
+      "DULCE D LECHE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1570,
+        "prototipo": null
+      },
+      "DURAZNO": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "FERRERO": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "FLAN": {
+        "status": "LIMPIO",
+        "venta_final_c3": 800,
+        "prototipo": null
+      },
+      "FRAMBUEZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 470,
+        "prototipo": null
+      },
+      "FRANUI": {
+        "status": "LIMPIO",
+        "venta_final_c3": 805,
+        "prototipo": null
+      },
+      "FRUTILLA AGUA": {
+        "status": "SENAL",
+        "venta_final_c3": 5660,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 5545
+        }
+      },
+      "FRUTILLA CREMA": {
+        "status": "SENAL",
+        "venta_final_c3": 2135,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 0
+        }
+      },
+      "FRUTILLA REINA": {
+        "status": "COMPUESTO",
+        "venta_final_c3": 455,
+        "prototipo": {
+          "codigo": "PF5",
+          "delta": 6275
+        }
+      },
+      "GRANIZADO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1210,
+        "prototipo": null
+      },
+      "IRLANDESA": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "KINDER": {
+        "status": "LIMPIO",
+        "venta_final_c3": 240,
+        "prototipo": null
+      },
+      "KITKAT": {
+        "status": "LIMPIO",
+        "venta_final_c3": 380,
+        "prototipo": null
+      },
+      "LEMON PIE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 370,
+        "prototipo": null
+      },
+      "LIMON": {
+        "status": "COMPUESTO",
+        "venta_final_c3": -4350,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 5
+        }
+      },
+      "MANTECOL": {
+        "status": "LIMPIO",
+        "venta_final_c3": 530,
+        "prototipo": null
+      },
+      "MANZANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 65,
+        "prototipo": null
+      },
+      "MARACUYA": {
+        "status": "SENAL",
+        "venta_final_c3": 5545,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 5315
+        }
+      },
+      "MARROC": {
+        "status": "LIMPIO",
+        "venta_final_c3": 305,
+        "prototipo": null
+      },
+      "MASCARPONE": {
+        "status": "SENAL",
+        "venta_final_c3": 1175,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 5
+        }
+      },
+      "MENTA": {
+        "status": "SENAL",
+        "venta_final_c3": 5360,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 4110
+        }
+      },
+      "MIX DE FRUTA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 330,
+        "prototipo": null
+      },
+      "MOUSSE LIMON": {
+        "status": "LIMPIO",
+        "venta_final_c3": 635,
+        "prototipo": null
+      },
+      "NUTE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 315,
+        "prototipo": null
+      },
+      "PISTACHO": {
+        "status": "SENAL",
+        "venta_final_c3": 5180,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 4750
+        }
+      },
+      "RUSA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 450,
+        "prototipo": null
+      },
+      "SAMBAYON": {
+        "status": "SENAL",
+        "venta_final_c3": 1825,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 1435
+        }
+      },
+      "SAMBAYON AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 560,
+        "prototipo": null
+      },
+      "SUPER": {
+        "status": "SOLO_DIA",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "TIRAMISU": {
+        "status": "LIMPIO",
+        "venta_final_c3": 355,
+        "prototipo": null
+      },
+      "TRAMONTANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 520,
+        "prototipo": null
+      },
+      "VAINILLA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 960,
+        "prototipo": null
+      }
+    },
+    "escalados": {
+      "B, SPLIT": {
+        "status": "COMPUESTO",
+        "flags": [
+          "C4d:6550",
+          "HIGH"
+        ],
+        "prototipo_is_none": true
+      },
+      "CHOCOLATE": {
+        "status": "COMPUESTO",
+        "flags": [
+          "AB_UP",
+          "C4d:6530"
+        ],
+        "prototipo_is_none": true
+      },
+      "DURAZNO": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6665",
+          "C4n:6605"
+        ],
+        "prototipo_is_none": true
+      },
+      "FERRERO": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6585",
+          "C4n:6505"
+        ],
+        "prototipo_is_none": true
+      },
+      "IRLANDESA": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6610",
+          "C4n:6670"
+        ],
+        "prototipo_is_none": true
+      }
+    },
+    "correcciones_c4": [
+      {
+        "nombre": "B, SPLIT",
+        "delta": -6550,
+        "banda": "CONFIRMADO"
+      },
+      {
+        "nombre": "DURAZNO",
+        "delta": -60,
+        "banda": "ESTIMADO"
+      },
+      {
+        "nombre": "FERRERO",
+        "delta": -80,
+        "banda": "ESTIMADO"
+      }
+    ],
+    "sin_resolver": [
+      "CHOCOLATE",
+      "IRLANDESA"
+    ]
   }
 }
