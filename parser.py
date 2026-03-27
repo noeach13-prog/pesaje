@@ -156,11 +156,39 @@ def _is_employee(text) -> Optional[str]:
 
 # ── Row helpers ───────────────────────────────────────────────────────────────
 
+def _recuperar_fraccion_fecha(dt_val) -> str:
+    """
+    Excel convierte fracciones como 1/4 en fechas (1 de abril).
+    Si el valor es datetime, intentar recuperar la fraccion original.
+    Fracciones conocidas: 1/2 (1 feb), 1/4 (1 abr), 3/4 (3 abr),
+    1/3 (1 mar), 2/3 (2 mar), 1/8 (1 ago).
+    """
+    if not isinstance(dt_val, datetime.datetime):
+        return ''
+    d, m = dt_val.day, dt_val.month
+    fracciones = {
+        (1, 2): '1/2',
+        (1, 4): '1/4',
+        (3, 4): '3/4',
+        (2, 4): '2/4',
+        (1, 3): '1/3',
+        (2, 3): '2/3',
+        (1, 8): '1/8',
+    }
+    return fracciones.get((d, m), '')
+
+
 def _parse_ventas_text(cell_value) -> list:
     """Extract SaleEntry items from a cell that may contain multiple unit descriptions."""
     if cell_value is None:
         return []
     if isinstance(cell_value, datetime.datetime):
+        # Intentar recuperar fraccion que Excel convirtio en fecha
+        fraccion = _recuperar_fraccion_fecha(cell_value)
+        if fraccion:
+            grams = text_to_grams(fraccion)
+            if grams > 0:
+                return [SaleEntry(raw_text=fraccion, grams=grams)]
         return []
     text = str(cell_value).strip()
     if not text:

@@ -1,7 +1,7 @@
 {
   "5": {
     "venta_raw_total": 35410,
-    "vdp_total": 500,
+    "vdp_total": 750,
     "sabores": {
       "AMARGO": {
         "status": "LIMPIO",
@@ -1045,7 +1045,7 @@
   },
   "27": {
     "venta_raw_total": 33560,
-    "vdp_total": 0,
+    "vdp_total": 250,
     "sabores": {
       "AMARGO": {
         "status": "LIMPIO",
@@ -1341,7 +1341,7 @@
   },
   "28": {
     "venta_raw_total": 57440,
-    "vdp_total": 2270,
+    "vdp_total": 2770,
     "sabores": {
       "AMARGO": {
         "status": "LIMPIO",
