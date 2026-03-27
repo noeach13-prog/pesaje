@@ -303,6 +303,66 @@ def _paso3_hipotesis(sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3,
                 sightings=sightings,
             ))
 
+    # --- 3a-bis: Continuidad de conteo — detección de cerrada duplicada ---
+    # Patrón sándwich: turno previo N cerr → DIA N+1 cerr → NOCHE N cerr,
+    # sin entrante que justifique la cerrada extra, y dos cerradas de DIA
+    # con diff ≤30g (varianza de pesaje de misma lata).
+    if timeline and len(timeline) >= 3 and sc.n_cerr_a > sc.n_cerr_b:
+        # Buscar turno inmediatamente anterior al DIA
+        turnos_pre = [s for s in timeline if s.label != p2.cerr_a and s.label != p2.cerr_b]
+        # El turno previo es el último antes del DIA en el timeline
+        dia_idx = None
+        for i, s in enumerate(timeline):
+            if s.cerradas == list(p2.cerr_a) or set(int(c) for c in s.cerradas) == set(int(c) for c in p2.cerr_a):
+                dia_idx = i
+                break
+        turno_previo = timeline[dia_idx - 1] if dia_idx and dia_idx > 0 else None
+        # El turno siguiente es NOCHE (último del timeline para este día)
+        noche_idx = None
+        for i, s in enumerate(timeline):
+            if set(int(c) for c in s.cerradas) == set(int(c) for c in p2.cerr_b):
+                noche_idx = i
+        turno_siguiente_cerr_n = len(p2.cerr_b)
+
+        if turno_previo is not None:
+            n_previo = len(turno_previo.cerradas)
+            n_dia = sc.n_cerr_a
+            n_noche = sc.n_cerr_b
+
+            # Patrón sándwich: N → N+1 → N (o menos)
+            if n_previo <= n_noche and n_dia == n_previo + 1:
+                # Buscar par de cerradas en DIA con diff ≤30g
+                cerr_dia = sorted(p2.cerr_a)
+                for i in range(len(cerr_dia)):
+                    for j in range(i + 1, len(cerr_dia)):
+                        diff = abs(cerr_dia[i] - cerr_dia[j])
+                        if diff <= 30:
+                            # Verificar que no hay entrante que justifique la extra
+                            tiene_entrante = False
+                            if turno_previo:
+                                for e in turno_previo.entrantes:
+                                    if any(abs(e - c) <= 200 for c in [cerr_dia[i], cerr_dia[j]]):
+                                        tiene_entrante = True
+                            # Solo si no hay entrante que justifique
+                            if not tiene_entrante:
+                                # La cerrada que desaparece es la duplicada
+                                # (la que matchea con NOCHE persiste, la otra es fantasma)
+                                peso_dup = None
+                                for peso_d, _ in p2.desaparecen:
+                                    if abs(peso_d - cerr_dia[i]) <= 30 or abs(peso_d - cerr_dia[j]) <= 30:
+                                        peso_dup = peso_d
+                                        break
+                                if peso_dup is not None:
+                                    hips.append(Hipotesis(
+                                        tipo='DUPLICADO_CERRADA',
+                                        peso=peso_dup,
+                                        accion=f'Cerr {int(peso_dup)} es duplicado registral de ~{int(cerr_dia[j]) if abs(peso_dup - cerr_dia[i]) <= 30 else int(cerr_dia[i])}. '
+                                               f'Sandwich {n_previo}->{n_dia}->{n_noche}, diff={diff}g. Eliminar duplicado.',
+                                        delta_stock=-peso_dup,
+                                        delta_latas=0,  # no es apertura, es duplicado
+                                        sightings=0,  # la duplicada no tiene historia propia
+                                    ))
+
     # --- 3b: Cerradas que APARECEN (en NOCHE, no en DIA) ---
     for peso, sightings in p2.aparecen:
         # H: omisión en DIA
@@ -478,6 +538,17 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
                 h.planos_contra.append('P1')
 
         elif h.tipo == 'APERTURA_REAL':
+            # Guardia duplicado: si hay DUPLICADO_CERRADA viable para el mismo peso,
+            # APERTURA_REAL no puede ganar por conteo
+            tiene_duplicado_rival = any(
+                hh.tipo == 'DUPLICADO_CERRADA' and abs(hh.peso - h.peso) <= 30
+                for hh in hips
+            )
+            if tiene_duplicado_rival:
+                h.planos_contra.append('P4_DUPLICADO_RIVAL')
+                h.planos_neutros.append('P1')
+                continue  # no evaluar más planos, ya está vetado
+
             # Guardia: si la cerrada desaparecida tiene competidora mismatch
             # en NOCHE (30-200g), apertura pierde privilegio de confirmación.
             tiene_mismatch_competitivo = False
@@ -511,6 +582,9 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
 
         elif h.tipo == 'GENEALOGIA_ENT_CERR':
             h.planos_neutros.append('P1')  # P1 no dice nada sobre genealogia
+
+        elif h.tipo == 'DUPLICADO_CERRADA':
+            h.planos_neutros.append('P1')  # P1 no dice nada sobre duplicados
 
         # --- Evaluar P2 ---
         if h.tipo == 'PHANTOM_DIA':
@@ -551,6 +625,12 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
             # P2: la genealogía explica la cerrada — a favor
             h.planos_favor.append('P2_GENEALOGIA')
 
+        elif h.tipo == 'DUPLICADO_CERRADA':
+            # P2: conteo sándwich N→N+1→N — a favor
+            h.planos_favor.append('P2_CONTEO')
+            # P4: continuidad temporal confirma que eran N, no N+1
+            h.planos_favor.append('P4_CONTINUIDAD')
+
         elif h.tipo == 'ENTRANTE_MISMO_CAN':
             h.planos_neutros.append('P2')
 
@@ -570,6 +650,9 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
         elif h.tipo == 'GENEALOGIA_ENT_CERR':
             # P3 a favor: hay entrante en timeline que explica la cerrada
             h.planos_favor.append('P3_GENEALOGIA')
+        elif h.tipo == 'DUPLICADO_CERRADA':
+            # P3: sin entrante que justifique la cerrada extra — a favor del duplicado
+            h.planos_favor.append('P3_SIN_ENTRANTE')
         else:
             h.planos_neutros.append('P3')
 
@@ -644,6 +727,9 @@ def _paso5_seleccionar(hips: List[Hipotesis], sc, p2: PlanoP2
         elif mejor.tipo == 'GENEALOGIA_ENT_CERR':
             # Genealogia con 1 plano -> ESTIMADO
             mejor._tipo_d_override = True
+        elif mejor.tipo == 'DUPLICADO_CERRADA':
+            # Duplicado con evidencia compuesta -> CONFIRMADO si >=2 planos
+            pass  # dejar que la convergencia normal lo maneje
         else:
             return None
 
@@ -750,7 +836,7 @@ def _resolver_sabor(nombre: str, clasificado: SaborClasificado,
     venta_corr = sc.venta_raw + mejor.delta_stock + mejor.delta_latas * 280
 
     tipo_res = TipoResolucion.RESUELTO_INDIVIDUAL
-    if mejor.tipo in ('MISMATCH_LEVE', 'CONJUNTO_BILATERAL'):
+    if mejor.tipo in ('MISMATCH_LEVE', 'CONJUNTO_BILATERAL', 'DUPLICADO_CERRADA'):
         tipo_res = TipoResolucion.RESUELTO_CONJUNTO
 
     motivo_planos = f"P_favor={mejor.planos_favor}, P_contra={mejor.planos_contra}"
