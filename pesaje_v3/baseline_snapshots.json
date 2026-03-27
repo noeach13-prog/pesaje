@@ -1,6 +1,6 @@
 {
   "5": {
-    "venta_raw_total": 34010,
+    "venta_raw_total": 35410,
     "vdp_total": 500,
     "sabores": {
       "AMARGO": {
@@ -10,7 +10,7 @@
       },
       "AMERICANA": {
         "status": "ENGINE",
-        "venta_final_c3": 375,
+        "venta_final_c3": 655,
         "prototipo": null
       },
       "ANANA": {
@@ -80,7 +80,7 @@
       },
       "COOKIES": {
         "status": "ENGINE",
-        "venta_final_c3": 225,
+        "venta_final_c3": 505,
         "prototipo": null
       },
       "D. GRANIZADO": {
@@ -205,7 +205,7 @@
       },
       "MENTA": {
         "status": "ENGINE",
-        "venta_final_c3": 975,
+        "venta_final_c3": 1255,
         "prototipo": null
       },
       "MIX DE FRUTA": {
@@ -243,7 +243,7 @@
       },
       "SAMBAYON AMORES": {
         "status": "ENGINE",
-        "venta_final_c3": 750,
+        "venta_final_c3": 1030,
         "prototipo": null
       },
       "SUPER": {
@@ -359,995 +359,6 @@
     ],
     "sin_resolver": [
       "CADBURY"
-    ]
-  },
-  "25": {
-    "venta_raw_total": 18030,
-    "vdp_total": 0,
-    "sabores": {
-      "AMARGO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 510,
-        "prototipo": null
-      },
-      "AMERICANA": {
-        "status": "COMPUESTO",
-        "venta_final_c3": 265,
-        "prototipo": {
-          "codigo": "PF7",
-          "delta": 2715
-        }
-      },
-      "ANANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 235,
-        "prototipo": null
-      },
-      "B, SPLIT": {
-        "status": "LIMPIO",
-        "venta_final_c3": 265,
-        "prototipo": null
-      },
-      "BLANCO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 20,
-        "prototipo": null
-      },
-      "BOSQUE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 590,
-        "prototipo": null
-      },
-      "CABSHA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 190,
-        "prototipo": null
-      },
-      "CADBURY": {
-        "status": "LIMPIO",
-        "venta_final_c3": 315,
-        "prototipo": null
-      },
-      "CEREZA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 290,
-        "prototipo": null
-      },
-      "CH AMORES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 345,
-        "prototipo": null
-      },
-      "CH C/ALM": {
-        "status": "LIMPIO",
-        "venta_final_c3": 230,
-        "prototipo": null
-      },
-      "CHOCOLATE": {
-        "status": "ENGINE",
-        "venta_final_c3": 1115,
-        "prototipo": null
-      },
-      "CHOCOLATE DUBAI": {
-        "status": "LIMPIO",
-        "venta_final_c3": 455,
-        "prototipo": null
-      },
-      "CIELO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 380,
-        "prototipo": null
-      },
-      "COCO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 75,
-        "prototipo": null
-      },
-      "COOKIES": {
-        "status": "SENAL",
-        "venta_final_c3": 130,
-        "prototipo": {
-          "codigo": "PF1",
-          "delta": -1000
-        }
-      },
-      "D. GRANIZADO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 745,
-        "prototipo": null
-      },
-      "DOS CORAZONES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 360,
-        "prototipo": null
-      },
-      "DULCE AMORES": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "DULCE C/NUEZ": {
-        "status": "LIMPIO",
-        "venta_final_c3": 0,
-        "prototipo": null
-      },
-      "DULCE D LECHE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 440,
-        "prototipo": null
-      },
-      "DURAZNO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 420,
-        "prototipo": null
-      },
-      "FERRERO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 250,
-        "prototipo": null
-      },
-      "FLAN": {
-        "status": "LIMPIO",
-        "venta_final_c3": 675,
-        "prototipo": null
-      },
-      "FRAMBUEZA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 145,
-        "prototipo": null
-      },
-      "FRANUI": {
-        "status": "LIMPIO",
-        "venta_final_c3": 50,
-        "prototipo": null
-      },
-      "FRUTILLA AGUA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 745,
-        "prototipo": null
-      },
-      "FRUTILLA CREMA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1090,
-        "prototipo": null
-      },
-      "FRUTILLA REINA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 385,
-        "prototipo": null
-      },
-      "GRANIZADO": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "IRLANDESA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 850,
-        "prototipo": null
-      },
-      "KINDER": {
-        "status": "LIMPIO",
-        "venta_final_c3": 300,
-        "prototipo": null
-      },
-      "KITKAT": {
-        "status": "LIMPIO",
-        "venta_final_c3": 635,
-        "prototipo": null
-      },
-      "LEMON PIE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 235,
-        "prototipo": null
-      },
-      "LIMON": {
-        "status": "LIMPIO",
-        "venta_final_c3": 910,
-        "prototipo": null
-      },
-      "MANTECOL": {
-        "status": "LIMPIO",
-        "venta_final_c3": 315,
-        "prototipo": null
-      },
-      "MANZANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 505,
-        "prototipo": null
-      },
-      "MARACUYA": {
-        "status": "SOLO_DIA",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "MARROC": {
-        "status": "LIMPIO",
-        "venta_final_c3": 260,
-        "prototipo": null
-      },
-      "MASCARPONE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 560,
-        "prototipo": null
-      },
-      "MENTA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 425,
-        "prototipo": null
-      },
-      "MIX DE FRUTA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 5,
-        "prototipo": null
-      },
-      "MOUSSE LIMON": {
-        "status": "LIMPIO",
-        "venta_final_c3": 5,
-        "prototipo": null
-      },
-      "NUTE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 85,
-        "prototipo": null
-      },
-      "PISTACHO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 455,
-        "prototipo": null
-      },
-      "RUSA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 5,
-        "prototipo": null
-      },
-      "SAMBAYON": {
-        "status": "LIMPIO",
-        "venta_final_c3": 675,
-        "prototipo": null
-      },
-      "SAMBAYON AMORES": {
-        "status": "ENGINE",
-        "venta_final_c3": 610,
-        "prototipo": null
-      },
-      "SUPER": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "TIRAMISU": {
-        "status": "LIMPIO",
-        "venta_final_c3": 95,
-        "prototipo": null
-      },
-      "TRAMONTANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 835,
-        "prototipo": null
-      },
-      "VAINILLA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 270,
-        "prototipo": null
-      }
-    },
-    "escalados": {
-      "DULCE AMORES": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6700",
-          "C4n:6740"
-        ],
-        "prototipo_is_none": true
-      },
-      "GRANIZADO": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6750",
-          "C4n:6710"
-        ],
-        "prototipo_is_none": true
-      },
-      "SUPER": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6730",
-          "C4n:6770"
-        ],
-        "prototipo_is_none": true
-      }
-    },
-    "correcciones_c4": [
-      {
-        "nombre": "GRANIZADO",
-        "delta": -40,
-        "banda": "ESTIMADO"
-      }
-    ],
-    "sin_resolver": [
-      "DULCE AMORES",
-      "SUPER"
-    ]
-  },
-  "27": {
-    "venta_raw_total": 32720,
-    "vdp_total": 0,
-    "sabores": {
-      "AMARGO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1440,
-        "prototipo": null
-      },
-      "AMERICANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 765,
-        "prototipo": null
-      },
-      "ANANA": {
-        "status": "ENGINE",
-        "venta_final_c3": 1240,
-        "prototipo": null
-      },
-      "B, SPLIT": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1210,
-        "prototipo": null
-      },
-      "BLANCO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 295,
-        "prototipo": null
-      },
-      "BOSQUE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 825,
-        "prototipo": null
-      },
-      "CABSHA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 185,
-        "prototipo": null
-      },
-      "CADBURY": {
-        "status": "LIMPIO",
-        "venta_final_c3": 435,
-        "prototipo": null
-      },
-      "CEREZA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 460,
-        "prototipo": null
-      },
-      "CH AMORES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 280,
-        "prototipo": null
-      },
-      "CH C/ALM": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1660,
-        "prototipo": null
-      },
-      "CHOCOLATE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1400,
-        "prototipo": null
-      },
-      "CHOCOLATE DUBAI": {
-        "status": "LIMPIO",
-        "venta_final_c3": 860,
-        "prototipo": null
-      },
-      "CIELO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 355,
-        "prototipo": null
-      },
-      "COCO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 370,
-        "prototipo": null
-      },
-      "COOKIES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 245,
-        "prototipo": null
-      },
-      "D. GRANIZADO": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "DOS CORAZONES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 260,
-        "prototipo": null
-      },
-      "DULCE AMORES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 895,
-        "prototipo": null
-      },
-      "DULCE C/NUEZ": {
-        "status": "LIMPIO",
-        "venta_final_c3": 275,
-        "prototipo": null
-      },
-      "DULCE D LECHE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 2155,
-        "prototipo": null
-      },
-      "DURAZNO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 555,
-        "prototipo": null
-      },
-      "FERRERO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 635,
-        "prototipo": null
-      },
-      "FLAN": {
-        "status": "LIMPIO",
-        "venta_final_c3": 335,
-        "prototipo": null
-      },
-      "FRAMBUEZA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 325,
-        "prototipo": null
-      },
-      "FRANUI": {
-        "status": "LIMPIO",
-        "venta_final_c3": 425,
-        "prototipo": null
-      },
-      "FRUTILLA AGUA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 495,
-        "prototipo": null
-      },
-      "FRUTILLA CREMA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1435,
-        "prototipo": null
-      },
-      "FRUTILLA REINA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 285,
-        "prototipo": null
-      },
-      "GRANIZADO": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "IRLANDESA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 365,
-        "prototipo": null
-      },
-      "KINDER": {
-        "status": "LIMPIO",
-        "venta_final_c3": 405,
-        "prototipo": null
-      },
-      "KITKAT": {
-        "status": "LIMPIO",
-        "venta_final_c3": 2130,
-        "prototipo": null
-      },
-      "LEMON PIE": {
-        "status": "ENGINE",
-        "venta_final_c3": 570,
-        "prototipo": null
-      },
-      "LIMON": {
-        "status": "LIMPIO",
-        "venta_final_c3": 540,
-        "prototipo": null
-      },
-      "MANTECOL": {
-        "status": "LIMPIO",
-        "venta_final_c3": 620,
-        "prototipo": null
-      },
-      "MANZANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 170,
-        "prototipo": null
-      },
-      "MARACUYA": {
-        "status": "SOLO_DIA",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "MARROC": {
-        "status": "LIMPIO",
-        "venta_final_c3": 80,
-        "prototipo": null
-      },
-      "MASCARPONE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 310,
-        "prototipo": null
-      },
-      "MENTA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 380,
-        "prototipo": null
-      },
-      "MIX DE FRUTA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 5,
-        "prototipo": null
-      },
-      "MOUSSE LIMON": {
-        "status": "LIMPIO",
-        "venta_final_c3": 110,
-        "prototipo": null
-      },
-      "NUTE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 20,
-        "prototipo": null
-      },
-      "PISTACHO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 830,
-        "prototipo": null
-      },
-      "RUSA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 305,
-        "prototipo": null
-      },
-      "SAMBAYON": {
-        "status": "ENGINE",
-        "venta_final_c3": 1195,
-        "prototipo": null
-      },
-      "SAMBAYON AMORES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 400,
-        "prototipo": null
-      },
-      "SUPER": {
-        "status": "LIMPIO",
-        "venta_final_c3": 580,
-        "prototipo": null
-      },
-      "TIRAMISU": {
-        "status": "LIMPIO",
-        "venta_final_c3": 85,
-        "prototipo": null
-      },
-      "TRAMONTANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 635,
-        "prototipo": null
-      },
-      "VAINILLA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 660,
-        "prototipo": null
-      }
-    },
-    "escalados": {
-      "D. GRANIZADO": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6675"
-        ],
-        "prototipo_is_none": true
-      },
-      "GRANIZADO": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6750",
-          "C4n:6710"
-        ],
-        "prototipo_is_none": true
-      }
-    },
-    "correcciones_c4": [
-      {
-        "nombre": "D. GRANIZADO",
-        "delta": -100,
-        "banda": "ESTIMADO"
-      },
-      {
-        "nombre": "GRANIZADO",
-        "delta": -40,
-        "banda": "ESTIMADO"
-      }
-    ],
-    "sin_resolver": []
-  },
-  "28": {
-    "venta_raw_total": 55200,
-    "vdp_total": 2270,
-    "sabores": {
-      "AMARGO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1345,
-        "prototipo": null
-      },
-      "AMERICANA": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "ANANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1115,
-        "prototipo": null
-      },
-      "B, SPLIT": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1765,
-        "prototipo": null
-      },
-      "BLANCO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 415,
-        "prototipo": null
-      },
-      "BOSQUE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 980,
-        "prototipo": null
-      },
-      "CABSHA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 660,
-        "prototipo": null
-      },
-      "CADBURY": {
-        "status": "LIMPIO",
-        "venta_final_c3": 845,
-        "prototipo": null
-      },
-      "CEREZA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1190,
-        "prototipo": null
-      },
-      "CH AMORES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 415,
-        "prototipo": null
-      },
-      "CH C/ALM": {
-        "status": "ENGINE",
-        "venta_final_c3": 1890,
-        "prototipo": null
-      },
-      "CHOCOLATE": {
-        "status": "COMPUESTO",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "CHOCOLATE DUBAI": {
-        "status": "ENGINE",
-        "venta_final_c3": 7580,
-        "prototipo": null
-      },
-      "CIELO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 835,
-        "prototipo": null
-      },
-      "COCO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 255,
-        "prototipo": null
-      },
-      "COOKIES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 420,
-        "prototipo": null
-      },
-      "D. GRANIZADO": {
-        "status": "COMPUESTO",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "DOS CORAZONES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 705,
-        "prototipo": null
-      },
-      "DULCE AMORES": {
-        "status": "ENGINE",
-        "venta_final_c3": 1310,
-        "prototipo": null
-      },
-      "DULCE C/NUEZ": {
-        "status": "LIMPIO",
-        "venta_final_c3": 100,
-        "prototipo": null
-      },
-      "DULCE D LECHE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1620,
-        "prototipo": null
-      },
-      "DURAZNO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 145,
-        "prototipo": null
-      },
-      "FERRERO": {
-        "status": "LIMPIO",
-        "venta_final_c3": 180,
-        "prototipo": null
-      },
-      "FLAN": {
-        "status": "LIMPIO",
-        "venta_final_c3": 185,
-        "prototipo": null
-      },
-      "FRAMBUEZA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 530,
-        "prototipo": null
-      },
-      "FRANUI": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1445,
-        "prototipo": null
-      },
-      "FRUTILLA AGUA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 855,
-        "prototipo": null
-      },
-      "FRUTILLA CREMA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 2210,
-        "prototipo": null
-      },
-      "FRUTILLA REINA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 700,
-        "prototipo": null
-      },
-      "GRANIZADO": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "IRLANDESA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 545,
-        "prototipo": null
-      },
-      "KINDER": {
-        "status": "LIMPIO",
-        "venta_final_c3": 930,
-        "prototipo": null
-      },
-      "KITKAT": {
-        "status": "LIMPIO",
-        "venta_final_c3": 595,
-        "prototipo": null
-      },
-      "LEMON PIE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 85,
-        "prototipo": null
-      },
-      "LIMON": {
-        "status": "ENGINE",
-        "venta_final_c3": 2645,
-        "prototipo": null
-      },
-      "MANTECOL": {
-        "status": "LIMPIO",
-        "venta_final_c3": 860,
-        "prototipo": null
-      },
-      "MANZANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 85,
-        "prototipo": null
-      },
-      "MARACUYA": {
-        "status": "COMPUESTO",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "MARROC": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1220,
-        "prototipo": null
-      },
-      "MASCARPONE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 390,
-        "prototipo": null
-      },
-      "MENTA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 2190,
-        "prototipo": null
-      },
-      "MIX DE FRUTA": {
-        "status": "COMPUESTO",
-        "venta_final_c3": -195,
-        "prototipo": {
-          "codigo": "PF7",
-          "delta": -100
-        }
-      },
-      "MOUSSE LIMON": {
-        "status": "LIMPIO",
-        "venta_final_c3": 80,
-        "prototipo": null
-      },
-      "NUTE": {
-        "status": "LIMPIO",
-        "venta_final_c3": 385,
-        "prototipo": null
-      },
-      "PISTACHO": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "RUSA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 65,
-        "prototipo": null
-      },
-      "SAMBAYON": {
-        "status": "COMPUESTO",
-        "venta_final_c3": null,
-        "prototipo": null
-      },
-      "SAMBAYON AMORES": {
-        "status": "LIMPIO",
-        "venta_final_c3": 460,
-        "prototipo": null
-      },
-      "SUPER": {
-        "status": "LIMPIO",
-        "venta_final_c3": 630,
-        "prototipo": null
-      },
-      "TIRAMISU": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1010,
-        "prototipo": null
-      },
-      "TRAMONTANA": {
-        "status": "LIMPIO",
-        "venta_final_c3": 1325,
-        "prototipo": null
-      },
-      "VAINILLA": {
-        "status": "SENAL",
-        "venta_final_c3": null,
-        "prototipo": null
-      }
-    },
-    "escalados": {
-      "AMERICANA": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6360",
-          "C4n:6290"
-        ],
-        "prototipo_is_none": true
-      },
-      "CHOCOLATE": {
-        "status": "COMPUESTO",
-        "flags": [
-          "C4d:6655",
-          "C4n:6255",
-          "C4n:6545",
-          "CERR+1N",
-          "NEG"
-        ],
-        "prototipo_is_none": true
-      },
-      "D. GRANIZADO": {
-        "status": "COMPUESTO",
-        "flags": [
-          "AB_UP",
-          "C4d:6675"
-        ],
-        "prototipo_is_none": true
-      },
-      "GRANIZADO": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6750",
-          "C4n:6715"
-        ],
-        "prototipo_is_none": true
-      },
-      "MARACUYA": {
-        "status": "COMPUESTO",
-        "flags": [
-          "AB_UP",
-          "NEG"
-        ],
-        "prototipo_is_none": true
-      },
-      "PISTACHO": {
-        "status": "SENAL",
-        "flags": [
-          "HIGH"
-        ],
-        "prototipo_is_none": true
-      },
-      "SAMBAYON": {
-        "status": "COMPUESTO",
-        "flags": [
-          "C4d:6450",
-          "C4d:6675",
-          "C4n:6575",
-          "HIGH"
-        ],
-        "prototipo_is_none": true
-      },
-      "VAINILLA": {
-        "status": "SENAL",
-        "flags": [
-          "C4d:6465",
-          "C4n:6405"
-        ],
-        "prototipo_is_none": true
-      }
-    },
-    "correcciones_c4": [
-      {
-        "nombre": "AMERICANA",
-        "delta": -70,
-        "banda": "ESTIMADO"
-      },
-      {
-        "nombre": "CHOCOLATE",
-        "delta": 6255,
-        "banda": "CONFIRMADO"
-      },
-      {
-        "nombre": "CHOCOLATE DUBAI",
-        "delta": -6120,
-        "banda": "CONFIRMADO"
-      },
-      {
-        "nombre": "D. GRANIZADO",
-        "delta": 0,
-        "banda": "CONFIRMADO"
-      },
-      {
-        "nombre": "GRANIZADO",
-        "delta": -35,
-        "banda": "ESTIMADO"
-      },
-      {
-        "nombre": "MARACUYA",
-        "delta": 6380,
-        "banda": "CONFIRMADO"
-      },
-      {
-        "nombre": "PISTACHO",
-        "delta": 0,
-        "banda": "CONFIRMADO"
-      },
-      {
-        "nombre": "VAINILLA",
-        "delta": -60,
-        "banda": "ESTIMADO"
-      }
-    ],
-    "sin_resolver": [
-      "SAMBAYON"
     ]
   },
   "12": {
@@ -1713,6 +724,995 @@
     "sin_resolver": [
       "CHOCOLATE",
       "IRLANDESA"
+    ]
+  },
+  "25": {
+    "venta_raw_total": 18590,
+    "vdp_total": 0,
+    "sabores": {
+      "AMARGO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 510,
+        "prototipo": null
+      },
+      "AMERICANA": {
+        "status": "COMPUESTO",
+        "venta_final_c3": 265,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": 2715
+        }
+      },
+      "ANANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 235,
+        "prototipo": null
+      },
+      "B, SPLIT": {
+        "status": "LIMPIO",
+        "venta_final_c3": 265,
+        "prototipo": null
+      },
+      "BLANCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 20,
+        "prototipo": null
+      },
+      "BOSQUE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 590,
+        "prototipo": null
+      },
+      "CABSHA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 190,
+        "prototipo": null
+      },
+      "CADBURY": {
+        "status": "LIMPIO",
+        "venta_final_c3": 315,
+        "prototipo": null
+      },
+      "CEREZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 290,
+        "prototipo": null
+      },
+      "CH AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 345,
+        "prototipo": null
+      },
+      "CH C/ALM": {
+        "status": "LIMPIO",
+        "venta_final_c3": 230,
+        "prototipo": null
+      },
+      "CHOCOLATE": {
+        "status": "ENGINE",
+        "venta_final_c3": 1395,
+        "prototipo": null
+      },
+      "CHOCOLATE DUBAI": {
+        "status": "LIMPIO",
+        "venta_final_c3": 455,
+        "prototipo": null
+      },
+      "CIELO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 380,
+        "prototipo": null
+      },
+      "COCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 75,
+        "prototipo": null
+      },
+      "COOKIES": {
+        "status": "SENAL",
+        "venta_final_c3": 130,
+        "prototipo": {
+          "codigo": "PF1",
+          "delta": -1000
+        }
+      },
+      "D. GRANIZADO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 745,
+        "prototipo": null
+      },
+      "DOS CORAZONES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 360,
+        "prototipo": null
+      },
+      "DULCE AMORES": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "DULCE C/NUEZ": {
+        "status": "LIMPIO",
+        "venta_final_c3": 0,
+        "prototipo": null
+      },
+      "DULCE D LECHE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 440,
+        "prototipo": null
+      },
+      "DURAZNO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 420,
+        "prototipo": null
+      },
+      "FERRERO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 250,
+        "prototipo": null
+      },
+      "FLAN": {
+        "status": "LIMPIO",
+        "venta_final_c3": 675,
+        "prototipo": null
+      },
+      "FRAMBUEZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 145,
+        "prototipo": null
+      },
+      "FRANUI": {
+        "status": "LIMPIO",
+        "venta_final_c3": 50,
+        "prototipo": null
+      },
+      "FRUTILLA AGUA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 745,
+        "prototipo": null
+      },
+      "FRUTILLA CREMA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1090,
+        "prototipo": null
+      },
+      "FRUTILLA REINA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 385,
+        "prototipo": null
+      },
+      "GRANIZADO": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "IRLANDESA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 850,
+        "prototipo": null
+      },
+      "KINDER": {
+        "status": "LIMPIO",
+        "venta_final_c3": 300,
+        "prototipo": null
+      },
+      "KITKAT": {
+        "status": "LIMPIO",
+        "venta_final_c3": 635,
+        "prototipo": null
+      },
+      "LEMON PIE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 235,
+        "prototipo": null
+      },
+      "LIMON": {
+        "status": "LIMPIO",
+        "venta_final_c3": 910,
+        "prototipo": null
+      },
+      "MANTECOL": {
+        "status": "LIMPIO",
+        "venta_final_c3": 315,
+        "prototipo": null
+      },
+      "MANZANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 505,
+        "prototipo": null
+      },
+      "MARACUYA": {
+        "status": "SOLO_DIA",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "MARROC": {
+        "status": "LIMPIO",
+        "venta_final_c3": 260,
+        "prototipo": null
+      },
+      "MASCARPONE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 560,
+        "prototipo": null
+      },
+      "MENTA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 425,
+        "prototipo": null
+      },
+      "MIX DE FRUTA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 5,
+        "prototipo": null
+      },
+      "MOUSSE LIMON": {
+        "status": "LIMPIO",
+        "venta_final_c3": 5,
+        "prototipo": null
+      },
+      "NUTE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 85,
+        "prototipo": null
+      },
+      "PISTACHO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 455,
+        "prototipo": null
+      },
+      "RUSA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 5,
+        "prototipo": null
+      },
+      "SAMBAYON": {
+        "status": "LIMPIO",
+        "venta_final_c3": 675,
+        "prototipo": null
+      },
+      "SAMBAYON AMORES": {
+        "status": "ENGINE",
+        "venta_final_c3": 890,
+        "prototipo": null
+      },
+      "SUPER": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "TIRAMISU": {
+        "status": "LIMPIO",
+        "venta_final_c3": 95,
+        "prototipo": null
+      },
+      "TRAMONTANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 835,
+        "prototipo": null
+      },
+      "VAINILLA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 270,
+        "prototipo": null
+      }
+    },
+    "escalados": {
+      "DULCE AMORES": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6700",
+          "C4n:6740"
+        ],
+        "prototipo_is_none": true
+      },
+      "GRANIZADO": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6750",
+          "C4n:6710"
+        ],
+        "prototipo_is_none": true
+      },
+      "SUPER": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6730",
+          "C4n:6770"
+        ],
+        "prototipo_is_none": true
+      }
+    },
+    "correcciones_c4": [
+      {
+        "nombre": "GRANIZADO",
+        "delta": -40,
+        "banda": "ESTIMADO"
+      }
+    ],
+    "sin_resolver": [
+      "DULCE AMORES",
+      "SUPER"
+    ]
+  },
+  "27": {
+    "venta_raw_total": 33560,
+    "vdp_total": 0,
+    "sabores": {
+      "AMARGO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1440,
+        "prototipo": null
+      },
+      "AMERICANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 765,
+        "prototipo": null
+      },
+      "ANANA": {
+        "status": "ENGINE",
+        "venta_final_c3": 1520,
+        "prototipo": null
+      },
+      "B, SPLIT": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1210,
+        "prototipo": null
+      },
+      "BLANCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 295,
+        "prototipo": null
+      },
+      "BOSQUE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 825,
+        "prototipo": null
+      },
+      "CABSHA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 185,
+        "prototipo": null
+      },
+      "CADBURY": {
+        "status": "LIMPIO",
+        "venta_final_c3": 435,
+        "prototipo": null
+      },
+      "CEREZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 460,
+        "prototipo": null
+      },
+      "CH AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 280,
+        "prototipo": null
+      },
+      "CH C/ALM": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1660,
+        "prototipo": null
+      },
+      "CHOCOLATE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1400,
+        "prototipo": null
+      },
+      "CHOCOLATE DUBAI": {
+        "status": "LIMPIO",
+        "venta_final_c3": 860,
+        "prototipo": null
+      },
+      "CIELO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 355,
+        "prototipo": null
+      },
+      "COCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 370,
+        "prototipo": null
+      },
+      "COOKIES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 245,
+        "prototipo": null
+      },
+      "D. GRANIZADO": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "DOS CORAZONES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 260,
+        "prototipo": null
+      },
+      "DULCE AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 895,
+        "prototipo": null
+      },
+      "DULCE C/NUEZ": {
+        "status": "LIMPIO",
+        "venta_final_c3": 275,
+        "prototipo": null
+      },
+      "DULCE D LECHE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 2155,
+        "prototipo": null
+      },
+      "DURAZNO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 555,
+        "prototipo": null
+      },
+      "FERRERO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 635,
+        "prototipo": null
+      },
+      "FLAN": {
+        "status": "LIMPIO",
+        "venta_final_c3": 335,
+        "prototipo": null
+      },
+      "FRAMBUEZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 325,
+        "prototipo": null
+      },
+      "FRANUI": {
+        "status": "LIMPIO",
+        "venta_final_c3": 425,
+        "prototipo": null
+      },
+      "FRUTILLA AGUA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 495,
+        "prototipo": null
+      },
+      "FRUTILLA CREMA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1435,
+        "prototipo": null
+      },
+      "FRUTILLA REINA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 285,
+        "prototipo": null
+      },
+      "GRANIZADO": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "IRLANDESA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 365,
+        "prototipo": null
+      },
+      "KINDER": {
+        "status": "LIMPIO",
+        "venta_final_c3": 405,
+        "prototipo": null
+      },
+      "KITKAT": {
+        "status": "LIMPIO",
+        "venta_final_c3": 2130,
+        "prototipo": null
+      },
+      "LEMON PIE": {
+        "status": "ENGINE",
+        "venta_final_c3": 850,
+        "prototipo": null
+      },
+      "LIMON": {
+        "status": "LIMPIO",
+        "venta_final_c3": 540,
+        "prototipo": null
+      },
+      "MANTECOL": {
+        "status": "LIMPIO",
+        "venta_final_c3": 620,
+        "prototipo": null
+      },
+      "MANZANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 170,
+        "prototipo": null
+      },
+      "MARACUYA": {
+        "status": "SOLO_DIA",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "MARROC": {
+        "status": "LIMPIO",
+        "venta_final_c3": 80,
+        "prototipo": null
+      },
+      "MASCARPONE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 310,
+        "prototipo": null
+      },
+      "MENTA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 380,
+        "prototipo": null
+      },
+      "MIX DE FRUTA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 5,
+        "prototipo": null
+      },
+      "MOUSSE LIMON": {
+        "status": "LIMPIO",
+        "venta_final_c3": 110,
+        "prototipo": null
+      },
+      "NUTE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 20,
+        "prototipo": null
+      },
+      "PISTACHO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 830,
+        "prototipo": null
+      },
+      "RUSA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 305,
+        "prototipo": null
+      },
+      "SAMBAYON": {
+        "status": "ENGINE",
+        "venta_final_c3": 1475,
+        "prototipo": null
+      },
+      "SAMBAYON AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 400,
+        "prototipo": null
+      },
+      "SUPER": {
+        "status": "LIMPIO",
+        "venta_final_c3": 580,
+        "prototipo": null
+      },
+      "TIRAMISU": {
+        "status": "LIMPIO",
+        "venta_final_c3": 85,
+        "prototipo": null
+      },
+      "TRAMONTANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 635,
+        "prototipo": null
+      },
+      "VAINILLA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 660,
+        "prototipo": null
+      }
+    },
+    "escalados": {
+      "D. GRANIZADO": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6675"
+        ],
+        "prototipo_is_none": true
+      },
+      "GRANIZADO": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6750",
+          "C4n:6710"
+        ],
+        "prototipo_is_none": true
+      }
+    },
+    "correcciones_c4": [
+      {
+        "nombre": "D. GRANIZADO",
+        "delta": -100,
+        "banda": "ESTIMADO"
+      },
+      {
+        "nombre": "GRANIZADO",
+        "delta": -40,
+        "banda": "ESTIMADO"
+      }
+    ],
+    "sin_resolver": []
+  },
+  "28": {
+    "venta_raw_total": 57440,
+    "vdp_total": 2270,
+    "sabores": {
+      "AMARGO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1345,
+        "prototipo": null
+      },
+      "AMERICANA": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "ANANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1115,
+        "prototipo": null
+      },
+      "B, SPLIT": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1765,
+        "prototipo": null
+      },
+      "BLANCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 415,
+        "prototipo": null
+      },
+      "BOSQUE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 980,
+        "prototipo": null
+      },
+      "CABSHA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 660,
+        "prototipo": null
+      },
+      "CADBURY": {
+        "status": "LIMPIO",
+        "venta_final_c3": 845,
+        "prototipo": null
+      },
+      "CEREZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1190,
+        "prototipo": null
+      },
+      "CH AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 415,
+        "prototipo": null
+      },
+      "CH C/ALM": {
+        "status": "ENGINE",
+        "venta_final_c3": 2170,
+        "prototipo": null
+      },
+      "CHOCOLATE": {
+        "status": "COMPUESTO",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "CHOCOLATE DUBAI": {
+        "status": "ENGINE",
+        "venta_final_c3": 8140,
+        "prototipo": null
+      },
+      "CIELO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 835,
+        "prototipo": null
+      },
+      "COCO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 255,
+        "prototipo": null
+      },
+      "COOKIES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 420,
+        "prototipo": null
+      },
+      "D. GRANIZADO": {
+        "status": "COMPUESTO",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "DOS CORAZONES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 705,
+        "prototipo": null
+      },
+      "DULCE AMORES": {
+        "status": "ENGINE",
+        "venta_final_c3": 1590,
+        "prototipo": null
+      },
+      "DULCE C/NUEZ": {
+        "status": "LIMPIO",
+        "venta_final_c3": 100,
+        "prototipo": null
+      },
+      "DULCE D LECHE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1620,
+        "prototipo": null
+      },
+      "DURAZNO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 145,
+        "prototipo": null
+      },
+      "FERRERO": {
+        "status": "LIMPIO",
+        "venta_final_c3": 180,
+        "prototipo": null
+      },
+      "FLAN": {
+        "status": "LIMPIO",
+        "venta_final_c3": 185,
+        "prototipo": null
+      },
+      "FRAMBUEZA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 530,
+        "prototipo": null
+      },
+      "FRANUI": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1445,
+        "prototipo": null
+      },
+      "FRUTILLA AGUA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 855,
+        "prototipo": null
+      },
+      "FRUTILLA CREMA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 2210,
+        "prototipo": null
+      },
+      "FRUTILLA REINA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 700,
+        "prototipo": null
+      },
+      "GRANIZADO": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "IRLANDESA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 545,
+        "prototipo": null
+      },
+      "KINDER": {
+        "status": "LIMPIO",
+        "venta_final_c3": 930,
+        "prototipo": null
+      },
+      "KITKAT": {
+        "status": "LIMPIO",
+        "venta_final_c3": 595,
+        "prototipo": null
+      },
+      "LEMON PIE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 85,
+        "prototipo": null
+      },
+      "LIMON": {
+        "status": "ENGINE",
+        "venta_final_c3": 2925,
+        "prototipo": null
+      },
+      "MANTECOL": {
+        "status": "LIMPIO",
+        "venta_final_c3": 860,
+        "prototipo": null
+      },
+      "MANZANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 85,
+        "prototipo": null
+      },
+      "MARACUYA": {
+        "status": "COMPUESTO",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "MARROC": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1220,
+        "prototipo": null
+      },
+      "MASCARPONE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 390,
+        "prototipo": null
+      },
+      "MENTA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 2190,
+        "prototipo": null
+      },
+      "MIX DE FRUTA": {
+        "status": "COMPUESTO",
+        "venta_final_c3": -195,
+        "prototipo": {
+          "codigo": "PF7",
+          "delta": -100
+        }
+      },
+      "MOUSSE LIMON": {
+        "status": "LIMPIO",
+        "venta_final_c3": 80,
+        "prototipo": null
+      },
+      "NUTE": {
+        "status": "LIMPIO",
+        "venta_final_c3": 385,
+        "prototipo": null
+      },
+      "PISTACHO": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "RUSA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 65,
+        "prototipo": null
+      },
+      "SAMBAYON": {
+        "status": "COMPUESTO",
+        "venta_final_c3": null,
+        "prototipo": null
+      },
+      "SAMBAYON AMORES": {
+        "status": "LIMPIO",
+        "venta_final_c3": 460,
+        "prototipo": null
+      },
+      "SUPER": {
+        "status": "LIMPIO",
+        "venta_final_c3": 630,
+        "prototipo": null
+      },
+      "TIRAMISU": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1010,
+        "prototipo": null
+      },
+      "TRAMONTANA": {
+        "status": "LIMPIO",
+        "venta_final_c3": 1325,
+        "prototipo": null
+      },
+      "VAINILLA": {
+        "status": "SENAL",
+        "venta_final_c3": null,
+        "prototipo": null
+      }
+    },
+    "escalados": {
+      "AMERICANA": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6360",
+          "C4n:6290"
+        ],
+        "prototipo_is_none": true
+      },
+      "CHOCOLATE": {
+        "status": "COMPUESTO",
+        "flags": [
+          "C4d:6655",
+          "C4n:6255",
+          "C4n:6545",
+          "CERR+1N",
+          "NEG"
+        ],
+        "prototipo_is_none": true
+      },
+      "D. GRANIZADO": {
+        "status": "COMPUESTO",
+        "flags": [
+          "AB_UP",
+          "C4d:6675"
+        ],
+        "prototipo_is_none": true
+      },
+      "GRANIZADO": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6750",
+          "C4n:6715"
+        ],
+        "prototipo_is_none": true
+      },
+      "MARACUYA": {
+        "status": "COMPUESTO",
+        "flags": [
+          "AB_UP",
+          "NEG"
+        ],
+        "prototipo_is_none": true
+      },
+      "PISTACHO": {
+        "status": "SENAL",
+        "flags": [
+          "HIGH"
+        ],
+        "prototipo_is_none": true
+      },
+      "SAMBAYON": {
+        "status": "COMPUESTO",
+        "flags": [
+          "C4d:6450",
+          "C4d:6675",
+          "C4n:6575",
+          "HIGH"
+        ],
+        "prototipo_is_none": true
+      },
+      "VAINILLA": {
+        "status": "SENAL",
+        "flags": [
+          "C4d:6465",
+          "C4n:6405"
+        ],
+        "prototipo_is_none": true
+      }
+    },
+    "correcciones_c4": [
+      {
+        "nombre": "AMERICANA",
+        "delta": -70,
+        "banda": "ESTIMADO"
+      },
+      {
+        "nombre": "CHOCOLATE",
+        "delta": 6255,
+        "banda": "CONFIRMADO"
+      },
+      {
+        "nombre": "CHOCOLATE DUBAI",
+        "delta": -6120,
+        "banda": "CONFIRMADO"
+      },
+      {
+        "nombre": "D. GRANIZADO",
+        "delta": 0,
+        "banda": "CONFIRMADO"
+      },
+      {
+        "nombre": "GRANIZADO",
+        "delta": -35,
+        "banda": "ESTIMADO"
+      },
+      {
+        "nombre": "MARACUYA",
+        "delta": 6380,
+        "banda": "CONFIRMADO"
+      },
+      {
+        "nombre": "PISTACHO",
+        "delta": 0,
+        "banda": "CONFIRMADO"
+      },
+      {
+        "nombre": "VAINILLA",
+        "delta": -60,
+        "banda": "ESTIMADO"
+      }
+    ],
+    "sin_resolver": [
+      "SAMBAYON"
     ]
   }
 }

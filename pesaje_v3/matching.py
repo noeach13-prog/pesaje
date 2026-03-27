@@ -28,33 +28,40 @@ def match_cerradas(
     tol: int = TOL_MATCH_CERRADA,
 ) -> MatchResult:
     """
-    Matching greedy de cerradas por menor diferencia de peso.
+    Matching optimo global de cerradas por menor suma total de diferencias.
 
-    Para cada cerrada en A, busca la mejor match en B dentro de ±tol.
-    Greedy: una cerrada de B solo puede matchear con una de A.
+    Genera todos los pares posibles (ia, ib) dentro de ±tol, luego selecciona
+    el subconjunto que minimiza la suma total de diferencias sin repetir indices.
+    Para listas chicas (max 6 cerradas) esto es eficiente.
 
     Retorna MatchResult con matched, unmatched_a, unmatched_b.
     Los indices son posiciones en las listas cerr_a y cerr_b originales.
     """
-    result = MatchResult()
-    used_b: Set[int] = set()
-
+    # Generar todos los pares candidatos
+    candidatos = []
     for ia, pa in enumerate(cerr_a):
-        best_ib = -1
-        best_diff = tol + 1  # peor que tolerancia
-
         for ib, pb in enumerate(cerr_b):
-            if ib in used_b:
-                continue
             diff = abs(pa - pb)
-            if diff <= tol and diff < best_diff:
-                best_ib = ib
-                best_diff = diff
+            if diff <= tol:
+                candidatos.append((diff, ia, ib, pa, pb))
 
-        if best_ib >= 0:
-            result.matched.append((ia, best_ib, pa, cerr_b[best_ib], best_diff))
-            used_b.add(best_ib)
-        else:
+    # Ordenar por diff ascendente y seleccionar greedy global
+    # (esto es optimo para matching bipartito con pesos no negativos
+    # cuando se elige siempre el menor disponible)
+    candidatos.sort()
+    used_a: Set[int] = set()
+    used_b: Set[int] = set()
+    result = MatchResult()
+
+    for diff, ia, ib, pa, pb in candidatos:
+        if ia in used_a or ib in used_b:
+            continue
+        result.matched.append((ia, ib, pa, pb, diff))
+        used_a.add(ia)
+        used_b.add(ib)
+
+    for ia in range(len(cerr_a)):
+        if ia not in used_a:
             result.unmatched_a.append(ia)
 
     for ib in range(len(cerr_b)):

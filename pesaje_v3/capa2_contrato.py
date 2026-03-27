@@ -113,7 +113,9 @@ def calcular_contabilidad(datos: DatosDia) -> ContabilidadDia:
                     restantes_ent_a.pop(i)
                     break
 
-        venta_raw = total_a + new_ent_b + ajuste_promo - total_b - ajuste
+        # venta_raw SIN descuento de latas (convención spec).
+        # El ajuste se aplica al total final, no por sabor.
+        venta_raw = total_a + new_ent_b + ajuste_promo - total_b
 
         nombre_display = d.nombre if d.nombre else n.nombre
         resultado.sabores[nombre] = SaborContable(

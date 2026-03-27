@@ -589,11 +589,11 @@ class ResultadoDia:
 
     @property
     def total_operativo(self) -> int:
-        return self.venta_operativo + self.vdp
+        return self.venta_operativo - self.lid_discount + self.vdp
 
     @property
     def total_refinado(self) -> int:
-        return self.venta_refinado + self.vdp
+        return self.venta_refinado - self.lid_discount + self.vdp
 
     @property
     def delta_estimado(self) -> int:
