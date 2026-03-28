@@ -135,6 +135,129 @@ def _paso1_timeline(nombre: str, datos: DatosDia) -> List[Snapshot]:
 
 
 # ═══════════════════════════════════════════════════════════════
+# PASO 1b: Lifecycle scan — detectar aperturas previas en timeline
+# No mata identidades; produce señales probatorias para Paso 3/4.
+# ═══════════════════════════════════════════════════════════════
+
+@dataclass
+class CanLifecycle:
+    """Estado inferido de una cerrada en el timeline."""
+    peso_ref: int
+    estado: str  # VIVA, ABIERTA_ALTA_CONFIANZA, REAPARICION_SOSPECHOSA
+    turno_apertura: Optional[str] = None  # label del turno donde se abrió
+    sightings_pre: int = 0   # sightings antes de apertura
+    sightings_post: int = 0  # sightings después de apertura (reapariciones)
+    sightings_relevantes: int = 0  # sightings que cuentan para hipótesis actuales
+    confianza_apertura: float = 0.0  # qué tan seguro es que se abrió
+
+
+def _paso1b_lifecycle(timeline: List[Snapshot], tol: int = 30) -> Dict[int, CanLifecycle]:
+    """
+    Recorre el timeline buscando eventos de apertura:
+      - Cerrada presente en turno T, ausente en T+1, ab sube significativamente.
+
+    Produce un dict peso_ref -> CanLifecycle con estados blandos.
+    No emite sentencias; produce evidencia para pasos posteriores.
+    """
+    lifecycle = {}
+
+    if len(timeline) < 2:
+        return lifecycle
+
+    # Recolectar todos los pesos de cerradas vistos en el timeline
+    all_cerr_pesos = set()
+    for snap in timeline:
+        for c in snap.cerradas:
+            all_cerr_pesos.add(int(c))
+
+    for peso_ref in all_cerr_pesos:
+        # Rastrear presencia/ausencia a lo largo del timeline
+        presencia = []
+        for i, snap in enumerate(timeline):
+            present = any(abs(peso_ref - c) <= tol for c in snap.cerradas)
+            # También contar como entrante
+            present_ent = any(abs(peso_ref - e) <= tol for e in snap.entrantes)
+            presencia.append({
+                'idx': i,
+                'label': snap.label,
+                'cerr': present,
+                'ent': present_ent,
+                'ab': snap.ab,
+            })
+
+        # Buscar patrón de apertura: cerr presente en T, ausente en T+1, ab sube
+        apertura_detectada = False
+        turno_apertura = None
+        idx_apertura = None
+        conf_apertura = 0.0
+
+        for i in range(len(presencia) - 1):
+            curr = presencia[i]
+            next_p = presencia[i + 1]
+
+            if curr['cerr'] and not next_p['cerr']:
+                # Cerrada desapareció. ¿Ab subió?
+                rise = next_p['ab'] - curr['ab']
+                expected_rise = peso_ref - 280  # peso neto sin tara
+
+                if rise > 500:
+                    # Rise significativo. ¿Coherente con esta cerrada?
+                    coherencia = 1.0 - min(1.0, abs(rise - expected_rise) / max(expected_rise, 1))
+
+                    if coherencia > 0.5:
+                        conf_apertura = min(0.95, 0.7 + coherencia * 0.25)
+                    else:
+                        # Rise existe pero no coherente con ESTA cerrada
+                        # Podría ser otra cerrada la que se abrió
+                        conf_apertura = 0.4
+
+                    apertura_detectada = True
+                    turno_apertura = curr['label']
+                    idx_apertura = i
+                    break
+
+                elif len(timeline[i].cerradas) > len(timeline[i + 1].cerradas):
+                    # Desapareció y hay menos cerradas, aunque ab no subió mucho
+                    # Posible apertura con venta inmediata fuerte
+                    conf_apertura = 0.5
+                    apertura_detectada = True
+                    turno_apertura = curr['label']
+                    idx_apertura = i
+                    break
+
+        if not apertura_detectada:
+            # Can viva — contar sightings normales
+            total_sightings = sum(1 for p in presencia if p['cerr'])
+            lifecycle[peso_ref] = CanLifecycle(
+                peso_ref=peso_ref,
+                estado='VIVA',
+                sightings_pre=total_sightings,
+                sightings_relevantes=total_sightings,
+            )
+        else:
+            # Can con apertura detectada
+            sightings_pre = sum(1 for p in presencia[:idx_apertura + 1] if p['cerr'])
+            sightings_post = sum(1 for p in presencia[idx_apertura + 1:] if p['cerr'])
+
+            if sightings_post > 0:
+                estado = 'REAPARICION_SOSPECHOSA'
+            else:
+                estado = 'ABIERTA_ALTA_CONFIANZA'
+
+            lifecycle[peso_ref] = CanLifecycle(
+                peso_ref=peso_ref,
+                estado=estado,
+                turno_apertura=turno_apertura,
+                sightings_pre=sightings_pre,
+                sightings_post=sightings_post,
+                sightings_relevantes=sightings_pre,  # post-apertura no cuenta
+                confianza_apertura=conf_apertura,
+            )
+
+    return lifecycle
+
+
+# ═══════════════════════════════════════════════════════════════
 # PASO 2: Planos de evidencia
 # ═══════════════════════════════════════════════════════════════
 
@@ -201,7 +324,8 @@ def _count_sightings(peso: int, timeline: List[Snapshot], tol: int = 30) -> int:
     return count
 
 
-def _paso2_plano2(nombre: str, datos: DatosDia, timeline: List[Snapshot]) -> PlanoP2:
+def _paso2_plano2(nombre: str, datos: DatosDia, timeline: List[Snapshot],
+                  lifecycle: Optional[Dict[int, CanLifecycle]] = None) -> PlanoP2:
     d = datos.turno_dia.sabores.get(nombre)
     n = datos.turno_noche.sabores.get(nombre)
     if not d or not n:
@@ -212,19 +336,28 @@ def _paso2_plano2(nombre: str, datos: DatosDia, timeline: List[Snapshot]) -> Pla
     cerr_b = list(n.cerradas)
     mr = match_cerradas(cerr_a, cerr_b)
 
+    def _effective_sightings(peso, timeline):
+        """Sightings relevantes: usa lifecycle si disponible."""
+        if lifecycle:
+            # Buscar en lifecycle con tolerancia
+            for lc_peso, lc in lifecycle.items():
+                if abs(peso - lc_peso) <= 30:
+                    return lc.sightings_relevantes
+        return _count_sightings(peso, timeline)
+
     matches = []
     for ia, ib, pa, pb, diff in mr.matched:
-        s = _count_sightings(pa, timeline)
+        s = _effective_sightings(pa, timeline)
         matches.append((pa, pb, diff, s))
 
-    unmatched_a = [(cerr_a[ia], _count_sightings(cerr_a[ia], timeline))
+    unmatched_a = [(cerr_a[ia], _effective_sightings(cerr_a[ia], timeline))
                    for ia in mr.unmatched_a]
-    unmatched_b = [(cerr_b[ib], _count_sightings(cerr_b[ib], timeline))
+    unmatched_b = [(cerr_b[ib], _effective_sightings(cerr_b[ib], timeline))
                    for ib in mr.unmatched_b]
 
     all_sightings = {}
     for c in cerr_a + cerr_b:
-        all_sightings[c] = _count_sightings(c, timeline)
+        all_sightings[c] = _effective_sightings(c, timeline)
 
     return PlanoP2(
         cerr_a=cerr_a, cerr_b=cerr_b,
@@ -737,6 +870,143 @@ def _paso5_seleccionar(hips: List[Hipotesis], sc, p2: PlanoP2
 
 
 # ═══════════════════════════════════════════════════════════════
+# PASO 5b: Composición de correcciones independientes
+# Solo combina hipótesis que:
+#   1. Apuntan a targets distintos (diferentes cerradas)
+#   2. No compiten causalmente
+#   3. Cada una pasa coherencia individual
+#   4. Una no presupone la falsedad de la otra
+# ═══════════════════════════════════════════════════════════════
+
+def _paso5b_componer(hips: List[Hipotesis], sc, p2: PlanoP2,
+                     lifecycle: Optional[Dict[int, CanLifecycle]] = None
+                     ) -> Optional[List[Hipotesis]]:
+    """
+    Intenta componer 2+ correcciones independientes.
+    Retorna lista de hipótesis compatibles o None si no aplica.
+    """
+    # Solo intentar composición si hay cerradas que desaparecen en DIA
+    # y la resolución individual dejaría una parte sin explicar
+    if len(p2.desaparecen) < 2:
+        return None
+
+    viables = [h for h in hips if h.n_contra == 0]
+    if len(viables) < 2:
+        return None
+
+    # Agrupar viables por peso target (la cerrada que tocan)
+    por_target = {}
+    for h in viables:
+        target = int(h.peso)
+        if target not in por_target:
+            por_target[target] = []
+        por_target[target].append(h)
+
+    if len(por_target) < 2:
+        return None
+
+    # Para cada target, elegir la mejor hipótesis
+    candidatos = {}
+    for target, hs in por_target.items():
+        hs.sort(key=lambda h: (h.independientes, h.n_favor), reverse=True)
+        best = hs[0]
+        # Filtrar: no componer hipótesis que solo tienen 0 planos favor
+        if best.n_favor == 0:
+            continue
+        # No componer APERTURA_REAL vetada
+        if best.tipo == 'APERTURA_REAL' and any('RIVAL' in c or 'DUPLICADO' in c for c in best.planos_contra):
+            continue
+        candidatos[target] = best
+
+    if len(candidatos) < 2:
+        return None
+
+    # Verificar compatibilidad: no deben competir causalmente
+    # Regla: no puede haber dos PHANTOM_DIA + dos OMISION_DIA sobre targets distintos
+    # (eso sería inventar dos explicaciones independientes para el mismo desorden)
+    # Permitido: PHANTOM + GENEALOGIA, PHANTOM + MISMATCH, GENEALOGIA + GENEALOGIA
+    combo = list(candidatos.values())
+
+    tipos = set(h.tipo for h in combo)
+    # Dos PHANTOM_DIA sería muy agresivo — permitir solo si uno tiene lifecycle sospechoso
+    n_phantom = sum(1 for h in combo if h.tipo == 'PHANTOM_DIA')
+    if n_phantom >= 2 and lifecycle:
+        # Solo permitir si al menos uno tiene REAPARICION_SOSPECHOSA
+        phantom_con_lifecycle = 0
+        for h in combo:
+            if h.tipo == 'PHANTOM_DIA':
+                for lc_peso, lc in lifecycle.items():
+                    if abs(h.peso - lc_peso) <= 30 and lc.estado == 'REAPARICION_SOSPECHOSA':
+                        phantom_con_lifecycle += 1
+                        break
+        if phantom_con_lifecycle == 0:
+            return None
+    elif n_phantom >= 2:
+        return None
+
+    # Verificar compatibilidad causal: una hipótesis no puede afirmar
+    # la existencia de un can que otra hipótesis niega.
+    # GENEALOGIA dice "peso X es en realidad peso Y (que existe)"
+    # PHANTOM dice "peso Z no existe"
+    # Si Y == Z → incompatibles.
+    pesos_afirmados = set()  # pesos cuya existencia se afirma
+    pesos_negados = set()    # pesos cuya existencia se niega
+
+    for h in combo:
+        if h.tipo == 'GENEALOGIA_ENT_CERR':
+            # Genealogía afirma que el can es realmente otro peso (el entrante)
+            # El entrante que hereda existe legítimamente
+            # Extraer peso del entrante del acción text o del delta
+            # El peso target de genealogía es el peso de la cerrada que se corrige
+            pesos_afirmados.add(int(h.peso))
+        elif h.tipo in ('PHANTOM_DIA', 'PHANTOM_NOCHE'):
+            pesos_negados.add(int(h.peso))
+        elif h.tipo == 'OMISION_DIA':
+            pesos_afirmados.add(int(h.peso))
+
+    # Conflicto: un peso no puede ser afirmado y negado a la vez
+    conflicto_directo = pesos_afirmados & pesos_negados
+    if conflicto_directo:
+        # Remover hipótesis conflictivas — quedarse con las que no contradicen
+        combo = [h for h in combo
+                 if not (h.tipo in ('PHANTOM_DIA', 'PHANTOM_NOCHE')
+                         and int(h.peso) in conflicto_directo)]
+        if len(combo) < 2:
+            return None
+
+    # También verificar: GENEALOGIA implica que un entrante se convirtió en cerrada.
+    # Si hay PHANTOM_NOCHE sobre esa misma cerrada target → conflicto implícito.
+    for h in list(combo):
+        if h.tipo == 'GENEALOGIA_ENT_CERR':
+            # El peso genealógico es la cerrada DIA. El entrante es el can real.
+            # Si hay phantom NOCHE sobre un peso cercano al entrante → conflicto
+            for h2 in combo:
+                if h2.tipo == 'PHANTOM_NOCHE' and h2 is not h:
+                    # Verificar si el phantom toca el mismo can que la genealogía establece
+                    if abs(int(h2.peso) - int(h.peso)) <= 200:
+                        combo = [x for x in combo if x is not h2]
+
+    if len(combo) < 2:
+        return None
+
+    # Verificar coherencia compuesta
+    delta_total = sum(h.delta_stock + h.delta_latas * 280 for h in combo)
+    venta_compuesta = sc.venta_raw + delta_total
+    if venta_compuesta < -300:
+        return None
+    if sc.total_a > 0 and abs(venta_compuesta) > sc.total_a * 0.8:
+        return None
+
+    # Verificar que cada componente aporta al resultado
+    # (no componer si uno de los deltas es 0 y no cambia nada)
+    deltas_reales = [h for h in combo if abs(h.delta_stock + h.delta_latas * 280) > 0]
+    if len(deltas_reales) < 2:
+        return None
+
+    return combo
+
+
+# ═══════════════════════════════════════════════════════════════
 # PASO 6: Asignar tipo/banda/confianza
 # ═══════════════════════════════════════════════════════════════
 
@@ -796,9 +1066,12 @@ def _resolver_sabor(nombre: str, clasificado: SaborClasificado,
     # PASO 1
     timeline = _paso1_timeline(nombre, datos)
 
+    # PASO 1b: Lifecycle scan
+    lifecycle = _paso1b_lifecycle(timeline)
+
     # PASO 2
     p1 = _paso2_plano1(nombre, datos)
-    p2 = _paso2_plano2(nombre, datos, timeline)
+    p2 = _paso2_plano2(nombre, datos, timeline, lifecycle=lifecycle)
     p3 = _paso2_plano3(nombre, datos, timeline)
 
     # PASO 3
@@ -809,8 +1082,73 @@ def _resolver_sabor(nombre: str, clasificado: SaborClasificado,
     # PASO 4
     _paso4_evaluar(hips, sc, p1, p2, p3)
 
-    # PASO 5
+    # PASO 5: Seleccionar mejor hipótesis individual
     mejor = _paso5_seleccionar(hips, sc, p2)
+
+    # PASO 5b: Intentar composición de correcciones independientes
+    # Si hay una ganadora + otras viables sobre targets DISTINTOS,
+    # componer si no se contradicen.
+    composicion = _paso5b_componer(hips, sc, p2, lifecycle)
+
+    if composicion:
+        # Composición gana sobre hipótesis individual
+        delta_total = sum(h.delta_stock + h.delta_latas * 280 for h in composicion)
+        venta_corr = sc.venta_raw + delta_total
+
+        # Guardia de coherencia compuesta
+        if venta_corr < -300:
+            composicion = None
+        elif sc.total_a > 0 and abs(venta_corr) > sc.total_a * 0.8:
+            composicion = None
+
+    if composicion:
+        # Recalcular latas en composición: la suma ingenua de delta_latas
+        # puede ser incorrecta si GENEALOGIA + PHANTOM eliminan la misma "apertura".
+        # Contar cerradas reales post-composición:
+        cerr_dia_reales = len(p2.cerr_a)
+        cerr_noche_reales = len(p2.cerr_b)
+        for h in composicion:
+            if h.tipo == 'PHANTOM_DIA':
+                cerr_dia_reales -= 1
+            elif h.tipo == 'PHANTOM_NOCHE':
+                cerr_noche_reales -= 1
+            elif h.tipo == 'DUPLICADO_CERRADA':
+                cerr_dia_reales -= 1
+            elif h.tipo == 'GENEALOGIA_ENT_CERR':
+                # Genealogía no agrega ni quita latas — reinterpreta identidad
+                pass
+        n_latas_reales = max(0, cerr_dia_reales - cerr_noche_reales)
+        # Limpiar delta_latas de los componentes y recalcular
+        for h in composicion:
+            h.delta_latas = 0
+        # El delta de latas va en el total, no por componente
+        # (se aplica al total final del día)
+
+        # Clasificar: la composición hereda la banda más baja de sus componentes
+        tipos_bandas = [_paso6_clasificar(h, sc) for h in composicion]
+        banda_orden = {'CONFIRMADO': 0, 'FORZADO': 1, 'ESTIMADO': 2}
+        peor_banda = max(tipos_bandas, key=lambda tb: banda_orden.get(tb[1].value, 99))
+        tipo, banda, conf = peor_banda[0], peor_banda[1], min(tb[2] for tb in tipos_bandas)
+
+        delta_total = sum(h.delta_stock + h.delta_latas * 280 for h in composicion)
+        venta_corr = sc.venta_raw + delta_total
+
+        motivos = ' + '.join(f'[{h.tipo}]{h.accion[:40]}' for h in composicion)
+        planos = ' | '.join(f'{h.tipo}:fav={h.planos_favor}' for h in composicion)
+
+        return Correccion(
+            nombre_norm=nombre,
+            venta_raw=sc.venta_raw,
+            venta_corregida=venta_corr,
+            delta=delta_total,
+            tipo_justificacion=tipo,
+            banda=banda,
+            tipo_resolucion=TipoResolucion.RESUELTO_CONJUNTO,
+            confianza=conf,
+            motivo=f'[COMPOSICION {len(composicion)}x] {motivos} | {planos}',
+        )
+
+    # Sin composición: usar hipótesis individual
     if not mejor:
         return None
 

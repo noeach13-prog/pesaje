@@ -655,24 +655,28 @@ def test_matching_consistencia_c3_c4(dia):
 # E) GUARDIA BILATERAL — Capa 4
 # ===================================================================
 
-def test_bilateral_sambayon_d28_resuelto_por_genealogia():
+def test_bilateral_sambayon_d28_resuelto_por_composicion():
     """
     CASO CONCRETO: SAMBAYON D28.
     cerr DIA [6450, 6675] -> cerr NOCHE [6575].
-    La 6675 no tiene historia como entrante, pero la entrante 6575 de D27
-    esta a 100g de distancia. Genealogia entrante->cerrada identifica
-    que 6675 = 6575 + error de pesaje.
-    El sistema DEBE resolver por GENEALOGIA_ENT_CERR con delta=-100g.
+    - 6450 fue abierta en D27 (lifecycle: REAPARICION_SOSPECHOSA) -> GENEALOGIA con entrante 6575
+    - 6675 es phantom (1 sighting, sin historia)
+    Composicion: GENEALOGIA(6450->6575, +125) + PHANTOM(6675, -6675) = -6550
+    Venta final = 555g (venta pura de abierta 6235->5680).
     """
     _, cont, c3, c4 = _correr_pipeline(28)
 
     samb_corr = next((c for c in c4.correcciones if c.nombre_norm == 'SAMBAYON'), None)
     assert samb_corr is not None, \
-        'SAMBAYON D28 no fue resuelto — deberia resolverse por genealogia'
+        'SAMBAYON D28 no fue resuelto — deberia resolverse por composicion'
+    assert 'COMPOSICION' in samb_corr.motivo, \
+        f'SAMBAYON D28 resuelto por {samb_corr.motivo[:40]}, esperaba COMPOSICION'
     assert 'GENEALOGIA_ENT_CERR' in samb_corr.motivo, \
-        f'SAMBAYON D28 resuelto por {samb_corr.motivo[:40]}, esperaba GENEALOGIA_ENT_CERR'
-    assert samb_corr.delta == -100, \
-        f'SAMBAYON D28 delta={samb_corr.delta}, esperaba -100 (correccion 6675->6575)'
+        f'SAMBAYON D28 debe incluir GENEALOGIA en composicion'
+    assert 'PHANTOM_DIA' in samb_corr.motivo, \
+        f'SAMBAYON D28 debe incluir PHANTOM_DIA en composicion'
+    assert samb_corr.venta_corregida == 555, \
+        f'SAMBAYON D28 venta={samb_corr.venta_corregida}, esperaba 555 (venta pura ab)'
 
 
 def test_bilateral_no_veta_phantom_limpio():
