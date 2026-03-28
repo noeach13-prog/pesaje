@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.xlsx
+!tabla_maestra.xlsx
+pesaje_v3_FINAL_Febrero2026/
+.pytest_cache/
+.venv/
+venv/
+.git/
+auditorias_diarias/
+C:UsersEliteBookPesajeauditorias_diarias/
+*.log
+*.tmp
+~$*

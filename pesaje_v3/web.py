@@ -68,6 +68,8 @@ def _procesar(path_in: str, filename: str):
     total_raw = sum(r.venta_raw for _, _, _, _, r in resultados)
     total_ref = sum(r.venta_refinado for _, _, _, _, r in resultados)
     total_vdp = sum(r.vdp for _, _, _, _, r in resultados)
+    total_latas = sum(r.n_latas for _, _, _, _, r in resultados)
+    total_final = sum(r.total_refinado for _, _, _, _, r in resultados)
 
     return {
         'output_name': output_name,
@@ -80,10 +82,13 @@ def _procesar(path_in: str, filename: str):
         'total_raw': total_raw,
         'total_refinada': total_ref,
         'total_vdp': total_vdp,
+        'total_latas': total_latas,
+        'total_final': total_final,
         'dias': [{
             'label': f'D{r.dia_label}',
             'raw': r.venta_raw,
             'refinada': r.venta_refinado,
+            'total': r.total_refinado,
             'vdp': r.vdp,
             'latas': r.n_latas,
             'corr': len(c4.correcciones),
@@ -196,19 +201,19 @@ _PAGE = """<!DOCTYPE html>
   <div class="result">
     <h2>Analisis completado</h2>
     <div class="stats">
-      <div class="stat-box"><div class="num">{{ result.n_dias }}</div><div class="lbl">Dias</div></div>
-      <div class="stat-box"><div class="num">{{ '{:,}'.format(result.total_refinada) }}g</div><div class="lbl">Venta Refinada</div></div>
+      <div class="stat-box"><div class="num">{{ result.n_dias }}</div><div class="lbl">Días</div></div>
+      <div class="stat-box"><div class="num">{{ '{:,}'.format(result.total_final) }}g</div><div class="lbl">Total del mes</div></div>
+      <div class="stat-box"><div class="num">{{ '{:,}'.format(result.total_vdp) }}g</div><div class="lbl">VDP</div></div>
       <div class="stat-box"><div class="num">{{ result.n_correcciones }}</div><div class="lbl">Correcciones</div></div>
-      <div class="stat-box"><div class="num">{{ result.n_sin_resolver }}</div><div class="lbl">Sin resolver</div></div>
     </div>
     <table>
-      <tr><th>Dia</th><th>RAW</th><th>Refinada</th><th>VDP</th><th>Latas</th><th>Corr</th><th>H0</th></tr>
+      <tr><th>Día</th><th>Helados</th><th>VDP</th><th>Total</th><th>Latas</th><th>Corr</th><th>H0</th></tr>
       {% for d in result.dias %}
       <tr class="{{ 'alert' if d.h0 > 3 else '' }}">
         <td>{{ d.label }}</td>
-        <td>{{ '{:,}'.format(d.raw) }}</td>
         <td>{{ '{:,}'.format(d.refinada) }}</td>
         <td>{{ '{:,}'.format(d.vdp) }}</td>
+        <td>{{ '{:,}'.format(d.total) }}</td>
         <td>{{ d.latas }}</td>
         <td>{{ d.corr }}</td>
         <td>{{ d.h0 }}{{ ' ⚠' if d.h0 > 0 else '' }}</td>
@@ -216,10 +221,10 @@ _PAGE = """<!DOCTYPE html>
       {% endfor %}
       <tr class="total">
         <td>TOTAL</td>
-        <td>{{ '{:,}'.format(result.total_raw) }}</td>
         <td>{{ '{:,}'.format(result.total_refinada) }}</td>
         <td>{{ '{:,}'.format(result.total_vdp) }}</td>
-        <td>{{ result.dias | sum(attribute='latas') }}</td>
+        <td>{{ '{:,}'.format(result.total_final) }}</td>
+        <td>{{ result.total_latas }}</td>
         <td>{{ result.n_correcciones }}</td>
         <td>{{ result.n_sin_resolver }}</td>
       </tr>
@@ -309,5 +314,6 @@ def download(filename):
 
 
 if __name__ == '__main__':
-    print("Pesaje v3 — http://localhost:5001")
-    app.run(host='0.0.0.0', port=5001, debug=False)
+    port = int(os.environ.get('PORT', 5001))
+    print(f"Pesaje v3 — http://localhost:{port}")
+    app.run(host='0.0.0.0', port=port, debug=False)

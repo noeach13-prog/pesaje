@@ -24,6 +24,9 @@ Thumbs.db
 *.xlsx
 !tabla_maestra.xlsx
 
+# Carpeta de versión congelada
+pesaje_v3_FINAL_Febrero2026/
+
 # Temp
 *.tmp
 ~$*
