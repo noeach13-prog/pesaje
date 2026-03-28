@@ -102,34 +102,30 @@ class Hipotesis:
 # ═══════════════════════════════════════════════════════════════
 
 def _paso1_timeline(nombre: str, datos: DatosDia) -> List[Snapshot]:
-    timeline = []
+    # Recolectar todos los turnos con su indice para ordenar cronologicamente
+    all_turnos = []
     for ctx in datos.contexto:
         s = ctx.sabores.get(nombre)
         if s:
-            timeline.append(Snapshot(
-                label=ctx.nombre_hoja,
-                ab=s.abierta or 0,
-                cerradas=list(s.cerradas),
-                entrantes=list(s.entrantes),
-                total=s.total,
-            ))
+            all_turnos.append((ctx.indice, ctx.nombre_hoja, s))
     sd = datos.turno_dia.sabores.get(nombre)
     if sd:
-        timeline.append(Snapshot(
-            label=datos.turno_dia.nombre_hoja,
-            ab=sd.abierta or 0,
-            cerradas=list(sd.cerradas),
-            entrantes=list(sd.entrantes),
-            total=sd.total,
-        ))
+        all_turnos.append((datos.turno_dia.indice, datos.turno_dia.nombre_hoja, sd))
     sn = datos.turno_noche.sabores.get(nombre)
     if sn:
+        all_turnos.append((datos.turno_noche.indice, datos.turno_noche.nombre_hoja, sn))
+
+    # Ordenar por indice del workbook (orden cronologico real)
+    all_turnos.sort(key=lambda t: t[0])
+
+    timeline = []
+    for idx, label, s in all_turnos:
         timeline.append(Snapshot(
-            label=datos.turno_noche.nombre_hoja,
-            ab=sn.abierta or 0,
-            cerradas=list(sn.cerradas),
-            entrantes=list(sn.entrantes),
-            total=sn.total,
+            label=label,
+            ab=s.abierta or 0,
+            cerradas=list(s.cerradas),
+            entrantes=list(s.entrantes),
+            total=s.total,
         ))
     return timeline
 
