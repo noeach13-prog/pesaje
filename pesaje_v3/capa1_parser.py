@@ -285,6 +285,7 @@ def _cargar_dia_turno_unico(path_excel, shifts, dia_num, turnos_contexto):
         turno_dia=turno_a,    # turno A = snapshot anterior (referencia)
         turno_noche=turno_b,  # turno B = snapshot actual (venta calculada aqui)
         contexto=contexto,
+        modo='TURNO_UNICO',
     )
 
 
@@ -366,6 +367,7 @@ def _todos_los_dias_turno_unico(path_excel, turnos):
             turno_dia=turno_a,
             turno_noche=turno_b,
             contexto=contexto,
+            modo='TURNO_UNICO',
         ))
 
     return resultado

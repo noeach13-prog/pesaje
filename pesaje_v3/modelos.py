@@ -46,6 +46,7 @@ class DatosDia:
     turno_dia: TurnoCrudo
     turno_noche: TurnoCrudo
     contexto: List[TurnoCrudo] = field(default_factory=list)  # turnos adyacentes para Capa 4
+    modo: str = 'DIA_NOCHE'  # 'DIA_NOCHE' | 'TURNO_UNICO'
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -73,6 +74,7 @@ class SaborContable:
     # Presencia
     solo_dia: bool = False   # presente en DIA pero no en NOCHE
     solo_noche: bool = False # presente en NOCHE pero no en DIA
+    new_cerr_b: int = 0      # cerradas nuevas en B no matcheadas en A (TURNO_UNICO)
 
 
 @dataclass

@@ -30,7 +30,28 @@ def _matching_entrantes(ent_a: list, ent_b: list, tolerancia: int = 50) -> int:
     return new_ent_b
 
 
-def calcular_contabilidad(datos: DatosDia) -> ContabilidadDia:
+def _new_cerradas_b(cerr_a: list, cerr_b: list, tolerancia: int = 200) -> int:
+    """
+    En modo TURNO_UNICO: suma de cerradas en B que no matchean ninguna cerrada en A.
+    Representan latas entregadas durante el dia B registradas directamente como cerradas
+    (sin pasar por la columna entrantes). Tolerancia 200g para varianza entre dias.
+    """
+    usadas_a = [False] * len(cerr_a)
+    total = 0
+    for cb in cerr_b:
+        matched = False
+        for i, ca in enumerate(cerr_a):
+            if not usadas_a[i] and abs(cb - ca) <= tolerancia:
+                usadas_a[i] = True
+                matched = True
+                break
+        if not matched:
+            total += cb
+    return total
+
+
+def calcular_contabilidad(datos: DatosDia, modo: str = None) -> ContabilidadDia:
+    modo = modo or getattr(datos, 'modo', 'DIA_NOCHE')
     """
     Aplica la fórmula de venta a cada sabor del día.
     Fórmula inmutable:
@@ -75,6 +96,13 @@ def calcular_contabilidad(datos: DatosDia) -> ContabilidadDia:
         total_b = n.total
         new_ent_b = _matching_entrantes(d.entrantes, n.entrantes)
 
+        # En TURNO_UNICO, latas entregadas el dia B pueden aparecer directamente
+        # como cerradas sin pasar por la columna entrantes. Sumarlas como stock entrante.
+        new_cerr_b = (
+            _new_cerradas_b(d.cerradas, n.cerradas)
+            if modo == 'TURNO_UNICO' else 0
+        )
+
         n_cerr_a = len(d.cerradas)
         n_cerr_b = len(n.cerradas)
         n_latas = max(0, n_cerr_a - n_cerr_b)
@@ -115,7 +143,7 @@ def calcular_contabilidad(datos: DatosDia) -> ContabilidadDia:
 
         # venta_raw SIN descuento de latas (convención spec).
         # El ajuste se aplica al total final, no por sabor.
-        venta_raw = total_a + new_ent_b + ajuste_promo - total_b
+        venta_raw = total_a + new_ent_b + new_cerr_b + ajuste_promo - total_b
 
         nombre_display = d.nombre if d.nombre else n.nombre
         resultado.sabores[nombre] = SaborContable(
@@ -126,6 +154,7 @@ def calcular_contabilidad(datos: DatosDia) -> ContabilidadDia:
             n_cerr_a=n_cerr_a, n_cerr_b=n_cerr_b,
             n_latas=n_latas, ajuste_latas=ajuste,
             venta_raw=venta_raw,
+            new_cerr_b=new_cerr_b,
         )
 
     # VDP
