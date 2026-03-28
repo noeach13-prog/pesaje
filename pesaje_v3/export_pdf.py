@@ -296,6 +296,107 @@ def _pagina_dia(pdf: ReportePDF, dia_data: dict):
 # FUNCION PRINCIPAL
 # ═══════════════════════════════════════════════════════════════
 
+def generar_pdf_desde_resultados(resultados: list, titulo: str, path_salida: str):
+    """
+    Genera el PDF a partir de resultados ya calculados por el pipeline.
+    Evita correr el pipeline dos veces (una en web.py y otra aqui).
+
+    resultados: lista de (datos, cont, c3, c4, resultado) igual que en cli.py
+    titulo: nombre del workbook para el header del PDF
+    """
+    from pesaje_v3.modelos import StatusC3, Banda
+
+    dias_data = []
+    for datos, cont, c3, c4, r in resultados:
+        casos_no_limpios = []
+        c4_map = {c.nombre_norm: c for c in c4.correcciones}
+
+        for nombre in sorted(cont.sabores.keys()):
+            s3 = c3.sabores.get(nombre)
+            if not s3 or s3.status == StatusC3.LIMPIO:
+                continue
+
+            sc = cont.sabores[nombre]
+            c4c = c4_map.get(nombre)
+            is_h0 = nombre in c4.sin_resolver
+
+            caso = {
+                'sabor': nombre,
+                'raw': sc.venta_raw,
+                'status': '',
+                'corregida': None,
+                'delta': None,
+                'banda': '',
+                'confianza': None,
+                'nota': '',
+            }
+
+            if s3.status == StatusC3.ENGINE:
+                caso['status'] = 'ENGINE'
+                caso['corregida'] = s3.venta_final_c3
+                if c4c:
+                    caso['delta'] = c4c.delta
+                    caso['banda'] = c4c.banda.value
+                    caso['confianza'] = c4c.confianza
+                    caso['nota'] = c4c.motivo[:120]
+                else:
+                    caso['nota'] = 'Apertura detectada, venta raw valida'
+            elif s3.status in (StatusC3.SOLO_DIA, StatusC3.SOLO_NOCHE):
+                caso['status'] = s3.status.value
+                caso['nota'] = 'Solo un turno presente, venta no calculable'
+            elif s3.prototipo:
+                caso['status'] = f'C3:{s3.prototipo.codigo}'
+                caso['corregida'] = s3.prototipo.venta_corregida
+                caso['delta'] = s3.prototipo.delta
+                caso['confianza'] = s3.prototipo.confianza
+                caso['banda'] = 'CONFIRMADO' if s3.prototipo.confianza >= 0.85 else 'ESTIMADO'
+                caso['nota'] = s3.prototipo.descripcion[:120]
+            elif c4c:
+                caso['status'] = 'C4'
+                caso['corregida'] = c4c.venta_corregida
+                caso['delta'] = c4c.delta
+                caso['banda'] = c4c.banda.value
+                caso['confianza'] = c4c.confianza
+                caso['nota'] = c4c.motivo[:120]
+            elif is_h0:
+                caso['status'] = 'H0'
+                flags_str = ', '.join(f.codigo for f in s3.flags) if s3.flags else ''
+                caso['nota'] = f'Sin resolver. Flags: {flags_str}'
+            else:
+                caso['status'] = s3.status.value
+                caso['nota'] = 'Clasificacion sin resolucion'
+
+            casos_no_limpios.append(caso)
+
+        notas_dia = []
+        if r.n_latas > 0:
+            notas_dia.append(f'{r.n_latas} latas')
+        if len(c4.sin_resolver) > 0:
+            notas_dia.append(f'{len(c4.sin_resolver)} H0')
+
+        dias_data.append({
+            'label': datos.dia_label,
+            'raw': r.venta_raw,
+            'conf': r.venta_confirmado,
+            'op': r.venta_operativo,
+            'ref': r.venta_refinado,
+            'vdp': r.vdp,
+            'latas': r.n_latas,
+            'corr': len(c4.correcciones),
+            'h0': len(c4.sin_resolver),
+            'notas': ' | '.join(notas_dia),
+            'casos_no_limpios': casos_no_limpios,
+        })
+
+    pdf = ReportePDF(titulo)
+    pdf.alias_nb_pages()
+    _pagina_resumen(pdf, dias_data)
+    for dia in dias_data:
+        _pagina_dia(pdf, dia)
+    pdf.output(path_salida)
+    return path_salida
+
+
 def generar_pdf(path_excel: str, path_salida: str):
     """Corre el pipeline completo y genera el PDF."""
     import os

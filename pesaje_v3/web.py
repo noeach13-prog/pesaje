@@ -55,11 +55,11 @@ def _procesar(path_in: str, filename: str):
     tmp_out = os.path.join(tempfile.gettempdir(), output_name)
     exportar_multi(resultados, tmp_out)
 
-    # Exportar PDF
-    from pesaje_v3.export_pdf import generar_pdf
+    # Exportar PDF (reusar resultados ya calculados, sin volver a correr el pipeline)
+    from pesaje_v3.export_pdf import generar_pdf_desde_resultados
     pdf_name = f"Reporte_{stem}.pdf"
     pdf_path = os.path.join(tempfile.gettempdir(), pdf_name)
-    generar_pdf(path_in, pdf_path)
+    generar_pdf_desde_resultados(resultados, stem, pdf_path)
 
     # Stats
     total_dias = len(resultados)
