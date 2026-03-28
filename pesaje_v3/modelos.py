@@ -522,6 +522,9 @@ class TipoResolucion(Enum):
     IDENTITY_AMBIGUOUS = 'IDENTITY_AMBIGUOUS'
     H0 = 'H0'
     UNRESOLVED = 'UNRESOLVED'
+    # Rescate colectivo: patron cross-sabor compensa la falta de convergencia individual.
+    # Semanticamente distinto de RESUELTO_INDIVIDUAL (>=2 planos independientes propios).
+    ELEVADO_POR_PATRON_COLECTIVO = 'ELEVADO_POR_PATRON_COLECTIVO'
 
 
 @dataclass

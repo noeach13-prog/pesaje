@@ -1260,30 +1260,84 @@ def _revisar_engine(nombre: str, clasificado: SaborClasificado,
 # ESPECIAL: Análisis CONJUNTO cross-sabor
 # ═══════════════════════════════════════════════════════════════
 
-def _analisis_conjunto(correcciones: List[Correccion]):
+def _analisis_conjunto(correcciones: List[Correccion],
+                       estimaciones_h0: List['EstimacionH0'],
+                       resultado: 'ResultadoC4') -> None:
     """
-    Post-procesamiento: busca patrones cross-sabor.
-    Modifica correcciones in-place si encuentra patrón.
-    """
-    # Patrón 1: Omisiones DIA sistemáticas
-    omisiones_dia = [c for c in correcciones if 'OMISION_DIA' in c.motivo]
-    if len(omisiones_dia) >= 2:
-        for c in omisiones_dia:
-            c.grupo_conjunto = 'OMISION_DIA_SISTEMATICA'
-            if c.tipo_justificacion != TipoJustificacion.A:
-                c.tipo_justificacion = TipoJustificacion.A
-                c.banda = Banda.CONFIRMADO
-                c.motivo += ' | ELEVADO por patron cross-sabor (>=2 omisiones DIA)'
+    Analisis colectivo cross-sabor. Dos responsabilidades separadas:
 
-    # Patron 2: Phantoms DIA sistematicos
-    phantoms_dia = [c for c in correcciones if 'PHANTOM_DIA' in c.motivo]
-    if len(phantoms_dia) >= 2:
-        for c in phantoms_dia:
-            c.grupo_conjunto = 'PHANTOM_DIA_SISTEMATICO'
-            if c.tipo_justificacion != TipoJustificacion.A:
-                c.tipo_justificacion = TipoJustificacion.A
-                c.banda = Banda.CONFIRMADO
-                c.motivo += ' | ELEVADO por patron cross-sabor (>=2 phantoms DIA)'
+    BLOQUE A — correcciones ya confirmadas individualmente:
+      Si >=2 del mismo tipo forman patron -> marcar grupo_conjunto y
+      tipo_resolucion = ELEVADO_POR_PATRON_COLECTIVO.
+      NO cambia la banda (ya era CONFIRMADO por merito propio);
+      solo agrega el contexto colectivo como metadato.
+
+    BLOQUE B — H0 no confirmados individualmente:
+      Si >=2 H0 del mismo tipo estructural forman patron ->
+      crear Correccion con banda=FORZADO y
+      tipo_resolucion = ELEVADO_POR_PATRON_COLECTIVO.
+      Semanticamente distinto de RESUELTO_INDIVIDUAL (convergencia
+      propia de >=2 planos independientes): aqui la confianza viene
+      de la evidencia cruzada, no de evidencia individual suficiente.
+
+    Tipos estructurales elegibles para rescate colectivo:
+      OMISION_DIA, OMISION_NOCHE, PHANTOM_DIA, PHANTOM_NOCHE.
+    MISMATCH_LEVE y APERTURA_REAL se excluyen: son ajustes menores
+    o ventas legitimas que no deben rescatarse por patron colectivo.
+    """
+    from collections import defaultdict
+
+    # ── BLOQUE A: patron en correcciones ya resueltas ──────────────
+    patrones_a = [
+        ('OMISION_DIA',    'OMISION_DIA_SISTEMATICA'),
+        ('PHANTOM_DIA',    'PHANTOM_DIA_SISTEMATICO'),
+        ('OMISION_NOCHE',  'OMISION_NOCHE_SISTEMATICA'),
+        ('PHANTOM_NOCHE',  'PHANTOM_NOCHE_SISTEMATICO'),
+    ]
+    for motivo_key, nombre_patron in patrones_a:
+        grupo = [c for c in correcciones if motivo_key in c.motivo]
+        if len(grupo) >= 2:
+            for c in grupo:
+                c.grupo_conjunto = nombre_patron
+                c.tipo_resolucion = TipoResolucion.ELEVADO_POR_PATRON_COLECTIVO
+                c.motivo += f' | patron colectivo {nombre_patron} (n={len(grupo)})'
+
+    # ── BLOQUE B: rescate de H0 por patron colectivo ───────────────
+    TIPOS_RESCATABLES = {'OMISION_DIA', 'OMISION_NOCHE', 'PHANTOM_DIA', 'PHANTOM_NOCHE'}
+
+    por_tipo: Dict[str, List] = defaultdict(list)
+    for est in estimaciones_h0:
+        if est.hipotesis_tipo in TIPOS_RESCATABLES:
+            por_tipo[est.hipotesis_tipo].append(est)
+
+    nombres_ya_resueltos = {c.nombre_norm for c in correcciones}
+
+    for tipo, grupo in por_tipo.items():
+        # Excluir los que ya fueron resueltos individualmente
+        grupo = [e for e in grupo if e.nombre_norm not in nombres_ya_resueltos]
+        if len(grupo) < 2:
+            continue
+
+        nombre_patron = f'{tipo}_COLECTIVO'
+        for est in grupo:
+            corr = Correccion(
+                nombre_norm=est.nombre_norm,
+                venta_raw=est.venta_raw,
+                venta_corregida=est.venta_estimada,
+                delta=est.delta,
+                tipo_justificacion=TipoJustificacion.B,   # evidencia parcial
+                banda=Banda.FORZADO,                       # no CONFIRMADO: no hubo convergencia individual
+                tipo_resolucion=TipoResolucion.ELEVADO_POR_PATRON_COLECTIVO,
+                confianza=0.65,
+                motivo=(
+                    f'[{nombre_patron} n={len(grupo)}] {est.motivo} | '
+                    f'sin convergencia individual ({est.razon_no_confirmada[:60]})'
+                ),
+                grupo_conjunto=nombre_patron,
+            )
+            correcciones.append(corr)
+            if est.nombre_norm in resultado.sin_resolver:
+                resultado.sin_resolver.remove(est.nombre_norm)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1380,6 +1434,8 @@ def resolver_escalados(datos: DatosDia, contabilidad: ContabilidadDia,
             resultado.correcciones.append(corr)
 
     # 3. Análisis CONJUNTO cross-sabor
-    _analisis_conjunto(resultado.correcciones)
+    # Pasa correcciones + estimaciones_h0 + resultado para que el bloque B
+    # pueda rescatar H0 no confirmados individualmente y actualizar sin_resolver.
+    _analisis_conjunto(resultado.correcciones, resultado.estimaciones_h0, resultado)
 
     return resultado
