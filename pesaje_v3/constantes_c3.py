@@ -23,7 +23,13 @@ VENTA_HIGH_THRESHOLD = 5000       # C2: raw por encima sin apertura -> flag HIGH
 TARA_LATA = 280                   # peso de la tapa, se descuenta al abrir
 
 # === PF1: Error de digito ===
+# Offsets de error de digito.
+# Centenas bajas (100-300): ya incluidas, requieren >=3 sightings
+# Centenas altas (400-900): solo con >=5 sightings (mas riesgo de falso positivo)
+# Millares (1000-2000): siempre incluidas
 PF1_OFFSETS = [300, -300, 1000, -1000, 2000, -2000]
+PF1_OFFSETS_CENTENA_ALTA = [400, -400, 500, -500, 600, -600, 700, -700, 800, -800, 900, -900]
+PF1_MIN_SIGHTINGS_CENTENA_ALTA = 5
 PF1_MIN_SIGHTINGS_STRONG = 5
 PF1_MIN_SIGHTINGS_WEAK = 3
 PF1_MAX_VAR_WEAK = 30             # varianza maxima para sightings < 5

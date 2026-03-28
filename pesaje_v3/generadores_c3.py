@@ -14,7 +14,8 @@ from .modelos import (
 from .constantes_c3 import (
     TOL_MATCH_CERRADA, TOL_MATCH_ENTRANTE, TOL_PROMO_ENTRANTE, TOL_MISMATCH_LEVE,
     TOL_SUBA_AB_LEVE, TARA_LATA, VENTA_NEG_THRESHOLD,
-    PF1_OFFSETS, PF1_MIN_SIGHTINGS_STRONG, PF1_MIN_SIGHTINGS_WEAK,
+    PF1_OFFSETS, PF1_OFFSETS_CENTENA_ALTA, PF1_MIN_SIGHTINGS_CENTENA_ALTA,
+    PF1_MIN_SIGHTINGS_STRONG, PF1_MIN_SIGHTINGS_WEAK,
     PF1_MAX_VAR_WEAK, PF1_CONF_STRONG, PF1_CONF_WEAK,
     PF2_CONF, PF3_CONF, PF3_MAX_SIGHTINGS_PHANTOM,
     PF4_MIN_SIGHTINGS, PF4_MIN_SIGHTINGS_NO_FORWARD, PF4_CONF, PF4_CONF_WEAK,
@@ -62,10 +63,15 @@ def generar_hipotesis_pf1(nombre: str, sc: SaborContable, datos: DatosDia,
         cerradas_turno = d.cerradas if es_dia else n.cerradas
         indice = next((i for i, c in enumerate(cerradas_turno) if int(c) == peso), 0)
 
-        for offset in PF1_OFFSETS:
+        all_offsets = list(PF1_OFFSETS) + list(PF1_OFFSETS_CENTENA_ALTA)
+        for offset in all_offsets:
             peso_corregido = peso + offset
             sightings = _count_sightings_cerr(peso_corregido, nombre, datos)
-            if sightings < PF1_MIN_SIGHTINGS_WEAK:
+
+            # Offsets de centena alta requieren mas sightings
+            is_centena_alta = offset in PF1_OFFSETS_CENTENA_ALTA or -offset in PF1_OFFSETS_CENTENA_ALTA
+            min_sightings = PF1_MIN_SIGHTINGS_CENTENA_ALTA if is_centena_alta else PF1_MIN_SIGHTINGS_WEAK
+            if sightings < min_sightings:
                 continue
 
             ref, var = _peso_historico_cerr(peso_corregido, nombre, datos)
