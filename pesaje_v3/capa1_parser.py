@@ -52,6 +52,14 @@ def _recuperar_ab_cero(path_excel: str, nombre_hoja: str, turno: 'TurnoCrudo'):
             )
 
 
+_PESO_MAX_FISICO = 7900  # gramos — T11: superar esto es imposible fisicamente
+
+
+def _peso_valido(v) -> bool:
+    """Devuelve True si el valor es un peso fisicamente posible."""
+    return isinstance(v, (int, float)) and 0 < v <= _PESO_MAX_FISICO
+
+
 def _shift_to_turno(shift: ShiftData) -> TurnoCrudo:
     """Convierte ShiftData (v1) a TurnoCrudo (v3)."""
     turno = TurnoCrudo(
@@ -63,10 +71,10 @@ def _shift_to_turno(shift: ShiftData) -> TurnoCrudo:
         turno.sabores[norm_name] = SaborCrudo(
             nombre=fsd.name,
             nombre_norm=norm_name,
-            abierta=int(fsd.abierta) if fsd.abierta else None,
-            celiaca=int(fsd.celiaca) if fsd.celiaca else None,
-            cerradas=[int(c) for c in fsd.cerradas],
-            entrantes=[int(e) for e in fsd.entrantes],
+            abierta=int(fsd.abierta) if fsd.abierta and _peso_valido(fsd.abierta) else None,
+            celiaca=int(fsd.celiaca) if fsd.celiaca and _peso_valido(fsd.celiaca) else None,
+            cerradas=[int(c) for c in fsd.cerradas if _peso_valido(c)],
+            entrantes=[int(e) for e in fsd.entrantes if _peso_valido(e)],
         )
 
     # Fix R1.4: incluir sabores con ab=0 que el parser v1 filtra
@@ -107,14 +115,42 @@ def _es_turno_noche(nombre: str) -> bool:
     return 'NOCHE' in nombre.upper()
 
 
+_DIA_NAME_PATTERN = re.compile(
+    r'(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo)\s+\d+',
+    re.IGNORECASE,
+)
+
+
 def _detectar_modo_workbook(shifts) -> str:
     """
     Detecta si el workbook usa pares DIA/NOCHE o turnos unicos.
     Retorna 'DIA_NOCHE' o 'TURNO_UNICO'.
+    Aborta con ValueError si el formato es ambiguo o desconocido.
     """
-    for shift in shifts:
-        if _es_turno_dia(shift.name) or _es_turno_noche(shift.name):
+    nombres = [s.name for s in shifts]
+
+    tiene_dia = any(_es_turno_dia(n) for n in nombres)
+    tiene_noche = any(_es_turno_noche(n) for n in nombres)
+
+    if tiene_dia or tiene_noche:
+        if tiene_dia and tiene_noche:
             return 'DIA_NOCHE'
+        presente = 'DIA' if tiene_dia else 'NOCHE'
+        faltante = 'NOCHE' if tiene_dia else 'DIA'
+        raise ValueError(
+            f"Workbook ambiguo: tiene hojas con {presente} pero ninguna con {faltante}. "
+            "No se puede determinar el modo (DIA_NOCHE o TURNO_UNICO)."
+        )
+
+    # Sin marcadores DIA/NOCHE → esperar TURNO_UNICO.
+    # Validacion secundaria: al menos una hoja debe tener nombre de dia plausible.
+    plausibles = sum(1 for n in nombres if _DIA_NAME_PATTERN.search(n))
+    if plausibles == 0:
+        raise ValueError(
+            "No se detectaron hojas DIA/NOCHE ni hojas con nombre de dia "
+            "(ej: 'Domingo 1', 'Lunes 2'). Formato de workbook desconocido."
+        )
+
     return 'TURNO_UNICO'
 
 
@@ -192,38 +228,49 @@ def _cargar_dia_dia_noche(path_excel, shifts, dia_num, turnos_contexto):
 
 def _cargar_dia_turno_unico(path_excel, shifts, dia_num, turnos_contexto):
     """
-    Modo turno unico: hoja dia_num es turno A, hoja dia_num+1 es turno B.
-    El periodo cubre un dia entero en vez de medio dia.
+    Modo turno unico: hoja dia_num es turno A (referencia anterior),
+    el siguiente dia con datos es turno B (dia cuya venta se calcula).
+    Maneja gaps: dias cerrados (es_vacio=True) se saltan para encontrar B.
     """
     dia_str = str(dia_num)
-    dia_next_str = str(dia_num + 1)
 
-    turno_a = None
-    turno_b = None
+    # Encontrar turno A por numero de dia
     idx_a = -1
-    idx_b = -1
-
     for i, shift in enumerate(shifts):
-        label = _extraer_dia_label(shift.name)
-        if label == dia_str:
-            turno_a = _shift_to_turno(shift)
+        if _extraer_dia_label(shift.name) == dia_str:
             idx_a = i
-        elif label == dia_next_str:
-            turno_b = _shift_to_turno(shift)
-            idx_b = i
+            break
 
-    if turno_a is None:
+    if idx_a == -1:
         raise ValueError(f"No se encontro hoja para dia {dia_num}")
+
+    turno_a = _shift_to_turno(shifts[idx_a])
+
+    # Encontrar turno B: siguiente hoja con datos despues de A
+    idx_b = -1
+    turno_b = None
+    for i in range(idx_a + 1, len(shifts)):
+        t = _shift_to_turno(shifts[i])
+        if not t.es_vacio:
+            idx_b = i
+            turno_b = t
+            break
+
     if turno_b is None:
-        raise ValueError(f"No se encontro hoja para dia {dia_num + 1} (turno B)")
+        raise ValueError(
+            f"No se encontro hoja con datos despues de dia {dia_num} (turno B)"
+        )
 
     # Fix R1.4
     _recuperar_ab_cero(path_excel, turno_a.nombre_hoja, turno_a)
     _recuperar_ab_cero(path_excel, turno_b.nombre_hoja, turno_b)
 
+    # La venta pertenece al dia B
+    label = _extraer_dia_label(turno_b.nombre_hoja)
+
     # Contexto
-    idx_min = max(0, min(idx_a, idx_b) - turnos_contexto)
-    idx_max = min(len(shifts) - 1, max(idx_a, idx_b) + turnos_contexto)
+    idx_min = max(0, idx_a - turnos_contexto)
+    idx_max = min(len(shifts) - 1, idx_b + turnos_contexto)
 
     contexto = []
     for i in range(idx_min, idx_max + 1):
@@ -234,9 +281,9 @@ def _cargar_dia_turno_unico(path_excel, shifts, dia_num, turnos_contexto):
             contexto.append(t)
 
     return DatosDia(
-        dia_label=dia_str,
-        turno_dia=turno_a,    # turno A = "dia" en la formula
-        turno_noche=turno_b,  # turno B = "noche" en la formula
+        dia_label=label,
+        turno_dia=turno_a,    # turno A = snapshot anterior (referencia)
+        turno_noche=turno_b,  # turno B = snapshot actual (venta calculada aqui)
         contexto=contexto,
     )
 
@@ -302,7 +349,7 @@ def _todos_los_dias_turno_unico(path_excel, turnos):
     for j in range(len(validos) - 1):
         idx_a, turno_a = validos[j]
         idx_b, turno_b = validos[j + 1]
-        label = _extraer_dia_label(turno_a.nombre_hoja)
+        label = _extraer_dia_label(turno_b.nombre_hoja)  # venta pertenece al dia B
 
         # Fix R1.4
         _recuperar_ab_cero(path_excel, turno_a.nombre_hoja, turno_a)
