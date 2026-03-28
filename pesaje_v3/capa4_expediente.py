@@ -1295,14 +1295,69 @@ def _analisis_conjunto(correcciones: List[Correccion]):
 # ═══════════════════════════════════════════════════════════════
 
 @dataclass
+class EstimacionH0:
+    """Mejor estimación para un sabor que quedó H0 (sin resolver)."""
+    nombre_norm: str
+    venta_raw: int
+    venta_estimada: int
+    delta: int
+    hipotesis_tipo: str
+    motivo: str
+    n_planos_favor: int
+    razon_no_confirmada: str  # por qué no convergió
+
+
+@dataclass
 class ResultadoC4:
     correcciones: List[Correccion] = field(default_factory=list)
     sin_resolver: List[str] = field(default_factory=list)
+    estimaciones_h0: List[EstimacionH0] = field(default_factory=list)
 
 
 # ═══════════════════════════════════════════════════════════════
 # FUNCIÓN PRINCIPAL
 # ═══════════════════════════════════════════════════════════════
+
+def _estimar_h0(nombre: str, clasificado: SaborClasificado,
+                datos: DatosDia) -> Optional[EstimacionH0]:
+    """Extrae la mejor estimación para un sabor que no se pudo resolver."""
+    sc = clasificado.contable
+    timeline = _paso1_timeline(nombre, datos)
+    lifecycle = _paso1b_lifecycle(timeline)
+    p1 = _paso2_plano1(nombre, datos)
+    p2 = _paso2_plano2(nombre, datos, timeline, lifecycle=lifecycle)
+    p3 = _paso2_plano3(nombre, datos, timeline)
+    hips = _paso3_hipotesis(sc, p1, p2, p3, timeline=timeline)
+    _paso4_evaluar(hips, sc, p1, p2, p3)
+
+    # Buscar mejor viable (sin contra)
+    viables = [h for h in hips if h.n_contra == 0]
+    viables.sort(key=lambda h: (h.independientes, h.n_favor), reverse=True)
+
+    if viables:
+        best = viables[0]
+        venta_est = sc.venta_raw + best.delta_stock + best.delta_latas * 280
+        razon = f'Solo {best.independientes} plano(s) independiente(s), requiere >=2 para confirmar'
+    else:
+        # Mejor con menos contra
+        hips.sort(key=lambda h: (h.n_contra, -h.independientes, -h.n_favor))
+        if not hips:
+            return None
+        best = hips[0]
+        venta_est = sc.venta_raw + best.delta_stock + best.delta_latas * 280
+        razon = f'{best.n_contra} plano(s) en contra: {best.planos_contra}'
+
+    return EstimacionH0(
+        nombre_norm=nombre,
+        venta_raw=sc.venta_raw,
+        venta_estimada=venta_est,
+        delta=venta_est - sc.venta_raw,
+        hipotesis_tipo=best.tipo,
+        motivo=f'[{best.tipo}] {best.accion[:60]}',
+        n_planos_favor=best.n_favor,
+        razon_no_confirmada=razon,
+    )
+
 
 def resolver_escalados(datos: DatosDia, contabilidad: ContabilidadDia,
                        resultado_c3: ResultadoC3) -> ResultadoC4:
@@ -1315,6 +1370,10 @@ def resolver_escalados(datos: DatosDia, contabilidad: ContabilidadDia,
             resultado.correcciones.append(corr)
         else:
             resultado.sin_resolver.append(nombre)
+            # Capturar mejor estimación para el reporte
+            est = _estimar_h0(nombre, clasificado, datos)
+            if est:
+                resultado.estimaciones_h0.append(est)
 
     # 2. Revisar ENGINE con posibles phantoms ocultos
     engines = {k: v for k, v in resultado_c3.sabores.items()
