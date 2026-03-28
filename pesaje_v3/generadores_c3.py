@@ -63,6 +63,12 @@ def generar_hipotesis_pf1(nombre: str, sc: SaborContable, datos: DatosDia,
         cerradas_turno = d.cerradas if es_dia else n.cerradas
         indice = next((i for i, c in enumerate(cerradas_turno) if int(c) == peso), 0)
 
+        # Si el peso original tiene identidad establecida en el historial, no es error de digito.
+        # Un typo ocurre 1-2 veces; una lata real aparece 3+ veces.
+        sightings_original = _count_sightings_cerr(peso, nombre, datos)
+        if sightings_original >= PF1_MIN_SIGHTINGS_WEAK:
+            continue
+
         all_offsets = list(PF1_OFFSETS) + list(PF1_OFFSETS_CENTENA_ALTA)
         for offset in all_offsets:
             peso_corregido = peso + offset
