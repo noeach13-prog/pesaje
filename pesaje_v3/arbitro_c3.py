@@ -131,6 +131,24 @@ def resolver_hipotesis(
                 motivo_detalle=f'{len(ganadores)} hipotesis todas incoherentes',
             )
 
+    # Paso 4b: coherencia individual — aplica siempre, no solo con multiples
+    ganadora_candidata = ganadores[0]
+    if ganadora_candidata.venta_propuesta is not None:
+        if ganadora_candidata.venta_propuesta < -300:
+            return DecisionC3(
+                resolucion=ResolucionC3.ESCALAR_C4,
+                motivo_codigo=MotivoDecisionC3.SIN_HIPOTESIS_VIABLE,
+                hipotesis_descartadas=descartadas + [ganadora_candidata],
+                motivo_detalle=f'Unica hipotesis produce venta={ganadora_candidata.venta_propuesta}g (incoherente negativa)',
+            )
+        if obs.total_a > 0 and ganadora_candidata.venta_propuesta > obs.total_a * 0.8:
+            return DecisionC3(
+                resolucion=ResolucionC3.ESCALAR_C4,
+                motivo_codigo=MotivoDecisionC3.SIN_HIPOTESIS_VIABLE,
+                hipotesis_descartadas=descartadas + [ganadora_candidata],
+                motivo_detalle=f'Unica hipotesis produce venta={ganadora_candidata.venta_propuesta}g (incoherente alta, total_a={obs.total_a})',
+            )
+
     # Paso 5: exactamente 1 ganadora
     ganadora = ganadores[0]
 

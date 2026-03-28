@@ -506,11 +506,8 @@
       },
       "FRUTILLA AGUA": {
         "status": "SENAL",
-        "venta_final_c3": 5660,
-        "prototipo": {
-          "codigo": "PF7",
-          "delta": 5545
-        }
+        "venta_final_c3": null,
+        "prototipo": null
       },
       "FRUTILLA CREMA": {
         "status": "SENAL",
@@ -555,11 +552,8 @@
       },
       "LIMON": {
         "status": "COMPUESTO",
-        "venta_final_c3": -4350,
-        "prototipo": {
-          "codigo": "PF7",
-          "delta": 5
-        }
+        "venta_final_c3": null,
+        "prototipo": null
       },
       "MANTECOL": {
         "status": "LIMPIO",
@@ -573,11 +567,8 @@
       },
       "MARACUYA": {
         "status": "SENAL",
-        "venta_final_c3": 5545,
-        "prototipo": {
-          "codigo": "PF7",
-          "delta": 5315
-        }
+        "venta_final_c3": null,
+        "prototipo": null
       },
       "MARROC": {
         "status": "LIMPIO",
@@ -594,11 +585,8 @@
       },
       "MENTA": {
         "status": "SENAL",
-        "venta_final_c3": 5360,
-        "prototipo": {
-          "codigo": "PF7",
-          "delta": 4110
-        }
+        "venta_final_c3": null,
+        "prototipo": null
       },
       "MIX DE FRUTA": {
         "status": "LIMPIO",
@@ -617,11 +605,8 @@
       },
       "PISTACHO": {
         "status": "SENAL",
-        "venta_final_c3": 5180,
-        "prototipo": {
-          "codigo": "PF7",
-          "delta": 4750
-        }
+        "venta_final_c3": null,
+        "prototipo": null
       },
       "RUSA": {
         "status": "LIMPIO",
@@ -695,11 +680,47 @@
         ],
         "prototipo_is_none": true
       },
+      "FRUTILLA AGUA": {
+        "status": "SENAL",
+        "flags": [
+          "AB_UP"
+        ],
+        "prototipo_is_none": true
+      },
       "IRLANDESA": {
         "status": "SENAL",
         "flags": [
           "C4d:6610",
           "C4n:6670"
+        ],
+        "prototipo_is_none": true
+      },
+      "LIMON": {
+        "status": "COMPUESTO",
+        "flags": [
+          "AB_UP",
+          "NEG"
+        ],
+        "prototipo_is_none": true
+      },
+      "MARACUYA": {
+        "status": "SENAL",
+        "flags": [
+          "AB_UP"
+        ],
+        "prototipo_is_none": true
+      },
+      "MENTA": {
+        "status": "SENAL",
+        "flags": [
+          "AB_UP"
+        ],
+        "prototipo_is_none": true
+      },
+      "PISTACHO": {
+        "status": "SENAL",
+        "flags": [
+          "AB_UP"
         ],
         "prototipo_is_none": true
       }
@@ -727,7 +748,12 @@
       }
     ],
     "sin_resolver": [
-      "IRLANDESA"
+      "FRUTILLA AGUA",
+      "IRLANDESA",
+      "LIMON",
+      "MARACUYA",
+      "MENTA",
+      "PISTACHO"
     ]
   },
   "25": {
