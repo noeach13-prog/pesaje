@@ -525,6 +525,9 @@ class TipoResolucion(Enum):
     # Rescate colectivo: patron cross-sabor compensa la falta de convergencia individual.
     # Semanticamente distinto de RESUELTO_INDIVIDUAL (>=2 planos independientes propios).
     ELEVADO_POR_PATRON_COLECTIVO = 'ELEVADO_POR_PATRON_COLECTIVO'
+    # Forzado sin convergencia: ni individual ni colectiva. Mejor hipotesis disponible
+    # aplicada con banda=FORZADO. Senaliza que el caso no tiene evidencia suficiente.
+    FORZADO_H0 = 'FORZADO_H0'
 
 
 @dataclass

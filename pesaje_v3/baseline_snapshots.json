@@ -327,6 +327,11 @@
     },
     "correcciones_c4": [
       {
+        "nombre": "CADBURY",
+        "delta": 50,
+        "banda": "ESTIMADO"
+      },
+      {
         "nombre": "CH C/ALM",
         "delta": -60,
         "banda": "ESTIMADO"
@@ -357,9 +362,7 @@
         "banda": "CONFIRMADO"
       }
     ],
-    "sin_resolver": [
-      "CADBURY"
-    ]
+    "sin_resolver": []
   },
   "12": {
     "venta_raw_total": 33065,
@@ -745,11 +748,15 @@
         "nombre": "FERRERO",
         "delta": -80,
         "banda": "ESTIMADO"
+      },
+      {
+        "nombre": "IRLANDESA",
+        "delta": 60,
+        "banda": "ESTIMADO"
       }
     ],
     "sin_resolver": [
       "FRUTILLA AGUA",
-      "IRLANDESA",
       "LIMON",
       "MARACUYA",
       "MENTA",
@@ -1055,6 +1062,11 @@
     },
     "correcciones_c4": [
       {
+        "nombre": "DULCE AMORES",
+        "delta": 40,
+        "banda": "ESTIMADO"
+      },
+      {
         "nombre": "GRANIZADO",
         "delta": -40,
         "banda": "ESTIMADO"
@@ -1065,9 +1077,7 @@
         "banda": "CONFIRMADO"
       }
     ],
-    "sin_resolver": [
-      "DULCE AMORES"
-    ]
+    "sin_resolver": []
   },
   "27": {
     "venta_raw_total": 33560,

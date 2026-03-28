@@ -1046,8 +1046,11 @@ def _paso7_guardia(h: Hipotesis, sc) -> bool:
     if venta_final < -300:
         return False
     # Si raw no era negativo y corrección lo empeora
-    if sc.venta_raw >= 0 and abs(venta_final) > abs(sc.venta_raw):
-        return False
+    # Excepcion: MISMATCH_LEVE es correccion de medicion (varianza de pesaje),
+    # puede subir la venta levemente — eso es el punto de la correccion.
+    if h.tipo != 'MISMATCH_LEVE':
+        if sc.venta_raw >= 0 and abs(venta_final) > abs(sc.venta_raw):
+            return False
     return True
 
 
@@ -1338,6 +1341,33 @@ def _analisis_conjunto(correcciones: List[Correccion],
             correcciones.append(corr)
             if est.nombre_norm in resultado.sin_resolver:
                 resultado.sin_resolver.remove(est.nombre_norm)
+
+    # ── BLOQUE C: forzar H0 restantes ──────────────────────────────
+    # Casos que no convergieron ni individualmente ni por patron colectivo.
+    # Se aplica la mejor estimacion disponible con banda=FORZADO y confianza baja.
+    # Semantica: "lo mejor que tenemos, sin evidencia suficiente para confirmar".
+    # No deja casos en H0 — garantia de cierre del pipeline.
+    nombres_ya_resueltos_c = {c.nombre_norm for c in correcciones}
+    for est in estimaciones_h0:
+        if est.nombre_norm in nombres_ya_resueltos_c:
+            continue
+        corr = Correccion(
+            nombre_norm=est.nombre_norm,
+            venta_raw=est.venta_raw,
+            venta_corregida=est.venta_estimada,
+            delta=est.delta,
+            tipo_justificacion=TipoJustificacion.B,
+            banda=Banda.FORZADO,
+            tipo_resolucion=TipoResolucion.FORZADO_H0,
+            confianza=0.50,
+            motivo=(
+                f'[FORZADO_H0] {est.motivo} | '
+                f'sin convergencia ({est.razon_no_confirmada[:60]})'
+            ),
+        )
+        correcciones.append(corr)
+        if est.nombre_norm in resultado.sin_resolver:
+            resultado.sin_resolver.remove(est.nombre_norm)
 
 
 # ═══════════════════════════════════════════════════════════════
