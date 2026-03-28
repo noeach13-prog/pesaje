@@ -446,9 +446,10 @@ def generar_hipotesis_pf7(nombre: str, sc: SaborContable, datos: DatosDia,
     if not any(f.codigo == 'AB_UP' for f in flags):
         return []
 
-    cerr_ok = all(any(abs(cd - cn) <= TOL_MATCH_CERRADA for cn in n.cerradas) for cd in d.cerradas)
-    if not cerr_ok:
-        return []
+    # Verificar cerradas intactas usando el matching formal de la observacion,
+    # NO con any() que permite doble-match al mismo slot
+    if obs.cerradas_unmatched_dia or obs.cerradas_unmatched_noche:
+        return []  # Hay cerradas sin match → no es AB_IMP, es otro patron
     if sc.new_ent_b > 0:
         return []
 
