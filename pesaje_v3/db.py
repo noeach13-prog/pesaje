@@ -36,18 +36,29 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db():
-    """Crea tablas si no existen. Idempotente."""
+    """Crea tablas si no existen. Idempotente. Migra schema si faltan columnas."""
     conn = get_db()
     conn.executescript(_SCHEMA)
-    # Semilla: sucursales conocidas
-    for nombre, modo in [
-        ('San Martín', 'DIA_NOCHE'),
-        ('Triunvirato', 'TURNO_UNICO'),
-        ('Unión', 'TURNO_UNICO'),
+
+    # Migration: agregar columna pin si no existe (DB creada antes de este cambio)
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(sucursales)").fetchall()]
+    if 'pin' not in cols:
+        conn.execute("ALTER TABLE sucursales ADD COLUMN pin TEXT NOT NULL DEFAULT '0000'")
+
+    # Semilla: sucursales conocidas con PIN de acceso
+    for nombre, modo, pin in [
+        ('San Martín', 'DIA_NOCHE', '1234'),
+        ('Triunvirato', 'TURNO_UNICO', '5678'),
+        ('Unión', 'TURNO_UNICO', '9012'),
     ]:
         conn.execute(
-            "INSERT OR IGNORE INTO sucursales (nombre, modo) VALUES (?, ?)",
-            (nombre, modo),
+            "INSERT OR IGNORE INTO sucursales (nombre, modo, pin) VALUES (?, ?, ?)",
+            (nombre, modo, pin),
+        )
+        # Actualizar PIN si sucursal ya existía sin PIN
+        conn.execute(
+            "UPDATE sucursales SET pin = ? WHERE nombre = ? AND pin = '0000'",
+            (pin, nombre),
         )
     conn.commit()
     conn.close()
@@ -58,6 +69,7 @@ CREATE TABLE IF NOT EXISTS sucursales (
     id INTEGER PRIMARY KEY,
     nombre TEXT NOT NULL UNIQUE,
     modo TEXT NOT NULL DEFAULT 'DIA_NOCHE',
+    pin TEXT NOT NULL DEFAULT '0000',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -299,9 +311,18 @@ def listar_turnos(db: sqlite3.Connection, sucursal_id: int = None,
     return [dict(r) for r in rows]
 
 
+def verificar_pin(db: sqlite3.Connection, sucursal_id: int, pin: str) -> Optional[dict]:
+    """Verifica PIN de acceso. Retorna sucursal si correcto, None si no."""
+    row = db.execute(
+        "SELECT * FROM sucursales WHERE id = ? AND pin = ?",
+        (sucursal_id, pin.strip()),
+    ).fetchone()
+    return dict(row) if row else None
+
+
 def obtener_sucursales(db: sqlite3.Connection) -> List[dict]:
-    """Lista todas las sucursales."""
-    rows = db.execute("SELECT * FROM sucursales ORDER BY nombre").fetchall()
+    """Lista todas las sucursales (sin exponer el PIN)."""
+    rows = db.execute("SELECT id, nombre, modo FROM sucursales ORDER BY nombre").fetchall()
     return [dict(r) for r in rows]
 
 

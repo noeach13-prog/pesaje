@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pesaje - Historial</title>
+<title>{{ sucursal_nombre }} - Historial</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
 .container { max-width: 600px; margin: 0 auto; padding: 16px; }
-h1 { font-size: 1.3rem; margin-bottom: 12px; }
+h1 { font-size: 1.2rem; margin-bottom: 12px; }
 .filters { display: flex; gap: 8px; margin-bottom: 16px; }
-.filters select, .filters input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.filters input { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.filters button { padding: 8px 16px; background: #1565c0; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
 table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 th { background: #1e3a5f; color: #fff; padding: 10px 8px; text-align: left; font-size: 0.8rem; }
 td { padding: 10px 8px; border-bottom: 1px solid #eee; font-size: 0.85rem; }
@@ -23,36 +24,29 @@ a { color: #1565c0; text-decoration: none; font-weight: 600; }
 </head>
 <body>
 <div class="container">
-    <a href="/entrada/" class="btn-back">&larr; Volver</a>
-    <h1>Historial de cargas</h1>
+    <a href="/entrada/seleccion" class="btn-back">&larr; Volver</a>
+    <h1>{{ sucursal_nombre }} - Historial</h1>
 
     <form class="filters" method="GET">
-        <select name="sucursal_id">
-            <option value="">Todas</option>
-            {% for s in sucursales %}
-            <option value="{{ s.id }}" {{ 'selected' if sucursal_id == s.id }}>{{ s.nombre }}</option>
-            {% endfor %}
-        </select>
         <input type="month" name="mes" value="{{ mes or '' }}">
-        <button type="submit" style="padding:8px 16px;background:#1565c0;color:#fff;border:none;border-radius:4px;cursor:pointer;">Filtrar</button>
+        <button type="submit">Filtrar</button>
     </form>
 
     <table>
         <thead>
-            <tr><th>Fecha</th><th>Sucursal</th><th>Turno</th><th>Estado</th><th></th></tr>
+            <tr><th>Fecha</th><th>Turno</th><th>Estado</th><th></th></tr>
         </thead>
         <tbody>
             {% for t in turnos %}
             <tr>
                 <td>{{ t.fecha }}</td>
-                <td>{{ t.sucursal_nombre }}</td>
                 <td>{{ t.tipo_turno }}</td>
                 <td><span class="badge badge-{{ t.estado }}">{{ t.estado }}</span></td>
-                <td><a href="/entrada/turno/{{ t.id }}">Editar</a></td>
+                <td><a href="/entrada/turno/{{ t.id }}">Abrir</a></td>
             </tr>
             {% endfor %}
             {% if not turnos %}
-            <tr><td colspan="5" style="text-align:center;color:#999;padding:20px;">No hay turnos cargados</td></tr>
+            <tr><td colspan="4" style="text-align:center;color:#999;padding:20px;">No hay turnos</td></tr>
             {% endif %}
         </tbody>
     </table>

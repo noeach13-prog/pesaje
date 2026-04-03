@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from flask import Flask, request, render_template_string, send_file
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'pesaje-dev-key-cambiar-en-prod')
 _outputs: dict = {}
 
 # --- Blueprint de carga manual ---
