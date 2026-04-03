@@ -5,160 +5,183 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>{{ data.sucursal.nombre }} - {{ data.nombre_hoja }}</title>
 <style>
+:root { --blue: #1565c0; --green: #2e7d32; --red: #c62828; --orange: #e65100; --gray: #888; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
-.top-bar { background: #1565c0; color: #fff; padding: 10px 16px; position: sticky; top: 0; z-index: 10; }
-.top-bar h1 { font-size: 1rem; font-weight: 600; }
-.top-bar .sub { font-size: 0.75rem; opacity: 0.8; }
-.top-bar .actions { display: flex; gap: 10px; align-items: center; }
-.top-bar a { color: #fff; opacity: 0.8; font-size: 0.75rem; text-decoration: none; }
-.top-row { display: flex; justify-content: space-between; align-items: center; }
-.progress { background: rgba(255,255,255,0.2); border-radius: 4px; height: 4px; margin-top: 6px; }
-.progress-fill { background: #fff; border-radius: 4px; height: 100%; transition: width 0.3s; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
 
-.container { max-width: 600px; margin: 0 auto; padding: 8px 8px 90px; }
+/* Top bar */
+.top { background: var(--blue); color: #fff; padding: 10px 16px; position: sticky; top: 0; z-index: 20; }
+.top-row { display: flex; justify-content: space-between; align-items: center; }
+.top h1 { font-size: 1rem; } .top .sub { font-size: 0.7rem; opacity: 0.8; }
+.top a { color: #fff; opacity: 0.8; font-size: 0.75rem; text-decoration: none; }
+.prog { background: rgba(255,255,255,0.2); border-radius: 3px; height: 3px; margin-top: 6px; }
+.prog-fill { background: #fff; height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+.wrap { max-width: 500px; margin: 0 auto; padding: 6px 6px 90px; }
 
 /* Search */
-.search { margin: 8px 0; }
-.search input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: #fff; }
+.search { position: sticky; top: 52px; z-index: 15; padding: 6px 0; background: #f0f2f5; }
+.search input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 20px; font-size: 16px; background: #fff; }
 
-/* Flavor row */
-.flavor { background: #fff; margin-bottom: 2px; border-left: 3px solid transparent; }
-.flavor.has-data { border-left-color: #2e7d32; }
-.flavor.hidden { display: none; }
-.flavor-main { display: grid; grid-template-columns: 1fr 70px 70px 30px; align-items: center; padding: 6px 8px; gap: 4px; min-height: 44px; }
-.flavor-name { font-weight: 600; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.flavor-input { position: relative; }
-.flavor-input input {
-    width: 100%; padding: 6px 2px; border: 1px solid #e0e0e0; border-radius: 4px;
-    font-size: 16px; text-align: right; background: #fafafa;
+/* Flavor */
+.fl { background: #fff; margin-bottom: 1px; overflow: hidden; }
+.fl.active { box-shadow: 0 0 0 2px var(--blue); border-radius: 4px; margin: 4px 0; }
+.fl.done { border-left: 3px solid var(--green); }
+.fl.hidden { display: none; }
+
+/* Collapsed row */
+.fl-row { display: flex; align-items: center; padding: 8px 10px; gap: 8px; min-height: 44px; cursor: pointer; }
+.fl-name { flex: 1; font-weight: 600; font-size: 0.85rem; }
+.fl-summary { font-size: 0.75rem; color: var(--gray); max-width: 120px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fl-dot { width: 8px; height: 8px; border-radius: 50%; background: #e0e0e0; flex-shrink: 0; }
+.fl.done .fl-dot { background: var(--green); }
+
+/* Expanded */
+.fl-body { display: none; padding: 0 10px 10px; }
+.fl.active .fl-body { display: block; }
+
+/* Weight chips */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip-group { }
+.chip-label { font-size: 0.6rem; color: var(--gray); text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.chip {
+    display: flex; align-items: center; gap: 2px; background: #f5f5f5;
+    border: 1px solid #e0e0e0; border-radius: 6px; padding: 4px 4px 4px 8px; font-size: 0.8rem;
 }
-.flavor-input input:focus { border-color: #1565c0; background: #fff; outline: none; }
-.flavor-input input.ok { border-color: #2e7d32; background: #f1f8e9; }
-.flavor-input input.warn { border-color: #e65100; background: #fff8e1; }
-.flavor-input input.err { border-color: #c62828; background: #fce4ec; }
-.flavor-ref { position: absolute; bottom: -10px; right: 2px; font-size: 0.6rem; color: #aaa; }
-.flavor-expand { background: none; border: none; color: #999; font-size: 1rem; cursor: pointer; text-align: center; }
-.flavor-expand.active { color: #1565c0; }
-
-/* Expanded fields */
-.flavor-extra { display: none; padding: 4px 8px 8px; background: #f8f9fa; }
-.flavor.open .flavor-extra { display: block; }
-.extra-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.extra-field { position: relative; }
-.extra-field label { display: block; font-size: 0.6rem; color: #888; text-transform: uppercase; margin-bottom: 1px; }
-.extra-field input {
-    width: 100%; padding: 5px 2px; border: 1px solid #e0e0e0; border-radius: 3px;
-    font-size: 15px; text-align: right; background: #fff;
+.chip input {
+    width: 65px; border: none; background: transparent; font-size: 16px;
+    text-align: right; padding: 4px 2px; font-weight: 600;
 }
-.extra-field input:focus { border-color: #1565c0; outline: none; }
-.extra-field .ref { font-size: 0.55rem; color: #bbb; text-align: right; }
-
-/* Column headers */
-.col-headers { display: grid; grid-template-columns: 1fr 70px 70px 30px; padding: 4px 8px; font-size: 0.65rem; color: #999; text-transform: uppercase; font-weight: 600; }
-.col-headers span:nth-child(2), .col-headers span:nth-child(3) { text-align: right; }
+.chip input:focus { outline: none; }
+.chip input.ok { color: var(--green); }
+.chip input.warn { color: var(--orange); }
+.chip input.err { color: var(--red); }
+.chip .unit { font-size: 0.7rem; color: var(--gray); }
+.chip .ref { font-size: 0.55rem; color: #bbb; margin-left: 2px; }
+.chip-rm { background: none; border: none; color: #ccc; font-size: 0.9rem; cursor: pointer; padding: 0 4px; }
+.chip-rm:hover { color: var(--red); }
+.add-btn {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: #e3f2fd; color: var(--blue); border: 1px dashed #90caf9;
+    border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+}
+.add-btn:hover { background: #bbdefb; }
 
 /* Sections */
-.section { background: #fff; margin-top: 10px; border-radius: 8px; overflow: hidden; }
-.section-header { padding: 10px 12px; font-weight: 600; font-size: 0.85rem; color: #555; cursor: pointer; display: flex; justify-content: space-between; }
-.section-body { display: none; padding: 8px 12px 12px; }
-.section.open .section-body { display: block; }
-.section.open .section-header { border-bottom: 1px solid #eee; }
-.section-count { background: #e3f2fd; color: #1565c0; padding: 1px 8px; border-radius: 10px; font-size: 0.7rem; }
-
-.extra-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
-.extra-row input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-.extra-row input[type="number"] { width: 70px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: right; }
-.extra-row select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-.btn-sm { padding: 5px 10px; background: #e3f2fd; color: #1565c0; border: none; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
-.rm-btn { background: none; border: none; color: #c62828; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
+.sec { background: #fff; margin-top: 8px; border-radius: 8px; overflow: hidden; }
+.sec-h { padding: 10px 12px; font-weight: 600; font-size: 0.85rem; color: #555; cursor: pointer; display: flex; justify-content: space-between; }
+.sec-b { display: none; padding: 8px 12px 12px; }
+.sec.open .sec-b { display: block; } .sec.open .sec-h { border-bottom: 1px solid #eee; }
+.sec-badge { background: #e3f2fd; color: var(--blue); padding: 1px 8px; border-radius: 10px; font-size: 0.7rem; }
+.xrow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.xrow input[type=text] { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.xrow input[type=number] { width: 65px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: right; }
+.xrow select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.btn-s { padding: 5px 10px; background: #e3f2fd; color: var(--blue); border: none; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.rm { background: none; border: none; color: #ccc; font-size: 1.1rem; cursor: pointer; }
+.rm:hover { color: var(--red); }
 
 /* Bottom */
-.bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 10px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 10; }
-.bottom-inner { max-width: 600px; margin: 0 auto; display: flex; gap: 8px; }
-.btn-save { flex: 1; padding: 14px; background: #1565c0; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
-.btn-save:hover { background: #0d47a1; }
-.btn-save:disabled { background: #ccc; }
+.bot { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 8px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 20; }
+.bot-in { max-width: 500px; margin: 0 auto; }
+.btn-main { width: 100%; padding: 14px; background: var(--blue); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+.btn-main:disabled { background: #ccc; }
 
-/* Status toast */
-.toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); padding: 8px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; z-index: 20; display: none; }
-.toast.show { display: block; animation: fadeout 3s forwards; }
-.toast-ok { background: #2e7d32; color: #fff; }
-.toast-warn { background: #e65100; color: #fff; }
-.toast-err { background: #c62828; color: #fff; }
-@keyframes fadeout { 0%,70% { opacity: 1; } 100% { opacity: 0; display: none; } }
+/* Toast */
+.toast { position: fixed; top: 55px; left: 50%; transform: translateX(-50%); padding: 8px 24px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; z-index: 30; display: none; color: #fff; }
+.toast.show { display: block; animation: fade 3.5s forwards; }
+.toast-ok { background: var(--green); } .toast-warn { background: var(--orange); } .toast-err { background: var(--red); }
+@keyframes fade { 0%,70%{opacity:1} 100%{opacity:0} }
 </style>
 </head>
 <body>
 
-<div class="top-bar">
+<div class="top">
     <div class="top-row">
-        <div>
-            <h1>{{ data.sucursal.nombre }}</h1>
-            <div class="sub">{{ data.nombre_hoja }}</div>
-        </div>
-        <div class="actions">
-            <span class="sub" id="statsText">0 sabores</span>
-            <a href="/entrada/seleccion">Volver</a>
+        <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">{{ data.nombre_hoja }}</div></div>
+        <div style="display:flex;gap:12px;align-items:center;">
+            <span class="sub" id="stats">0</span>
+            <a href="/entrada/seleccion">Salir</a>
         </div>
     </div>
-    <div class="progress"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="prog"><div class="prog-fill" id="prog" style="width:0%"></div></div>
 </div>
-
 <div id="toast" class="toast"></div>
 
-<div class="container">
-    <div class="search">
-        <input type="text" id="search" placeholder="Buscar sabor..." oninput="filtrar(this.value)">
-    </div>
+<div class="wrap">
+    <div class="search"><input type="text" id="q" placeholder="Buscar sabor..." oninput="buscar(this.value)"></div>
 
-    <div class="col-headers">
-        <span>Sabor</span><span>Abierta</span><span>Cerrada 1</span><span></span>
-    </div>
-
-    <div id="flavors">
+    <div id="list">
     {% for nombre in catalogo %}
     {% set s = cargados.get(nombre) %}
     {% set r = ref.get(nombre) %}
     {% set has = s is not none %}
-    <div class="flavor{{ ' has-data' if has else '' }}" data-nombre="{{ nombre }}" id="f-{{ nombre | replace(' ', '_') | replace(',', '') }}">
-        <div class="flavor-main">
-            <div class="flavor-name">{{ nombre }}</div>
-            <div class="flavor-input">
-                <input type="number" data-field="abierta" inputmode="numeric" placeholder="-"
-                       value="{{ s.abierta if s and s.abierta is not none else '' }}"
-                       onblur="onBlur(this)" onfocus="onFoc(this)">
-                {% if r and r.abierta %}<span class="flavor-ref">{{ r.abierta }}</span>{% endif %}
-            </div>
-            <div class="flavor-input">
-                <input type="number" data-field="cerrada_1" inputmode="numeric" placeholder="-"
-                       value="{{ s.cerrada_1 if s and s.cerrada_1 is not none else '' }}"
-                       onblur="onBlur(this)" onfocus="onFoc(this)">
-                {% if r and r.cerrada_1 %}<span class="flavor-ref">{{ r.cerrada_1 }}</span>{% endif %}
-            </div>
-            <button class="flavor-expand{{ ' active' if has else '' }}" onclick="toggleExpand(this)">&#9660;</button>
+    <div class="fl{{ ' done' if has else '' }}" data-n="{{ nombre }}" onclick="toggle(this, event)">
+        <div class="fl-row">
+            <div class="fl-dot"></div>
+            <div class="fl-name">{{ nombre }}</div>
+            <div class="fl-summary" data-sum>{% if has %}{{ s.abierta or '-' }}g{% endif %}</div>
         </div>
-        <div class="flavor-extra">
-            <div class="extra-grid">
-                <div class="extra-field">
-                    <label>Celiaca</label>
-                    <input type="number" data-field="celiaca" inputmode="numeric" value="{{ s.celiaca if s and s.celiaca is not none else '' }}" onblur="onBlur(this)">
-                    {% if r and r.celiaca %}<div class="ref">ant: {{ r.celiaca }}</div>{% endif %}
+        <div class="fl-body">
+            <!-- Abierta -->
+            <div class="chip-group">
+                <div class="chip-label">Abierta</div>
+                <div class="chip-row">
+                    <div class="chip">
+                        <input type="number" inputmode="numeric" data-f="abierta" value="{{ s.abierta if s and s.abierta is not none else '' }}" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()">
+                        <span class="unit">g</span>
+                        {% if r and r.abierta is not none %}<span class="ref">ant:{{ r.abierta }}</span>{% endif %}
+                    </div>
                 </div>
-                {% for i in range(2, 7) %}
-                <div class="extra-field">
-                    <label>Cerrada {{ i }}</label>
-                    <input type="number" data-field="cerrada_{{ i }}" inputmode="numeric" value="{{ s['cerrada_' ~ i] if s and s['cerrada_' ~ i] is not none else '' }}" onblur="onBlur(this)">
-                    {% if r and r['cerrada_' ~ i] %}<div class="ref">ant: {{ r['cerrada_' ~ i] }}</div>{% endif %}
+            </div>
+            <!-- Celiaca -->
+            <div class="chip-group" style="margin-top:6px;">
+                <div class="chip-label">Celiaca</div>
+                <div class="chip-row">
+                    <div class="chip">
+                        <input type="number" inputmode="numeric" data-f="celiaca" value="{{ s.celiaca if s and s.celiaca is not none else '' }}" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()">
+                        <span class="unit">g</span>
+                    </div>
                 </div>
-                {% endfor %}
-                {% for i in range(1, 3) %}
-                <div class="extra-field">
-                    <label>Entrante {{ i }}</label>
-                    <input type="number" data-field="entrante_{{ i }}" inputmode="numeric" value="{{ s['entrante_' ~ i] if s and s['entrante_' ~ i] is not none else '' }}" onblur="onBlur(this)">
-                    {% if r and r['entrante_' ~ i] %}<div class="ref">ant: {{ r['entrante_' ~ i] }}</div>{% endif %}
+            </div>
+            <!-- Cerradas: solo las que tienen valor + boton agregar -->
+            <div class="chip-group" style="margin-top:6px;">
+                <div class="chip-label">Cerradas</div>
+                <div class="chip-row" data-cerr>
+                    {% for i in range(1, 7) %}
+                    {% set cv = s['cerrada_' ~ i] if s and s['cerrada_' ~ i] is not none else none %}
+                    {% set rv = r['cerrada_' ~ i] if r and r['cerrada_' ~ i] is not none else none %}
+                    {% if cv is not none or (loop.index <= 1) %}
+                    <div class="chip" data-slot="cerrada_{{ i }}">
+                        <input type="number" inputmode="numeric" data-f="cerrada_{{ i }}" value="{{ cv if cv is not none else '' }}" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()">
+                        <span class="unit">g</span>
+                        {% if rv %}<span class="ref">{{ rv }}</span>{% endif %}
+                        {% if i > 1 %}<button class="chip-rm" onclick="rmChip(this, event)">&times;</button>{% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    <button class="add-btn" onclick="addCerr(this, event)">+ cerrada</button>
                 </div>
-                {% endfor %}
+            </div>
+            <!-- Entrantes: solo las que tienen valor + boton agregar -->
+            <div class="chip-group" style="margin-top:6px;">
+                <div class="chip-label">Entrantes</div>
+                <div class="chip-row" data-ent>
+                    {% for i in range(1, 3) %}
+                    {% set ev = s['entrante_' ~ i] if s and s['entrante_' ~ i] is not none else none %}
+                    {% set erv = r['entrante_' ~ i] if r and r['entrante_' ~ i] is not none else none %}
+                    {% if ev is not none %}
+                    <div class="chip" data-slot="entrante_{{ i }}">
+                        <input type="number" inputmode="numeric" data-f="entrante_{{ i }}" value="{{ ev }}" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()">
+                        <span class="unit">g</span>
+                        {% if erv %}<span class="ref">{{ erv }}</span>{% endif %}
+                        <button class="chip-rm" onclick="rmChip(this, event)">&times;</button>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    <button class="add-btn" onclick="addEnt(this, event)">+ entrante</button>
+                </div>
             </div>
         </div>
     </div>
@@ -166,212 +189,154 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
 
     <!-- Agregar sabor -->
-    <div class="section">
-        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">+ Agregar sabor nuevo</div>
-        <div class="section-body">
-            <div class="extra-row">
-                <input type="text" id="nuevoSabor" placeholder="Nombre del sabor" style="font-size:16px;">
-                <button class="btn-sm" onclick="agregarSabor()">Agregar</button>
-            </div>
-        </div>
-    </div>
+    <div class="sec"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">+ Agregar sabor nuevo</div>
+        <div class="sec-b"><div class="xrow"><input type="text" id="newFlav" placeholder="Nombre" style="font-size:16px;" onclick="event.stopPropagation()"><button class="btn-s" onclick="addFlav()">Agregar</button></div></div></div>
 
     <!-- VDP -->
-    <div class="section{{ ' open' if data.vdp else '' }}">
-        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-            Ventas despues del peso
-            <span class="section-count" id="vdpCount">{{ data.vdp|length }}</span>
-        </div>
-        <div class="section-body" id="vdpBox">
-            {% for v in data.vdp %}
-            <div class="extra-row">
-                <input type="text" class="vdp-t" value="{{ v.texto }}" placeholder="Ej: 2 vasitos frutilla">
-                <input type="number" class="vdp-g" value="{{ v.gramos }}" placeholder="g" inputmode="numeric">
-                <button class="rm-btn" onclick="this.parentElement.remove()">&times;</button>
-            </div>
-            {% endfor %}
-            <button class="btn-sm" onclick="addVDP()">+ Agregar</button>
-        </div>
-    </div>
+    <div class="sec{{ ' open' if data.vdp else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Ventas despues del peso <span class="sec-badge">{{ data.vdp|length }}</span></div>
+        <div class="sec-b" id="vB">{% for v in data.vdp %}<div class="xrow"><input type="text" class="vt" value="{{ v.texto }}"><input type="number" class="vg" value="{{ v.gramos }}" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>{% endfor %}<button class="btn-s" onclick="addV()">+ Agregar</button></div></div>
 
     <!-- Consumos -->
-    <div class="section{{ ' open' if data.consumos else '' }}">
-        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-            Consumos internos
-            <span class="section-count" id="conCount">{{ data.consumos|length }}</span>
-        </div>
-        <div class="section-body" id="conBox">
-            {% for c in data.consumos %}
-            <div class="extra-row">
-                <input type="text" class="con-t" value="{{ c.texto }}" placeholder="Ej: 1 cucurucho chocolate">
-                <input type="number" class="con-g" value="{{ c.gramos }}" placeholder="g" inputmode="numeric">
-                <button class="rm-btn" onclick="this.parentElement.remove()">&times;</button>
-            </div>
-            {% endfor %}
-            <button class="btn-sm" onclick="addCon()">+ Agregar</button>
-        </div>
-    </div>
+    <div class="sec{{ ' open' if data.consumos else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Consumos internos <span class="sec-badge">{{ data.consumos|length }}</span></div>
+        <div class="sec-b" id="cB">{% for c in data.consumos %}<div class="xrow"><input type="text" class="ct" value="{{ c.texto }}"><input type="number" class="cg" value="{{ c.gramos }}" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>{% endfor %}<button class="btn-s" onclick="addC()">+ Agregar</button></div></div>
 
     <!-- Notas -->
-    <div class="section{{ ' open' if data.notas else '' }}">
-        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
-            Notas de caja
-            <span class="section-count" id="notaCount">{{ data.notas|length }}</span>
-        </div>
-        <div class="section-body" id="notaBox">
-            {% for n in data.notas %}
-            <div class="extra-row" style="flex-wrap:wrap;">
-                <select class="nota-c"><option value="novedad" {{ 'selected' if n.categoria=='novedad' }}>Novedad</option><option value="reclamo" {{ 'selected' if n.categoria=='reclamo' }}>Reclamo</option><option value="faltante" {{ 'selected' if n.categoria=='faltante' }}>Faltante</option><option value="otro" {{ 'selected' if n.categoria=='otro' }}>Otro</option></select>
-                <input type="text" class="nota-d" value="{{ n.detalle }}" placeholder="Detalle..." style="flex:1;min-width:150px;">
-                <button class="rm-btn" onclick="this.parentElement.remove()">&times;</button>
-            </div>
-            {% endfor %}
-            <button class="btn-sm" onclick="addNota()">+ Agregar</button>
-        </div>
-    </div>
+    <div class="sec{{ ' open' if data.notas else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Notas de caja <span class="sec-badge">{{ data.notas|length }}</span></div>
+        <div class="sec-b" id="nB">{% for n in data.notas %}<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad"{{ ' selected' if n.categoria=='novedad' }}>Novedad</option><option value="reclamo"{{ ' selected' if n.categoria=='reclamo' }}>Reclamo</option><option value="faltante"{{ ' selected' if n.categoria=='faltante' }}>Faltante</option><option value="otro"{{ ' selected' if n.categoria=='otro' }}>Otro</option></select><input type="text" class="nd" value="{{ n.detalle }}" style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>{% endfor %}<button class="btn-s" onclick="addN()">+ Agregar</button></div></div>
 </div>
 
-<div class="bottom">
-    <div class="bottom-inner">
-        <button class="btn-save" id="btnSave" onclick="guardarTodo()">Guardar borrador</button>
-    </div>
-</div>
+<div class="bot"><div class="bot-in"><button class="btn-main" id="btnS" onclick="save()">Guardar borrador</button></div></div>
 
 <script>
-const TID = {{ data.turno.id }};
-const PMAX = 7900;
+const TID={{data.turno.id}}, MX=7900;
+let active=null;
 
-function filtrar(q) {
-    q = q.toUpperCase().trim();
-    document.querySelectorAll('.flavor').forEach(f => {
-        f.classList.toggle('hidden', q && !f.dataset.nombre.includes(q));
-    });
+function toggle(fl, e) {
+    if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON'||e.target.tagName==='SELECT') return;
+    if(active && active!==fl) active.classList.remove('active');
+    fl.classList.toggle('active');
+    active = fl.classList.contains('active') ? fl : null;
+    if(active) { const inp=active.querySelector('.fl-body input'); if(inp)setTimeout(()=>inp.focus(),50); }
 }
 
-function toggleExpand(btn) {
-    btn.closest('.flavor').classList.toggle('open');
-    btn.classList.toggle('active');
+function buscar(q) {
+    q=q.toUpperCase().trim();
+    document.querySelectorAll('.fl').forEach(f=>f.classList.toggle('hidden',q&&!f.dataset.n.includes(q)));
 }
 
-function onFoc(inp) { inp.select(); }
-
-function onBlur(inp) {
-    const v = inp.value.trim();
-    inp.classList.remove('ok','warn','err');
-    if (!v) { updateRow(inp); return; }
-    const n = parseInt(v);
-    if (isNaN(n) || n < 0) inp.classList.add('err');
-    else if (n > PMAX) inp.classList.add('err');
-    else if (n > 0 && n < 50) inp.classList.add('warn');
-    else if (n === 280) inp.classList.add('warn');
-    else if (n > 0) inp.classList.add('ok');
-    updateRow(inp);
+function v(inp) {
+    const s=inp.value.trim(); inp.classList.remove('ok','warn','err');
+    if(!s){upd(inp);return;}
+    const n=parseInt(s);
+    if(isNaN(n)||n<0)inp.classList.add('err');
+    else if(n>MX)inp.classList.add('err');
+    else if(n>0&&n<50)inp.classList.add('warn');
+    else if(n===280)inp.classList.add('warn');
+    else if(n>0)inp.classList.add('ok');
+    upd(inp);
 }
 
-function updateRow(inp) {
-    const fl = inp.closest('.flavor');
-    let has = false;
-    fl.querySelectorAll('input[type="number"]').forEach(i => {
-        if (i.value.trim()) has = true;
-    });
-    fl.classList.toggle('has-data', has);
-    updateStats();
+function upd(inp) {
+    const fl=inp.closest('.fl'); let has=false, ab='';
+    fl.querySelectorAll('input[type=number]').forEach(i=>{if(i.value.trim()){has=true; if(i.dataset.f==='abierta')ab=i.value+'g';}});
+    fl.classList.toggle('done',has);
+    fl.querySelector('[data-sum]').textContent=ab;
+    stats();
 }
 
-function updateStats() {
-    const total = document.querySelectorAll('.flavor').length;
-    const done = document.querySelectorAll('.flavor.has-data').length;
-    document.getElementById('statsText').textContent = done + '/' + total + ' sabores';
-    document.getElementById('progressFill').style.width = (done/total*100) + '%';
+function stats() {
+    const t=document.querySelectorAll('.fl').length, d=document.querySelectorAll('.fl.done').length;
+    document.getElementById('stats').textContent=d+'/'+t;
+    document.getElementById('prog').style.width=(d/t*100)+'%';
 }
 
+// Dynamic cerrada/entrante chips
+function addCerr(btn, e) {
+    e.stopPropagation();
+    const row=btn.closest('[data-cerr]');
+    const existing=row.querySelectorAll('.chip');
+    if(existing.length>=6){toast('Maximo 6 cerradas','warn');return;}
+    const idx=existing.length+1;
+    const chip=document.createElement('div'); chip.className='chip'; chip.dataset.slot='cerrada_'+idx;
+    chip.innerHTML='<input type="number" inputmode="numeric" data-f="cerrada_'+idx+'" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()"><span class="unit">g</span><button class="chip-rm" onclick="rmChip(this,event)">&times;</button>';
+    row.insertBefore(chip, btn);
+    chip.querySelector('input').focus();
+}
+
+function addEnt(btn, e) {
+    e.stopPropagation();
+    const row=btn.closest('[data-ent]');
+    const existing=row.querySelectorAll('.chip');
+    if(existing.length>=2){toast('Maximo 2 entrantes','warn');return;}
+    const idx=existing.length+1;
+    const chip=document.createElement('div'); chip.className='chip'; chip.dataset.slot='entrante_'+idx;
+    chip.innerHTML='<input type="number" inputmode="numeric" data-f="entrante_'+idx+'" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()"><span class="unit">g</span><button class="chip-rm" onclick="rmChip(this,event)">&times;</button>';
+    row.insertBefore(chip, btn);
+    chip.querySelector('input').focus();
+}
+
+function rmChip(btn, e) {
+    e.stopPropagation();
+    const chip=btn.closest('.chip');
+    const fl=chip.closest('.fl');
+    chip.remove();
+    // Reindex
+    const cerr=fl.querySelectorAll('[data-cerr] .chip');
+    cerr.forEach((c,i)=>{c.dataset.slot='cerrada_'+(i+1); c.querySelector('input').dataset.f='cerrada_'+(i+1);});
+    const ent=fl.querySelectorAll('[data-ent] .chip');
+    ent.forEach((c,i)=>{c.dataset.slot='entrante_'+(i+1); c.querySelector('input').dataset.f='entrante_'+(i+1);});
+    upd(fl.querySelector('input[type=number]')||fl);
+}
+
+// Collect data
 function collect() {
-    const sabores = [];
-    document.querySelectorAll('.flavor').forEach(fl => {
-        const nombre = fl.dataset.nombre;
-        let has = false;
-        const row = { nombre };
-        fl.querySelectorAll('input[type="number"]').forEach(inp => {
-            const v = inp.value.trim();
-            row[inp.dataset.field] = v === '' ? null : parseInt(v);
-            if (v) has = true;
+    const out=[];
+    document.querySelectorAll('.fl').forEach(fl=>{
+        const n=fl.dataset.n; let has=false;
+        const row={nombre:n,abierta:null,celiaca:null,cerrada_1:null,cerrada_2:null,cerrada_3:null,cerrada_4:null,cerrada_5:null,cerrada_6:null,entrante_1:null,entrante_2:null};
+        fl.querySelectorAll('input[type=number]').forEach(inp=>{
+            const val=inp.value.trim(); if(!val)return;
+            has=true; row[inp.dataset.f]=parseInt(val);
         });
-        if (has) sabores.push(row);
+        if(has) out.push(row);
     });
-    return sabores;
+    return out;
 }
 
-function collectExtras() {
-    const vdp = [], con = [], notas = [];
-    document.querySelectorAll('#vdpBox .extra-row').forEach(r => {
-        const t = (r.querySelector('.vdp-t')||{}).value||'';
-        const g = parseInt((r.querySelector('.vdp-g')||{}).value)||0;
-        if (t.trim()) vdp.push({texto:t,gramos:g});
-    });
-    document.querySelectorAll('#conBox .extra-row').forEach(r => {
-        const t = (r.querySelector('.con-t')||{}).value||'';
-        const g = parseInt((r.querySelector('.con-g')||{}).value)||0;
-        if (t.trim()) con.push({texto:t,gramos:g});
-    });
-    document.querySelectorAll('#notaBox .extra-row').forEach(r => {
-        const c = (r.querySelector('.nota-c')||{}).value||'otro';
-        const d = (r.querySelector('.nota-d')||{}).value||'';
-        if (d.trim()) notas.push({categoria:c,detalle:d});
-    });
-    return {vdp,consumos:con,notas};
+function collectX() {
+    const vdp=[],con=[],notas=[];
+    document.querySelectorAll('#vB .xrow').forEach(r=>{const t=(r.querySelector('.vt')||{}).value||'',g=parseInt((r.querySelector('.vg')||{}).value)||0;if(t.trim())vdp.push({texto:t,gramos:g});});
+    document.querySelectorAll('#cB .xrow').forEach(r=>{const t=(r.querySelector('.ct')||{}).value||'',g=parseInt((r.querySelector('.cg')||{}).value)||0;if(t.trim())con.push({texto:t,gramos:g});});
+    document.querySelectorAll('#nB .xrow').forEach(r=>{const c=(r.querySelector('.nc')||{}).value||'otro',d=(r.querySelector('.nd')||{}).value||'';if(d.trim())notas.push({categoria:c,detalle:d});});
+    return{vdp,consumos:con,notas};
 }
 
-function showToast(msg, tipo) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = 'toast show toast-' + tipo;
-    setTimeout(() => t.className = 'toast', 3500);
-}
+function toast(msg,t){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show toast-'+t;setTimeout(()=>el.className='toast',3500);}
 
-async function guardarTodo() {
-    const btn = document.getElementById('btnSave');
-    btn.disabled = true; btn.textContent = 'Guardando...';
-    try {
-        const [r1, r2] = await Promise.all([
-            fetch('/entrada/api/guardar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({turno_id:TID, sabores:collect()}) }),
-            fetch('/entrada/api/guardar-extras', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({turno_id:TID, ...collectExtras()}) }),
+async function save() {
+    const btn=document.getElementById('btnS');
+    btn.disabled=true; btn.textContent='Guardando...';
+    try{
+        const[r1,r2]=await Promise.all([
+            fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect()})}),
+            fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,...collectX()})}),
         ]);
-        const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
-        if (d1.ok && d2.ok) {
-            let p = [d1.n_sabores+' sabores'];
-            if (d2.n_vdp) p.push(d2.n_vdp+' VDP');
-            if (d2.n_consumos) p.push(d2.n_consumos+' consumos');
-            if (d2.n_notas) p.push(d2.n_notas+' notas');
-            showToast('Guardado: '+p.join(', '), d1.warnings?.length ? 'warn' : 'ok');
-        } else { showToast('Error: '+(d1.error||d2.error), 'err'); }
-    } catch(e) { showToast('Sin conexion', 'err'); }
-    btn.disabled = false; btn.textContent = 'Guardar borrador';
+        const[d1,d2]=await Promise.all([r1.json(),r2.json()]);
+        if(d1.ok&&d2.ok){
+            let p=[d1.n_sabores+' sabores'];
+            if(d2.n_vdp)p.push(d2.n_vdp+' VDP');if(d2.n_consumos)p.push(d2.n_consumos+' consumos');if(d2.n_notas)p.push(d2.n_notas+' notas');
+            toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');
+        }else toast('Error: '+(d1.error||d2.error),'err');
+    }catch(e){toast('Sin conexion','err');}
+    btn.disabled=false; btn.textContent='Guardar borrador';
 }
 
-function addVDP() {
-    document.getElementById('vdpBox').insertAdjacentHTML('beforeend',
-        '<div class="extra-row"><input type="text" class="vdp-t" placeholder="Ej: 2 vasitos"><input type="number" class="vdp-g" placeholder="g" inputmode="numeric"><button class="rm-btn" onclick="this.parentElement.remove()">&times;</button></div>');
-}
-function addCon() {
-    document.getElementById('conBox').insertAdjacentHTML('beforeend',
-        '<div class="extra-row"><input type="text" class="con-t" placeholder="Ej: 1 cucurucho"><input type="number" class="con-g" placeholder="g" inputmode="numeric"><button class="rm-btn" onclick="this.parentElement.remove()">&times;</button></div>');
-}
-function addNota() {
-    document.getElementById('notaBox').insertAdjacentHTML('beforeend',
-        '<div class="extra-row" style="flex-wrap:wrap;"><select class="nota-c"><option value="novedad">Novedad</option><option value="reclamo">Reclamo</option><option value="faltante">Faltante</option><option value="otro">Otro</option></select><input type="text" class="nota-d" placeholder="Detalle..." style="flex:1;min-width:150px;"><button class="rm-btn" onclick="this.parentElement.remove()">&times;</button></div>');
-}
-async function agregarSabor() {
-    const inp = document.getElementById('nuevoSabor');
-    const n = inp.value.trim();
-    if (!n) return;
-    const r = await fetch('/entrada/api/agregar-sabor', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
-    const d = await r.json();
-    if (d.ok) { showToast(d.nombre_norm+' agregado. Recarga para verlo.', 'ok'); inp.value=''; }
-    else showToast(d.error, 'err');
-}
+function addV(){document.getElementById('vB').insertAdjacentHTML('beforeend','<div class="xrow"><input type="text" class="vt" placeholder="Ej: 2 vasitos"><input type="number" class="vg" placeholder="g" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
+function addC(){document.getElementById('cB').insertAdjacentHTML('beforeend','<div class="xrow"><input type="text" class="ct" placeholder="Ej: 1 cucurucho"><input type="number" class="cg" placeholder="g" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
+function addN(){document.getElementById('nB').insertAdjacentHTML('beforeend','<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad">Novedad</option><option value="reclamo">Reclamo</option><option value="faltante">Faltante</option><option value="otro">Otro</option></select><input type="text" class="nd" placeholder="Detalle..." style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
+async function addFlav(){const inp=document.getElementById('newFlav'),n=inp.value.trim();if(!n)return;const r=await fetch('/entrada/api/agregar-sabor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});const d=await r.json();if(d.ok){toast(d.nombre_norm+' agregado. Recarga para verlo.','ok');inp.value='';}else toast(d.error,'err');}
 
-// Init
-updateStats();
+stats();
 </script>
 </body>
 </html>
