@@ -9,6 +9,34 @@ from typing import List, Tuple, Optional
 from datetime import datetime
 
 
+def _safe(text: str) -> str:
+    """Sanitiza texto para Helvetica (Latin-1). Reemplaza caracteres fuera de rango."""
+    if not text:
+        return text
+    out = []
+    for ch in text:
+        try:
+            ch.encode('latin-1')
+            out.append(ch)
+        except UnicodeEncodeError:
+            # Reemplazos conocidos
+            _MAP = {
+                '\u2248': '~',   # ≈
+                '\u2264': '<=',  # ≤
+                '\u2265': '>=',  # ≥
+                '\u2192': '->',  # →
+                '\u2190': '<-',  # ←
+                '\u2194': '<->', # ↔
+                '\u00b1': '+-',  # ±
+                '\u2713': 'OK',  # ✓
+                '\u26a0': '!',   # ⚠
+                '\u26aa': '?',   # ⚪
+                '\u2b1c': '-',   # ⬜
+            }
+            out.append(_MAP.get(ch, '?'))
+    return ''.join(out)
+
+
 class ReportePDF(FPDF):
     """PDF con header/footer corporativo."""
 
@@ -120,7 +148,7 @@ def _pagina_resumen(pdf: ReportePDF, dias_data: list):
             ('R', str(d['latas'])),
             ('R', str(d['corr'])),
             ('R', str(d['h0'])),
-            ('L', d.get('notas', '')),
+            ('L', _safe(d.get('notas', ''))),
         ]
         for (align, val), (_, w) in zip(vals, cols):
             pdf.cell(w, 5, val, border=0, fill=True, align=align)
@@ -242,7 +270,7 @@ def _pagina_dia(pdf: ReportePDF, dia_data: dict):
         delta = caso.get('delta')
         banda = caso.get('banda', '')
         conf = caso.get('confianza')
-        nota = caso.get('nota', '')
+        nota = _safe(caso.get('nota', ''))
 
         # Color del delta
         delta_str = f"{delta:+,}".replace(',', '.') if delta is not None and delta != 0 else '-'
@@ -250,8 +278,8 @@ def _pagina_dia(pdf: ReportePDF, dia_data: dict):
         conf_str = f"{conf:.0%}" if conf is not None else '-'
 
         vals = [
-            ('L', caso.get('sabor', '')),
-            ('C', status),
+            ('L', _safe(caso.get('sabor', ''))),
+            ('C', _safe(status)),
             ('R', _fmt(raw_val)),
             ('R', corr_str),
             ('R', delta_str),
