@@ -372,6 +372,19 @@ function v(inp) {
         upd(inp); return;
     }
 
+    // Cerradas y entrantes: la balanza pesa de a 5g, no puede terminar en otro digito
+    if(field && (field.startsWith('cerrada') || field.startsWith('entrante')) && n > 0) {
+        const ultimo = n % 10;
+        if(ultimo !== 0 && ultimo !== 5) {
+            inp.classList.add('warn');
+            const sugerido5 = Math.round(n / 5) * 5;
+            showAlert('Peso no termina en 0 o 5',
+                n+'g termina en '+ultimo+'. La balanza pesa de a 5g. Quisiste poner '+sugerido5+'g?',
+                'warning', inp);
+            upd(inp); return;
+        }
+    }
+
     // Comparacion con turno anterior
     const refData=REF[nombre];
     if(refData && field && refData[field]!=null){
