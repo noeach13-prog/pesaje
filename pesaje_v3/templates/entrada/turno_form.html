@@ -372,8 +372,8 @@ function v(inp) {
         upd(inp); return;
     }
 
-    // Cerradas y entrantes: la balanza pesa de a 5g, no puede terminar en otro digito
-    if(field && (field.startsWith('cerrada') || field.startsWith('entrante')) && n > 0) {
+    // Todos los pesos: la balanza pesa de a 5g, nunca tira un numero que no termine en 0 o 5
+    if(n > 0) {
         const ultimo = n % 10;
         if(ultimo !== 0 && ultimo !== 5) {
             inp.classList.add('warn');
