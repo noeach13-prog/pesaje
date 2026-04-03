@@ -77,12 +77,12 @@ def _cell(ws, row, col, value=None, font=None, fill=None,
 # ===================================================================
 
 _SITUACION_PRIORITY = {
-    '⚠ Corregido':      0,
+    '! Corregido':      0,
     '~ Estimado':       1,
-    '≈ Ajuste leve':    2,
-    '✓ Sin cambios':    3,
-    '⚪ Sin resolver':   3,
-    '⬜ Solo un turno': 4,
+    '~ Ajuste leve':    2,
+    'OK Sin cambios':   3,
+    '? Sin resolver':   3,
+    '- Solo un turno':  4,
 }
 
 def _clasificar_fila(sc: SaborClasificado, corr: Optional[Correccion], venta_raw_fallback: int = 0):
@@ -90,15 +90,15 @@ def _clasificar_fila(sc: SaborClasificado, corr: Optional[Correccion], venta_raw
     # SOLO un turno
     if sc.status in (StatusC3.SOLO_DIA, StatusC3.SOLO_NOCHE):
         vf = 0
-        return '⬜ Solo un turno', C_SOLO, None, vf
+        return '- Solo un turno', C_SOLO, None, vf
 
     # Prototipo C3 (PF) sin corrección C4
     proto = sc.prototipo
     if corr is None and proto is None:
         if sc.venta_final_c3 is not None:
-            return '✓ Sin cambios', C_LIMPIO, None, sc.venta_final_c3
+            return 'OK Sin cambios', C_LIMPIO, None, sc.venta_final_c3
         # ESCALAR_C4: venta_final_c3 no resuelta, mostrar raw para coherencia de columna
-        return '⚪ Sin resolver', C_ESTIMADO, None, venta_raw_fallback
+        return '? Sin resolver', C_ESTIMADO, None, venta_raw_fallback
 
     # Usar corrección C4 si existe, si no el prototipo
     if corr is not None:
@@ -116,10 +116,10 @@ def _clasificar_fila(sc: SaborClasificado, corr: Optional[Correccion], venta_raw
         return '~ Estimado', C_ESTIMADO, delta, vf
 
     if abs(delta) <= 200:
-        return '≈ Ajuste leve', C_AJUSTE_LEVE, delta, vf
+        return '~ Ajuste leve', C_AJUSTE_LEVE, delta, vf
 
     if banda == 'CONFIRMADO':
-        return '⚠ Corregido', C_CORREGIDO, delta, vf
+        return '! Corregido', C_CORREGIDO, delta, vf
 
     return '~ Estimado', C_ESTIMADO, delta, vf
 
@@ -234,11 +234,11 @@ def _write_guia(ws):
     row += 1
 
     leyenda = [
-        (C_LIMPIO,      '✓ Sin cambios',    'El registro del día no presentó inconsistencias. Valor directo de la planilla.'),
-        (C_AJUSTE_LEVE, '≈ Ajuste leve',    'Varianza de pesaje menor (≤ 200 g). Corrección automática de pequeña medición.'),
-        (C_CORREGIDO,   '⚠ Corregido',      'Se detectó y corrigió un problema con alta confianza (lata fantasma, omisión, error de dígito, etc.).'),
+        (C_LIMPIO,      'OK Sin cambios',    'El registro del día no presentó inconsistencias. Valor directo de la planilla.'),
+        (C_AJUSTE_LEVE, '~ Ajuste leve',    'Varianza de pesaje menor (≤ 200 g). Corrección automática de pequeña medición.'),
+        (C_CORREGIDO,   '! Corregido',      'Se detectó y corrigió un problema con alta confianza (lata fantasma, omisión, error de dígito, etc.).'),
         (C_ESTIMADO,    '~ Estimado',        'Corrección aplicada con confianza media o baja. Revisar si hay dudas sobre el registro.'),
-        (C_SOLO,        '⬜ Solo un turno',  'El sabor no tiene datos en ambos turnos del día. No se puede calcular venta.'),
+        (C_SOLO,        '- Solo un turno',  'El sabor no tiene datos en ambos turnos del día. No se puede calcular venta.'),
     ]
 
     for color, label, texto in leyenda:

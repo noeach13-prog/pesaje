@@ -579,7 +579,7 @@ def generar_hipotesis_pf7(nombre: str, sc: SaborContable, datos: DatosDia,
 #           EXCEPCIÓN: turno_masivo=True eleva DÉBIL a MEDIA (ver INTRADUP_MASIVO_TURNO)
 #
 # PFIT_MASIVO (N>=2 pares, bajo turno_masivo):
-#   Cuando el sabor tiene N>=2 pares (entrante≈cerrada) mutuamente no conflictivos,
+#   Cuando el sabor tiene N>=2 pares (entrante~cerrada) mutuamente no conflictivos,
 #   se genera UNA hipótesis compuesta en lugar de N individuales.
 #   Condición de no-conflicto: la asignación par↔par es forzada (biyectiva en slots Y en pesos).
 #   Si dos entrantes son intercambiables con dos cerradas (pesos cruzados en tolerancia),
@@ -673,7 +673,7 @@ def _sin_rival_apertura_o_genealogia(pares: List[tuple], n) -> bool:
     Condición 5 (PFIT_MASIVO_AMBIGU): ninguna cerrada emparejada está siendo
     reclamada por una hipótesis rival fuerte.
 
-    Señal de rival: la cerrada DIA ≈ algún entrante NOCHE (candidato PF2,
+    Señal de rival: la cerrada DIA ~ algún entrante NOCHE (candidato PF2,
     promoción legítima de entrante→cerrada). Si hay rival, la masa puede
     estar participando en una genealogía real y el monto deja de ser inequívoco.
     pares: [(ea_idx, ea, c_val, c_idx), ...]
@@ -725,7 +725,7 @@ def _generar_pfit_masivo_ambigu(nombre: str, sc: SaborContable,
         'sin rival de genealogía ni apertura sobre esas masas (cond. 5 ok)',
         'INTRADUP_MASIVO_TURNO: patrón colectivo de doble-registro en planilla',
     ]
-    pares_desc = '; '.join(f'ent {p[1]}g≈cerr {p[2]}g' for p in pares)
+    pares_desc = '; '.join(f'ent {p[1]}g~cerr {p[2]}g' for p in pares)
 
     return [HipotesisCorreccion(
         codigo_pf='PFIT_MASIVO_AMBIGU',
@@ -875,7 +875,7 @@ def _generar_pfit_masivo(nombre: str, sc: SaborContable,
     # Fuente: MATCHING colectivo (la asignación conjunta es la evidencia)
     fuente = FuenteEvidencia(
         TipoFuente.MATCHING,
-        f'PFIT_MASIVO: {len(pares)} pares entrante≈cerrada mutuamente no conflictivos; '
+        f'PFIT_MASIVO: {len(pares)} pares entrante~cerrada mutuamente no conflictivos; '
         f'INTRADUP_MASIVO_TURNO confirmado',
     )
 
