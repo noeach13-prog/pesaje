@@ -20,6 +20,12 @@ from flask import Flask, request, render_template_string, send_file
 app = Flask(__name__)
 _outputs: dict = {}
 
+# --- Blueprint de carga manual ---
+from pesaje_v3.web_entrada import entrada_bp
+from pesaje_v3.db import init_db
+app.register_blueprint(entrada_bp)
+init_db()
+
 
 def _procesar(path_in: str, filename: str):
     """Corre el pipeline v3 sobre el archivo y retorna stats + path de salida."""

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pesaje - Carga de turno</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+.container { max-width: 480px; margin: 0 auto; padding: 16px; }
+h1 { font-size: 1.4rem; margin-bottom: 4px; }
+.subtitle { color: #666; font-size: 0.85rem; margin-bottom: 20px; }
+.card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; color: #555; }
+select, input[type="date"], input[type="text"] {
+    width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 16px; /* evita zoom en iOS */ margin-bottom: 12px; background: #fff;
+}
+.turno-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+.turno-btn {
+    flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 6px;
+    background: #fff; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    text-align: center; transition: all 0.15s;
+}
+.turno-btn.active { border-color: #1565c0; background: #e3f2fd; color: #1565c0; }
+.turno-btn:hover { border-color: #90caf9; }
+.btn-primary {
+    width: 100%; padding: 14px; background: #1565c0; color: #fff; border: none;
+    border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer;
+}
+.btn-primary:disabled { background: #ccc; cursor: default; }
+.btn-primary:hover:not(:disabled) { background: #0d47a1; }
+.recientes { margin-top: 20px; }
+.recientes h2 { font-size: 1rem; margin-bottom: 8px; }
+.turno-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid #eee; font-size: 0.85rem;
+}
+.turno-item a { color: #1565c0; text-decoration: none; font-weight: 600; }
+.badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
+.badge-borrador { background: #fff3e0; color: #e65100; }
+.badge-confirmado { background: #e8f5e9; color: #2e7d32; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Pesaje v3</h1>
+    <p class="subtitle">Carga de turno</p>
+
+    <form method="POST" action="/entrada/turno/nuevo" id="formNuevo">
+    <div class="card">
+        <label>Sucursal</label>
+        <select name="sucursal_id" id="sucursal" required>
+            <option value="">Seleccionar...</option>
+            {% for s in sucursales %}
+            <option value="{{ s.id }}" data-modo="{{ s.modo }}">{{ s.nombre }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Fecha</label>
+        <input type="date" name="fecha" id="fecha" value="{{ hoy }}" required>
+
+        <label>Turno</label>
+        <div class="turno-btns" id="turnoBtns">
+            <div class="turno-btn" data-val="DIA" onclick="selTurno(this)">DIA</div>
+            <div class="turno-btn" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
+        </div>
+        <input type="hidden" name="tipo_turno" id="tipoTurno" value="">
+
+        <label>Quien carga (opcional)</label>
+        <input type="text" name="ingresado_por" placeholder="Nombre del empleado">
+    </div>
+
+    <button type="submit" class="btn-primary" id="btnCrear" disabled>Crear turno</button>
+    </form>
+
+    {% if recientes %}
+    <div class="recientes">
+        <h2>Turnos recientes</h2>
+        {% for t in recientes %}
+        <div class="turno-item">
+            <div>
+                <a href="/entrada/turno/{{ t.id }}">{{ t.sucursal_nombre }} - {{ t.fecha }} {{ t.tipo_turno }}</a>
+            </div>
+            <span class="badge badge-{{ t.estado }}">{{ t.estado }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function selTurno(el) {
+    document.querySelectorAll('.turno-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tipoTurno').value = el.dataset.val;
+    checkReady();
+}
+
+// Adaptar botones segun modo sucursal
+document.getElementById('sucursal').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const modo = opt.dataset.modo;
+    const btns = document.getElementById('turnoBtns');
+    if (modo === 'TURNO_UNICO') {
+        btns.innerHTML = '<div class="turno-btn active" data-val="UNICO" onclick="selTurno(this)">TURNO UNICO</div>';
+        document.getElementById('tipoTurno').value = 'UNICO';
+    } else {
+        btns.innerHTML = '<div class="turno-btn" data-val="DIA" onclick="selTurno(this)">DIA</div>' +
+                         '<div class="turno-btn" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>';
+        document.getElementById('tipoTurno').value = '';
+    }
+    checkReady();
+});
+
+function checkReady() {
+    const suc = document.getElementById('sucursal').value;
+    const fecha = document.getElementById('fecha').value;
+    const turno = document.getElementById('tipoTurno').value;
+    document.getElementById('btnCrear').disabled = !(suc && fecha && turno);
+}
+document.getElementById('fecha').addEventListener('change', checkReady);
+</script>
+</body>
+</html>
