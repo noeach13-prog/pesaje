@@ -12,7 +12,9 @@ from .modelos import (
 from .constantes_c3 import (
     APERTURA_PROXY_MIN_RISE, TOL_SUBA_AB_LEVE, TOL_MATCH_CERRADA,
     TOL_MATCH_ENTRANTE, TOL_PROMO_ENTRANTE, TOL_MISMATCH_LEVE,
-    VENTA_NEG_THRESHOLD, VENTA_HIGH_THRESHOLD, TARA_LATA,
+    VENTA_NEG_THRESHOLD,
+    VENTA_HIGH_THRESHOLD_DUAL_SHIFT, VENTA_HIGH_THRESHOLD_SINGLE_SHIFT,
+    TARA_LATA,
     PF1_OFFSETS, PF1_MIN_SIGHTINGS_STRONG, PF1_MIN_SIGHTINGS_WEAK,
     PF1_MAX_VAR_WEAK, PF1_CONF_STRONG, PF1_CONF_WEAK,
     PF2_CONF, PF3_CONF, PF3_MAX_SIGHTINGS_PHANTOM,
@@ -21,6 +23,8 @@ from .constantes_c3 import (
     PF6_CONF, PF6_RISE_COHERENCE_RATIO, PF6_RISE_MAX_DIFF_RATIO,
     PF7_CONF_FORWARD, PF7_CONF_BACKWARD_ONLY, PF7_BACKWARD_TOLERANCE,
     CALIDAD_PENALIZACION_COPIA_FUERTE,
+    PFIT_TOL_INTRA,
+    INTRADUP_MASIVO_MIN_SABORES, INTRADUP_MASIVO_MIN_PCT, INTRADUP_MASIVO_MIN_PESO,
 )
 from typing import Dict, List, Optional, Tuple
 
@@ -29,10 +33,16 @@ from typing import Dict, List, Optional, Tuple
 # SCREENING — 5 condiciones
 # ═══════════════════════════════════════════════════════════════
 
-def _screening(nombre: str, sc: SaborContable, obs: ObservacionC3) -> tuple:
+def _screening(nombre: str, sc: SaborContable, obs: ObservacionC3,
+               modo: str = 'DIA_NOCHE',
+               intradup_masivo: bool = False) -> tuple:
     """
     Evalua C1-C4 para un sabor. Lee SOLO desde ObservacionC3 y SaborContable.
     No toca datos crudos del turno. Retorna (status, flags).
+    El threshold HIGH depende del modo: TURNO_UNICO usa umbral mayor (unidad temporal distinta).
+
+    intradup_masivo: si True y obs.intradup_candidato, fuerza flag INTRADUP y eleva a SENAL.
+    Esto no sustituye la evidencia individual de PFIT; la hace mas visible.
     """
     if sc.solo_dia:
         return StatusC3.SOLO_DIA, []
@@ -40,6 +50,12 @@ def _screening(nombre: str, sc: SaborContable, obs: ObservacionC3) -> tuple:
         return StatusC3.SOLO_NOCHE, []
 
     flags = []
+
+    # Threshold HIGH según modo (principio: respetar la unidad temporal del período)
+    venta_high_threshold = (
+        VENTA_HIGH_THRESHOLD_SINGLE_SHIFT if modo == 'TURNO_UNICO'
+        else VENTA_HIGH_THRESHOLD_DUAL_SHIFT
+    )
 
     # Apertura proxy: juicio derivado de metricas de observacion
     ab_d = obs.ab_d or 0
@@ -51,8 +67,8 @@ def _screening(nombre: str, sc: SaborContable, obs: ObservacionC3) -> tuple:
     if sc.venta_raw < VENTA_NEG_THRESHOLD:
         flags.append(FlagC3('NEG', 1, f'raw={sc.venta_raw}g'))
 
-    # C2: raw < VENTA_HIGH_THRESHOLD o apertura
-    if sc.venta_raw >= VENTA_HIGH_THRESHOLD and not apertura:
+    # C2: raw < venta_high_threshold o apertura
+    if sc.venta_raw >= venta_high_threshold and not apertura:
         flags.append(FlagC3('HIGH', 2, f'raw={sc.venta_raw}g sin apertura'))
 
     # C3: ab sube sin apertura
@@ -87,6 +103,12 @@ def _screening(nombre: str, sc: SaborContable, obs: ObservacionC3) -> tuple:
     if n_cerr_b_eff > sc.n_cerr_a:
         flags.append(FlagC3(f'CERR+{n_cerr_b_eff - sc.n_cerr_a}N', 4,
                             f'{n_cerr_b_eff} cerr NOCHE (eff) vs {sc.n_cerr_a} DIA'))
+
+    # INTRADUP: vicio de carga confirmado a nivel de planilla eleva candidatos individuales
+    # El flag no reemplaza la validacion PFIT; hace visible lo que era sospechoso.
+    if intradup_masivo and obs.intradup_candidato:
+        flags.append(FlagC3('INTRADUP', 2,
+                            'entrante DIA coincide con cerrada DIA (patron colectivo de turno)'))
 
     # Clasificar
     if apertura and not flags:
@@ -348,12 +370,69 @@ def _observar(nombre: str, sc: SaborContable, datos: DatosDia) -> ObservacionC3:
         else:
             obs.varianza_historica[slot.peso] = (slot.peso, 0.0, 0)
 
+    # --- intradup_candidato: hay entrante DIA que matchea cerrada DIA ---
+    if d and d.entrantes and d.cerradas:
+        for ea in d.entrantes:
+            ea_int = int(ea)
+            if any(abs(ea_int - int(c)) <= PFIT_TOL_INTRA for c in d.cerradas):
+                obs.intradup_candidato = True
+                break
+
     # Totales contables (espejo de sc, para guardias de coherencia en arbitro)
     obs.total_a = sc.total_a
     obs.total_b = sc.total_b
     obs.venta_raw = sc.venta_raw
 
     return obs
+
+
+# ═══════════════════════════════════════════════════════════════
+# INTRADUP_MASIVO_TURNO — señal colectiva de vicio de carga
+# ═══════════════════════════════════════════════════════════════
+
+def _detectar_intradup_masivo(
+    datos: DatosDia,
+    observaciones: Dict[str, 'ObservacionC3'],
+) -> bool:
+    """
+    Detecta si el turno DIA presenta un patron sistematico de doble-registro:
+    muchos sabores con entrante que coincide con cerrada del mismo turno.
+
+    Condicion compuesta (todas deben cumplirse):
+    - N sabores candidatos >= INTRADUP_MASIVO_MIN_SABORES
+    - N candidatos / total sabores >= INTRADUP_MASIVO_MIN_PCT
+    - Peso total de entrantes duplicados >= INTRADUP_MASIVO_MIN_PESO
+
+    No absuelve en masa. Solo eleva el estatuto de evidencia de cada PFIT individual.
+    """
+    d_turno = datos.turno_dia
+    total_sabores = len(d_turno.sabores)
+    if total_sabores == 0:
+        return False
+
+    n_candidatos = 0
+    peso_total_dup = 0
+
+    for nombre, obs in observaciones.items():
+        if not obs.intradup_candidato:
+            continue
+        n_candidatos += 1
+        # Sumar peso de los entrantes que matchean cerrada DIA
+        d = d_turno.sabores.get(nombre)
+        if d:
+            for ea in d.entrantes:
+                ea_int = int(ea)
+                if any(abs(ea_int - int(c)) <= PFIT_TOL_INTRA for c in d.cerradas):
+                    peso_total_dup += ea_int
+
+    if n_candidatos < INTRADUP_MASIVO_MIN_SABORES:
+        return False
+    if n_candidatos / total_sabores < INTRADUP_MASIVO_MIN_PCT:
+        return False
+    if peso_total_dup < INTRADUP_MASIVO_MIN_PESO:
+        return False
+
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -434,13 +513,26 @@ def clasificar(datos: DatosDia, contabilidad: ContabilidadDia) -> ResultadoC3:
     # clasificar() NO muta nombres.
 
     resultado = ResultadoC3(dia_label=datos.dia_label)
+    modo = getattr(datos, 'modo', 'DIA_NOCHE')
+
+    # Fase 1: Observar todos los sabores (unico punto de contacto con datos crudos)
+    # Necesario antes del screening para poder detectar patron masivo de turno.
+    observaciones: Dict[str, ObservacionC3] = {}
+    for nombre, sc in contabilidad.sabores.items():
+        observaciones[nombre] = _observar(nombre, sc, datos)
+
+    # Detectar patron INTRADUP_MASIVO_TURNO: condicion compuesta sobre el turno completo
+    intradup_masivo = _detectar_intradup_masivo(datos, observaciones)
+    if intradup_masivo:
+        resultado.warnings.append(
+            f'INTRADUP_MASIVO_TURNO: patron sistematico de doble-registro detectado en {datos.dia_label}'
+        )
 
     for nombre, sc in contabilidad.sabores.items():
-        # Fase 1: Observar (unico punto de contacto con datos crudos)
-        obs = _observar(nombre, sc, datos)
+        obs = observaciones[nombre]
 
         # Fase 2: Screening (lee desde observacion, no desde datos crudos)
-        status, flags = _screening(nombre, sc, obs)
+        status, flags = _screening(nombre, sc, obs, modo=modo, intradup_masivo=intradup_masivo)
 
         clasificado = SaborClasificado(
             nombre_norm=nombre,
@@ -477,7 +569,8 @@ def clasificar(datos: DatosDia, contabilidad: ContabilidadDia) -> ResultadoC3:
             # Nuevo pipeline: generar hipotesis + arbitrar
             from .generadores_c3 import generar_todas_hipotesis
             from .arbitro_c3 import resolver_hipotesis
-            hipotesis = generar_todas_hipotesis(nombre, sc, datos, obs, flags)
+            hipotesis = generar_todas_hipotesis(nombre, sc, datos, obs, flags,
+                                                turno_masivo=intradup_masivo)
             decision = resolver_hipotesis(hipotesis, obs, clasificado.marcas)
             clasificado.decision = decision
             clasificado.screening_status = status

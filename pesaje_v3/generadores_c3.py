@@ -23,6 +23,8 @@ from .constantes_c3 import (
     PF6_CONF, PF6_RISE_COHERENCE_RATIO, PF6_RISE_MAX_DIFF_RATIO,
     PF7_CONF_FORWARD, PF7_CONF_BACKWARD_ONLY, PF7_BACKWARD_TOLERANCE,
     APERTURA_PROXY_MIN_RISE,
+    PFIT_TOL_INTRA, PFIT_TOL_CONTEXTO, PFIT_CONF_FUERTE, PFIT_CONF_MEDIA, PFIT_CONF_AMBIGU,
+    TOL_MATCH_CERRADA,
 )
 
 
@@ -559,10 +561,437 @@ def generar_hipotesis_pf7(nombre: str, sc: SaborContable, datos: DatosDia,
 
 
 # ===================================================================
+# PFIT: Entrante duplicado intra-turno
+# ===================================================================
+#
+# Fenómeno: en la misma planilla (turno_DIA), el mismo can físico aparece
+# registrado DOS veces: una en la columna de cerradas y otra en la de entrantes.
+# Resultado: total_A inflado en ~peso_entrante → venta_raw inflada en el mismo monto.
+#
+# Distinción semántica obligatoria:
+#   PF2 (PROMO_DUP): entrante DIA se TRANSFORMA en cerrada NOCHE (genealogía cross-turno)
+#   PFIT (ENTRANTE_MISMO_CAN): cerrada DIA y entrante DIA son el mismo can (doble registro, mismo turno)
+#
+# Jerarquía de confianza:
+#   FUERTE (0.88): match intra-turno ±100g + cerrada ya existía en turno PREVIO ±200g
+#   MEDIA  (0.72): match intra-turno + cerrada persiste en turno SIGUIENTE ±200g, previo ambiguo
+#   DÉBIL:  solo match intra-turno, sin soporte temporal → no genera hipótesis
+#           EXCEPCIÓN: turno_masivo=True eleva DÉBIL a MEDIA (ver INTRADUP_MASIVO_TURNO)
+#
+# PFIT_MASIVO (N>=2 pares, bajo turno_masivo):
+#   Cuando el sabor tiene N>=2 pares (entrante≈cerrada) mutuamente no conflictivos,
+#   se genera UNA hipótesis compuesta en lugar de N individuales.
+#   Condición de no-conflicto: la asignación par↔par es forzada (biyectiva en slots Y en pesos).
+#   Si dos entrantes son intercambiables con dos cerradas (pesos cruzados en tolerancia),
+#   la asignación es ambigua → no se compone → se cae al comportamiento individual.
+#   Confianza = min(confianzas individuales). No se premia la cantidad.
+#
+# Corrección: ELIMINAR el entrante de DIA. No tocar la cerrada (la cerrada es la identidad real).
+# delta_venta = -entrante_peso  (total_A baja → venta_raw baja)
+#
+# Tests doctrinales (PFIT individual):
+#   [+] Positivo: ent=6700, cerr=6720 mismo turno, cerr=6700 en previo → FUERTE
+#   [-] Negativo: ent=6700, cerr=6720 mismo turno, cerr NO en previo ni siguiente → DÉBIL → sin hipótesis
+#   [~] Borde: ent=6700, cerr=6720 mismo turno, cerr en siguiente pero NO en previo → MEDIA, conf=0.72
+#
+# Tests doctrinales (PFIT_MASIVO):
+#   [+] Positivo: CH AMORES D14 — 2 PFIT individuales → 1 PFIT_MASIVO, delta acumulado
+#   [-] Negativo masivo: pares ambiguos (pesos cruzados) → no compone, cae a individual
+#   [!] Coherencia: delta acumulado > raw → venta_propuesta absurda → árbitro rechaza
+#   [-] San Martín D5/D6: masivo=False → no aparece PFIT_MASIVO
+
+
+def _pares_no_conflictivos(pares: List[tuple]) -> bool:
+    """
+    Verifica que los pares (ea_idx, ea, cerrada_match, c_idx) sean mutuamente no conflictivos.
+
+    Condición doble:
+    1. Biyectividad de slots: ningún slot de entrante ni de cerrada aparece más de una vez.
+    2. No cruce de pesos: para cada par (e_i, c_i), ningún otro par (e_j, c_j) tiene
+       |e_i - c_j| <= PFIT_TOL_INTRA (el entrante de i no puede reclamar la cerrada de j).
+
+    Si cualquiera falla → asignación ambigua → no se compone.
+    """
+    if len(pares) < 2:
+        return True
+
+    # 1. Biyectividad de slots
+    ent_slots = [p[0] for p in pares]
+    cerr_slots = [p[3] for p in pares]
+    if len(ent_slots) != len(set(ent_slots)):
+        return False
+    if len(cerr_slots) != len(set(cerr_slots)):
+        return False
+
+    # 2. No cruce de pesos: e_i no puede matchear c_j (para i != j)
+    for i, (_, ei, ci, ci_idx) in enumerate(pares):
+        for j, (_, ej, cj, cj_idx) in enumerate(pares):
+            if i == j:
+                continue
+            if abs(ei - cj) <= PFIT_TOL_INTRA:
+                return False  # e_i intercambiable con c_j → asignación ambigua
+
+    return True
+
+
+def _slots_biyectivos(pares: List[tuple]) -> bool:
+    """
+    Verifica solo la biyectividad de slots (sin chequear cruce de pesos).
+    Precondición de PFIT_MASIVO_AMBIGU: N entrantes distintos → N cerradas distintas.
+    pares: [(ea_idx, ea, c_val, c_idx), ...]
+    """
+    ent_slots = [p[0] for p in pares]
+    cerr_slots = [p[3] for p in pares]
+    return (len(ent_slots) == len(set(ent_slots)) and
+            len(cerr_slots) == len(set(cerr_slots)))
+
+
+def _cerradas_persisten_en_noche(pares: List[tuple], n) -> bool:
+    """
+    Condición 4 (PFIT_MASIVO_AMBIGU): cada cerrada DIA emparejada también aparece
+    en NOCHE (dentro de TOL_MATCH_CERRADA = 30g).
+
+    Usa TOL_MATCH_CERRADA (no PFIT_TOL_INTRA) porque la pregunta es de identidad
+    física del mismo can, no de rango de emparejamiento entrante↔cerrada.
+    Un can que pesa 5450 en DIA y está ausente de NOCHE no es el mismo que el
+    de 5400 aunque ambos estén dentro de 100g.
+
+    Si una cerrada desaparece entre DIA y NOCHE podría haberse abierto o
+    transformado — el monto ya no es inequívoco.
+    pares: [(ea_idx, ea, c_val, c_idx), ...]
+    """
+    if not n or not n.cerradas:
+        return False
+    for ea_idx, ea, c_val, c_idx in pares:
+        if not any(abs(c_val - int(cn)) <= TOL_MATCH_CERRADA for cn in n.cerradas):
+            return False
+    return True
+
+
+def _sin_rival_apertura_o_genealogia(pares: List[tuple], n) -> bool:
+    """
+    Condición 5 (PFIT_MASIVO_AMBIGU): ninguna cerrada emparejada está siendo
+    reclamada por una hipótesis rival fuerte.
+
+    Señal de rival: la cerrada DIA ≈ algún entrante NOCHE (candidato PF2,
+    promoción legítima de entrante→cerrada). Si hay rival, la masa puede
+    estar participando en una genealogía real y el monto deja de ser inequívoco.
+    pares: [(ea_idx, ea, c_val, c_idx), ...]
+    """
+    if not n:
+        return True
+    for ea_idx, ea, c_val, c_idx in pares:
+        if n.entrantes and any(abs(c_val - int(en)) <= PFIT_TOL_INTRA for en in n.entrantes):
+            return False  # rival de genealogía detectado
+    return True
+
+
+def _generar_pfit_masivo_ambigu(nombre: str, sc: SaborContable,
+                                 pares: list) -> List[HipotesisCorreccion]:
+    """
+    Genera UNA hipótesis PFIT_MASIVO_AMBIGU cuando:
+    - Los slots son biyectivos (N entrantes distintos → N cerradas distintas).
+    - Pero los pesos se cruzan entre pares (asignación fina ambigua).
+    - Todas las cerradas emparejadas persisten en NOCHE (cond. 4).
+    - Sin rival de apertura/genealogía sobre esas masas (cond. 5).
+    - turno_masivo = True.
+
+    El monto total a eliminar es inequívoco:
+    toda asignación bijéctiva posible produce el mismo delta = -sum(entrantes).
+    La ambigüedad es de relato (¿cuál entrante duplica a cuál cerrada?),
+    no de monto (¿cuánto sobra en total?).
+
+    Confianza: PFIT_CONF_AMBIGU (0.65) → CORREGIDO_C3_BAJA_CONFIANZA.
+    pares: [(ea_idx, ea_int, c_val, c_idx, conf, fuente_tipo, bw, fw), ...]
+    """
+    delta_total = -sum(p[1] for p in pares)
+    venta_propuesta = sc.venta_raw + delta_total
+
+    primer_slot = SlotEntrante(peso=pares[0][1], turno='DIA', indice_slot=pares[0][0])
+
+    fuente = FuenteEvidencia(
+        TipoFuente.MATCHING,
+        f'PFIT_MASIVO_AMBIGU: {len(pares)} entrantes emparejables con cerradas DIA; '
+        f'asignación bijéctiva ambigua (cruce de pesos) pero monto total '
+        f'={delta_total:+d}g inequívoco; cerradas persisten en NOCHE; '
+        f'sin rival; INTRADUP_MASIVO_TURNO confirmado',
+    )
+
+    evidencias = [
+        f'PFIT_MASIVO_AMBIGU: {len(pares)} pares, delta acumulado={delta_total:+d}g',
+        'slots biyectivos pero pesos cruzados entre pares (asignación fina ambigua)',
+        'monto inequívoco: toda asignación bijéctiva posible produce el mismo delta',
+        'cerradas emparejadas persisten en NOCHE (descartada apertura o transformación)',
+        'sin rival de genealogía ni apertura sobre esas masas (cond. 5 ok)',
+        'INTRADUP_MASIVO_TURNO: patrón colectivo de doble-registro en planilla',
+    ]
+    pares_desc = '; '.join(f'ent {p[1]}g≈cerr {p[2]}g' for p in pares)
+
+    return [HipotesisCorreccion(
+        codigo_pf='PFIT_MASIVO_AMBIGU',
+        target=TargetCorreccion(
+            lado=LadoError.DIA,
+            campo=CampoAfectado.ENTRANTE,
+            operacion=OperacionCorreccion.ELIMINAR,
+            slot_entrante=primer_slot,
+        ),
+        delta_venta=delta_total,
+        venta_propuesta=venta_propuesta,
+        confianza=PFIT_CONF_AMBIGU,
+        mecanismo_causal=MecanismoCausal.ENTRANTE_MISMO_CAN,
+        fuente_decision=fuente,
+        fuente_correccion=fuente,
+        evidencias=evidencias,
+        descripcion=(
+            f'Doble registro compuesto (asignación ambigua): {len(pares)} entrantes '
+            f'({pares_desc}); '
+            f'monto inequívoco={delta_total:+d}g bajo INTRADUP_MASIVO_TURNO'
+        ),
+    )]
+
+
+def _evaluar_par_temporal(cerrada_match: int, nombre: str,
+                          pre: list, post: list) -> tuple:
+    """
+    Evalúa soporte temporal para un par (entrante, cerrada).
+    Retorna (conf, fuente_tipo, backward_ok, forward_ok).
+    """
+    backward_ok = any(
+        s and any(abs(cerrada_match - int(c)) <= PFIT_TOL_CONTEXTO for c in s.cerradas)
+        for t in pre
+        for s in [t.sabores.get(nombre)]
+    )
+    forward_ok = any(
+        s and any(abs(cerrada_match - int(c)) <= PFIT_TOL_CONTEXTO for c in s.cerradas)
+        for t in post
+        for s in [t.sabores.get(nombre)]
+    )
+    if backward_ok:
+        return PFIT_CONF_FUERTE, TipoFuente.BACKWARD, True, False
+    elif forward_ok:
+        return PFIT_CONF_MEDIA, TipoFuente.FORWARD, False, True
+    else:
+        return None, None, False, False  # DÉBIL
+
+
+def generar_hipotesis_pfit(nombre: str, sc: SaborContable, datos: DatosDia,
+                           obs: ObservacionC3, flags: List[FlagC3],
+                           turno_masivo: bool = False) -> List[HipotesisCorreccion]:
+    """
+    Detecta doble registro intra-turno: mismo can registrado como cerrada Y entrante
+    en la MISMA planilla (mismo turno).
+
+    Cuando turno_masivo=True y hay N>=2 pares mutuamente no conflictivos,
+    genera UNA hipótesis compuesta PFIT_MASIVO en lugar de N individuales.
+    Ver _pares_no_conflictivos() para la definición de no-conflicto.
+    """
+    d = datos.turno_dia.sabores.get(nombre)
+    if not d or not d.entrantes or not d.cerradas:
+        return []
+    if sc.venta_raw < 0:
+        return []
+
+    pre = sorted([t for t in datos.contexto if t.indice < datos.turno_dia.indice],
+                 key=lambda t: t.indice, reverse=True)
+    post = sorted([t for t in datos.contexto if t.indice > datos.turno_noche.indice],
+                  key=lambda t: t.indice)
+
+    # --- Paso 1: recolectar todos los pares (entrante, cerrada) con su soporte temporal ---
+    # Matching: asignación greedy por distancia mínima con slots reclamados.
+    # Garantiza biyectividad de slots siempre que el matching sea posible
+    # (cada entrante toma la cerrada más cercana aún no reclamada).
+    # Par: (ea_idx, ea_int, cerrada_match, c_idx, conf, fuente_tipo, backward_ok, forward_ok)
+    pares_completos = []
+    cerradas_list = [(i, int(c)) for i, c in enumerate(d.cerradas)]
+    cerradas_usadas: set = set()
+
+    for ea_idx, ea in enumerate(d.entrantes):
+        ea_int = int(ea)
+        # Candidatas: cerradas no usadas dentro de PFIT_TOL_INTRA
+        candidatas = [
+            (c_idx, c_val, abs(ea_int - c_val))
+            for c_idx, c_val in cerradas_list
+            if c_idx not in cerradas_usadas and abs(ea_int - c_val) <= PFIT_TOL_INTRA
+        ]
+        if not candidatas:
+            continue
+        # Tomar la más cercana (menor distancia)
+        c_idx, c_val, _ = min(candidatas, key=lambda x: x[2])
+        cerradas_usadas.add(c_idx)
+        conf, fuente_tipo, bw, fw = _evaluar_par_temporal(c_val, nombre, pre, post)
+        pares_completos.append((ea_idx, ea_int, c_val, c_idx, conf, fuente_tipo, bw, fw))
+
+    if not pares_completos:
+        return []
+
+    # --- Paso 2: determinar ruta —————————————————————————————————————————————————
+    # Prioridad:
+    #   A) PFIT_MASIVO       — pares no conflictivos (slots biyectivos + pesos no cruzados)
+    #   B) PFIT_MASIVO_AMBIGU — slots biyectivos, pesos cruzados, cerradas persisten, sin rival
+    #   C) PFIT individual   — cualquier otro caso (N=1 o condiciones AMBIGU no cumplidas)
+    pares_para_conflicto = [(p[0], p[1], p[2], p[3]) for p in pares_completos]
+    n_sab = datos.turno_noche.sabores.get(nombre)
+
+    if turno_masivo and len(pares_completos) >= 2:
+        if _pares_no_conflictivos(pares_para_conflicto):
+            # A) Hipótesis compuesta: asignación inequívoca
+            return _generar_pfit_masivo(nombre, sc, pares_completos, turno_masivo)
+        elif (_slots_biyectivos(pares_para_conflicto)
+              and _cerradas_persisten_en_noche(pares_para_conflicto, n_sab)
+              and _sin_rival_apertura_o_genealogia(pares_para_conflicto, n_sab)):
+            # B) Hipótesis compuesta: asignación ambigua pero monto inequívoco
+            return _generar_pfit_masivo_ambigu(nombre, sc, pares_completos)
+
+    # C) Comportamiento individual (con elevación DÉBIL→MEDIA si masivo)
+    return _generar_pfit_individuales(nombre, sc, pares_completos, turno_masivo)
+
+
+def _generar_pfit_masivo(nombre: str, sc: SaborContable,
+                         pares: list, turno_masivo: bool) -> List[HipotesisCorreccion]:
+    """
+    Genera una hipótesis compuesta PFIT_MASIVO que elimina todos los entrantes duplicados
+    de una sola vez. Solo se llama cuando los pares son mutuamente no conflictivos.
+    Confianza = min(conf_individual). Conservador: no se premia la cantidad.
+    """
+    # Determinar confianzas individuales (incluyendo elevación masivo para DÉBIL)
+    confs = []
+    for ea_idx, ea, cm, c_idx, conf, fuente_tipo, bw, fw in pares:
+        if conf is not None:
+            confs.append(conf)
+        elif turno_masivo:
+            confs.append(PFIT_CONF_MEDIA)  # DÉBIL elevado
+        # Si conf is None y no masivo: no debería llegar aquí (filtrado antes)
+
+    if not confs:
+        return []
+
+    conf_compuesta = min(confs)
+    delta_total = -sum(p[1] for p in pares)  # suma de todos los entrantes eliminados
+    venta_propuesta = sc.venta_raw + delta_total
+
+    # Slot representativo: el primero (para arbitraje de clave_agrupamiento)
+    primer_slot = SlotEntrante(peso=pares[0][1], turno='DIA', indice_slot=pares[0][0])
+
+    # Fuente: MATCHING colectivo (la asignación conjunta es la evidencia)
+    fuente = FuenteEvidencia(
+        TipoFuente.MATCHING,
+        f'PFIT_MASIVO: {len(pares)} pares entrante≈cerrada mutuamente no conflictivos; '
+        f'INTRADUP_MASIVO_TURNO confirmado',
+    )
+
+    evidencias = [f'PFIT_MASIVO: {len(pares)} pares no conflictivos, delta acumulado={delta_total:+d}g']
+    for ea_idx, ea, cm, c_idx, conf, fuente_tipo, bw, fw in pares:
+        soporte = 'backward' if bw else ('forward' if fw else 'masivo')
+        conf_ind = conf if conf is not None else PFIT_CONF_MEDIA
+        evidencias.append(f'  par: ent {ea}g ~ cerr {cm}g ({soporte}, conf={conf_ind:.2f})')
+
+    pares_desc = '; '.join(f'ent {p[1]}g~cerr {p[2]}g' for p in pares)
+
+    return [HipotesisCorreccion(
+        codigo_pf='PFIT_MASIVO',
+        target=TargetCorreccion(
+            lado=LadoError.DIA,
+            campo=CampoAfectado.ENTRANTE,
+            operacion=OperacionCorreccion.ELIMINAR,
+            slot_entrante=primer_slot,
+        ),
+        delta_venta=delta_total,
+        venta_propuesta=venta_propuesta,
+        confianza=conf_compuesta,
+        mecanismo_causal=MecanismoCausal.ENTRANTE_MISMO_CAN,
+        fuente_decision=fuente,
+        fuente_correccion=fuente,
+        evidencias=evidencias,
+        descripcion=(
+            f'Doble registro compuesto: {len(pares)} entrantes duplicados '
+            f'({pares_desc}); PFIT_MASIVO bajo patrón colectivo de turno'
+        ),
+    )]
+
+
+def _generar_pfit_individuales(nombre: str, sc: SaborContable,
+                               pares: list, turno_masivo: bool) -> List[HipotesisCorreccion]:
+    """
+    Genera hipótesis PFIT individuales (comportamiento original).
+    Para N=1, o cuando los pares son conflictivos (no biyectivos o pesos cruzados).
+    """
+    hipotesis = []
+
+    for ea_idx, ea, cerrada_match, c_idx, conf, fuente_tipo, backward_ok, forward_ok in pares:
+        elevado_por_masivo = False
+
+        if conf == PFIT_CONF_FUERTE:
+            fuente = FuenteEvidencia(
+                TipoFuente.BACKWARD,
+                f'cerr {cerrada_match} confirmada en turno previo; ent {ea} ~ cerr {cerrada_match} mismo turno',
+            )
+            evidencias = [
+                f'ent DIA {ea} ~ cerr DIA {cerrada_match} (±{PFIT_TOL_INTRA}g)',
+                'cerrada confirmada en turno previo (backward)',
+            ]
+
+        elif conf == PFIT_CONF_MEDIA:
+            fuente = FuenteEvidencia(
+                TipoFuente.FORWARD,
+                f'cerr {cerrada_match} persiste en turno siguiente; ent {ea} ~ cerr {cerrada_match} mismo turno',
+            )
+            evidencias = [
+                f'ent DIA {ea} ~ cerr DIA {cerrada_match} (±{PFIT_TOL_INTRA}g)',
+                'cerrada persiste en turno siguiente (forward), previo ambiguo',
+            ]
+
+        elif turno_masivo:
+            # DÉBIL elevado a MEDIA por patrón colectivo
+            conf = PFIT_CONF_MEDIA
+            fuente = FuenteEvidencia(
+                TipoFuente.MATCHING,
+                f'ent {ea} ~ cerr {cerrada_match} mismo turno; sin soporte temporal individual; '
+                f'ELEVADO_POR_INTRADUP_MASIVO_TURNO',
+            )
+            evidencias = [
+                f'ent DIA {ea} ~ cerr DIA {cerrada_match} (±{PFIT_TOL_INTRA}g)',
+                'sin backward ni forward individual',
+                'ELEVADO_POR_INTRADUP_MASIVO_TURNO: patron colectivo de doble-registro en planilla',
+            ]
+            elevado_por_masivo = True
+
+        else:
+            continue  # DÉBIL sin masivo → descartar
+
+        slot = SlotEntrante(peso=ea, turno='DIA', indice_slot=ea_idx)
+        desc_suffix = '; PFIT reforzado por patrón colectivo de turno' if elevado_por_masivo else ''
+
+        hipotesis.append(HipotesisCorreccion(
+            codigo_pf='PFIT',
+            target=TargetCorreccion(
+                lado=LadoError.DIA,
+                campo=CampoAfectado.ENTRANTE,
+                operacion=OperacionCorreccion.ELIMINAR,
+                slot_entrante=slot,
+            ),
+            delta_venta=-ea,
+            venta_propuesta=sc.venta_raw - ea,
+            confianza=conf,
+            mecanismo_causal=MecanismoCausal.ENTRANTE_MISMO_CAN,
+            fuente_decision=fuente,
+            fuente_correccion=fuente,
+            evidencias=evidencias,
+            descripcion=(
+                f'Doble registro: ent DIA {ea}g ~ cerr DIA {cerrada_match}g; '
+                f'{"backward" if backward_ok else ("forward" if forward_ok else "masivo")} '
+                f'confirma cerrada como identidad real{desc_suffix}'
+            ),
+        ))
+
+    return hipotesis
+
+
+# ===================================================================
 # COLECTOR
 # ===================================================================
 
 _GENERADORES = [
+    generar_hipotesis_pfit,  # antes que el resto: detecta doble registro intra-turno
     generar_hipotesis_pf1,
     generar_hipotesis_pf2,
     generar_hipotesis_pf3,
@@ -574,9 +1003,16 @@ _GENERADORES = [
 
 
 def generar_todas_hipotesis(nombre: str, sc: SaborContable, datos: DatosDia,
-                            obs: ObservacionC3, flags: List[FlagC3]) -> List[HipotesisCorreccion]:
-    """Colecta todas las hipotesis de todos los PFs."""
+                            obs: ObservacionC3, flags: List[FlagC3],
+                            turno_masivo: bool = False) -> List[HipotesisCorreccion]:
+    """Colecta todas las hipotesis de todos los PFs.
+
+    turno_masivo: si True, PFIT puede elevar señales DÉBIL a MEDIA por contexto colectivo.
+    """
     todas = []
     for gen_fn in _GENERADORES:
-        todas.extend(gen_fn(nombre, sc, datos, obs, flags))
+        if gen_fn is generar_hipotesis_pfit:
+            todas.extend(gen_fn(nombre, sc, datos, obs, flags, turno_masivo=turno_masivo))
+        else:
+            todas.extend(gen_fn(nombre, sc, datos, obs, flags))
     return todas

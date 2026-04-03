@@ -764,6 +764,476 @@ def test_bilateral_mismatch_incoherente_no_veta():
 
 
 # ===================================================================
+# F) PFIT_MASIVO — hipótesis compuesta bajo patrón colectivo
+# ===================================================================
+
+EXCEL_TRIUNVIRATO = os.path.join(os.path.expanduser('~'), 'Downloads', 'Febrero Triunvirato 2026.xlsx')
+
+
+def _fabricar_datos_pfit(cerradas_dia, entrantes_dia, cerradas_previo=None,
+                         cerradas_siguiente=None, venta_raw=None, cerradas_noche=None):
+    """
+    Fabrica un DatosDia mínimo para tests PFIT.
+    turno_DIA tiene cerradas + entrantes dados.
+    turno_NOCHE tiene cerradas_noche (default: vacío) y sin entrantes.
+    contexto: un turno previo y/o uno siguiente si se proveen.
+    cerradas_noche: permite simular qué cerradas persisten en NOCHE para tests
+    de condición 4 de PFIT_MASIVO_AMBIGU.
+    """
+    from pesaje_v3.modelos import SaborCrudo, TurnoCrudo, DatosDia, SaborContable
+    nombre = 'TEST'
+
+    noche_cerradas = cerradas_noche if cerradas_noche is not None else []
+    turno_dia = TurnoCrudo(nombre_hoja='T_DIA', indice=5, sabores={
+        nombre: SaborCrudo(nombre=nombre, nombre_norm=nombre, abierta=3000, celiaca=None,
+                           cerradas=cerradas_dia, entrantes=entrantes_dia),
+    })
+    turno_noche = TurnoCrudo(nombre_hoja='T_NOCHE', indice=6, sabores={
+        nombre: SaborCrudo(nombre=nombre, nombre_norm=nombre, abierta=2800, celiaca=None,
+                           cerradas=noche_cerradas, entrantes=[]),
+    })
+    ctx = []
+    if cerradas_previo is not None:
+        ctx.append(TurnoCrudo(nombre_hoja='T_PREV', indice=4, sabores={
+            nombre: SaborCrudo(nombre=nombre, nombre_norm=nombre, abierta=3100, celiaca=None,
+                               cerradas=cerradas_previo, entrantes=[]),
+        }))
+    if cerradas_siguiente is not None:
+        ctx.append(TurnoCrudo(nombre_hoja='T_NEXT', indice=7, sabores={
+            nombre: SaborCrudo(nombre=nombre, nombre_norm=nombre, abierta=2700, celiaca=None,
+                               cerradas=cerradas_siguiente, entrantes=[]),
+        }))
+
+    datos = DatosDia(dia_label='test', turno_dia=turno_dia, turno_noche=turno_noche, contexto=ctx)
+    total_a = 3000 + sum(cerradas_dia) + sum(entrantes_dia)
+    total_b = 2800
+    raw = venta_raw if venta_raw is not None else total_a - total_b
+    sc = SaborContable(
+        nombre_norm=nombre, nombre_display=nombre,
+        total_a=total_a, total_b=total_b, new_ent_b=0,
+        n_cerr_a=len(cerradas_dia), n_cerr_b=0, n_latas=0, ajuste_latas=0,
+        venta_raw=raw,
+    )
+    from pesaje_v3.modelos import ObservacionC3, FlagC3
+    obs = ObservacionC3(nombre_norm=nombre, venta_raw=raw)
+    flags = [FlagC3('HIGH', 2, f'raw={raw}g')]
+    return nombre, datos, sc, obs, flags
+
+
+def test_pfit_masivo_positivo_ch_amores_d14():
+    """
+    CASO CONCRETO: CH AMORES D14 Triunvirato.
+    Dos entrantes (~6485g, ~6760g) coinciden con dos cerradas del mismo turno.
+    Los pares son no conflictivos (pesos bien separados, ±100g no se cruzan).
+    Con turno_masivo=True → debe generarse UNA hipótesis PFIT_MASIVO,
+    no dos hipótesis PFIT individuales.
+    El delta debe ser la suma de ambos entrantes (negativo).
+    """
+    from pesaje_v3.capa1_parser import cargar_dia
+    from pesaje_v3.capa2_contrato import calcular_contabilidad
+    from pesaje_v3.capa3_motor import (
+        canonicalizar_nombres, aplicar_canonicalizacion,
+        _observar, _detectar_intradup_masivo, _screening, clasificar,
+    )
+    from pesaje_v3.generadores_c3 import generar_todas_hipotesis
+
+    if not os.path.exists(EXCEL_TRIUNVIRATO):
+        pytest.skip('Febrero Triunvirato 2026.xlsx no disponible')
+
+    datos = cargar_dia(EXCEL_TRIUNVIRATO, 13)
+    canon = canonicalizar_nombres(datos)
+    aplicar_canonicalizacion(datos, canon)
+    cont = calcular_contabilidad(datos)
+    observaciones = {n: _observar(n, sc, datos) for n, sc in cont.sabores.items()}
+    masivo = _detectar_intradup_masivo(datos, observaciones)
+    assert masivo, 'D14 Triunvirato deberia activar INTRADUP_MASIVO'
+
+    nombre = 'CH AMORES'
+    sc = cont.sabores[nombre]
+    obs = observaciones[nombre]
+    status, flags = _screening(nombre, sc, obs, modo='TURNO_UNICO', intradup_masivo=masivo)
+
+    hipotesis = generar_todas_hipotesis(nombre, sc, datos, obs, flags, turno_masivo=masivo)
+    pfit_h = [h for h in hipotesis if h.codigo_pf in ('PFIT', 'PFIT_MASIVO')]
+
+    assert len(pfit_h) == 1, \
+        f'Esperaba 1 hipótesis PFIT_MASIVO, encontré {len(pfit_h)}: {[h.codigo_pf for h in pfit_h]}'
+    h = pfit_h[0]
+    assert h.codigo_pf == 'PFIT_MASIVO', \
+        f'Esperaba PFIT_MASIVO, encontré {h.codigo_pf}'
+    assert h.delta_venta < -10000, \
+        f'Delta acumulado debería ser < -10000g (dos latas ~6500g cada una), fue {h.delta_venta}'
+    assert h.venta_propuesta >= 0, \
+        f'venta_propuesta={h.venta_propuesta} negativa — incoherente'
+    assert h.confianza >= 0.72, \
+        f'confianza={h.confianza} demasiado baja para caso con backward'
+
+    # El clasificar completo debe resolver CH AMORES (no escalar)
+    resultado = clasificar(datos, cont)
+    sc_final = resultado.sabores[nombre]
+    assert sc_final.prototipo is not None, \
+        'CH AMORES D14 debe estar resuelta con PFIT_MASIVO, no escalada a C4'
+    assert sc_final.prototipo.codigo == 'PFIT_MASIVO', \
+        f'Prototipo={sc_final.prototipo.codigo}, esperaba PFIT_MASIVO'
+
+
+def test_pfit_masivo_negativo_pares_ambiguos():
+    """
+    NEGATIVO: dos entrantes que podrían reclamar la misma cerrada (pesos cruzados).
+    entrantes=[6500, 6520], cerradas=[6510].
+    Ambos entrantes están dentro de ±100g de la cerrada → asignación ambigua.
+    Con turno_masivo=True → NO debe generarse PFIT_MASIVO.
+    Debe caer a comportamiento individual (PFIT o sin hipótesis).
+    """
+    from pesaje_v3.generadores_c3 import generar_hipotesis_pfit, _pares_no_conflictivos
+
+    # Verificar directamente la condición de no-conflicto
+    # Par 0: ea_idx=0, ea=6500, cerrada=6510, c_idx=0
+    # Par 1: ea_idx=1, ea=6520, cerrada=6510, c_idx=0  <- mismo c_idx: no biyectivo
+    pares_no_biyectivos = [(0, 6500, 6510, 0), (1, 6520, 6510, 0)]
+    assert not _pares_no_conflictivos(pares_no_biyectivos), \
+        'Pares que comparten c_idx=0 deben ser conflictivos (no biyectivos)'
+
+    # También: entrantes con pesos que se cruzan (cada entrante podría ir a cualquier cerrada)
+    # ea0=6490, ea1=6510, c0=6500, c1=6500: |ea0-c1|=10 <= 100 → conflicto de cruce
+    pares_cruzados = [(0, 6490, 6500, 0), (1, 6510, 6500, 1)]
+    # Aquí: |ea0=6490 - c1=6500| = 10 <= 100 → cruce → conflictivo
+    assert not _pares_no_conflictivos(pares_cruzados), \
+        'Pares con pesos cruzados deben ser conflictivos'
+
+    # Y con el generador completo: pares ambiguos → sin PFIT_MASIVO
+    # Fabricar: 2 entrantes ~6500 y 1 cerrada 6510
+    nombre, datos, sc, obs, flags = _fabricar_datos_pfit(
+        cerradas_dia=[6510],
+        entrantes_dia=[6500, 6520],
+        cerradas_previo=[6510],
+    )
+    hipotesis = generar_hipotesis_pfit(nombre, sc, datos, obs, flags, turno_masivo=True)
+    masivo_h = [h for h in hipotesis if h.codigo_pf == 'PFIT_MASIVO']
+    assert len(masivo_h) == 0, \
+        f'Pares ambiguos no deben generar PFIT_MASIVO, pero se generó: {masivo_h}'
+
+
+def test_pfit_masivo_coherencia_delta_absurdo():
+    """
+    COHERENCIA: delta acumulado produce venta negativa absurda.
+    Pesos bien separados (no hay cruce de pares) → PFIT_MASIVO se genera.
+    raw=7000g, ent0=4010 ~ cerr0=4000, ent1=5490 ~ cerr1=5500 → no se cruzan.
+    delta = -(4010+5490) = -9500 → venta_propuesta = -2500g (absurda).
+    El generador crea la hipótesis; el árbitro debe rechazarla por incoherencia.
+    Nota: los pesos 4000 y 5500 están 1500g separados → |ea0-c1|=1490 > 100 → no hay cruce.
+    """
+    from pesaje_v3.generadores_c3 import generar_hipotesis_pfit
+    from pesaje_v3.arbitro_c3 import resolver_hipotesis
+    from pesaje_v3.modelos import ObservacionC3, ResolucionC3
+
+    nombre, datos, sc, obs, flags = _fabricar_datos_pfit(
+        cerradas_dia=[4000, 5500],    # pesos separados: sin cruce posible
+        entrantes_dia=[4010, 5490],   # cada uno matchea solo su cerrada
+        cerradas_previo=[4000, 5500], # backward confirma ambos → FUERTE
+        venta_raw=7000,
+    )
+    obs = ObservacionC3(nombre_norm=nombre, total_a=sc.total_a, total_b=sc.total_b, venta_raw=7000)
+
+    hipotesis = generar_hipotesis_pfit(nombre, sc, datos, obs, flags, turno_masivo=True)
+    masivo_h = [h for h in hipotesis if h.codigo_pf == 'PFIT_MASIVO']
+
+    assert len(masivo_h) == 1, \
+        f'Esperaba 1 PFIT_MASIVO, encontré {len(masivo_h)}: {[h.codigo_pf for h in hipotesis]}'
+    h = masivo_h[0]
+    assert h.venta_propuesta < -300, \
+        f'venta_propuesta={h.venta_propuesta} debería ser < -300 (absurda)'
+
+    # El árbitro debe rechazarla por incoherencia material
+    decision = resolver_hipotesis(masivo_h, obs, [])
+    assert decision.resolucion == ResolucionC3.ESCALAR_C4, \
+        f'Árbitro debería rechazar PFIT_MASIVO con venta absurda, pero resolvió: {decision.resolucion}'
+
+
+@pytest.mark.parametrize('dia', [5, 6])
+def test_pfit_masivo_negativo_san_martin(dia):
+    """
+    AISLAMIENTO DIA/NOCHE: San Martín no debe generar PFIT_MASIVO.
+    D5 y D6 son días DIA/NOCHE normales sin doble registro masivo.
+    - masivo debe ser False (prueba la condición compuesta)
+    - Ningún sabor debe tener hipótesis PFIT_MASIVO
+    """
+    from pesaje_v3.capa1_parser import cargar_dia
+    from pesaje_v3.capa2_contrato import calcular_contabilidad
+    from pesaje_v3.capa3_motor import (
+        canonicalizar_nombres, aplicar_canonicalizacion,
+        _observar, _detectar_intradup_masivo, _screening,
+    )
+    from pesaje_v3.generadores_c3 import generar_todas_hipotesis
+
+    if not os.path.exists(EXCEL):
+        pytest.skip('Febrero San Martin 2026.xlsx no disponible')
+
+    datos = cargar_dia(EXCEL, dia)
+    canon = canonicalizar_nombres(datos)
+    aplicar_canonicalizacion(datos, canon)
+    cont = calcular_contabilidad(datos)
+    observaciones = {n: _observar(n, sc, datos) for n, sc in cont.sabores.items()}
+    masivo = _detectar_intradup_masivo(datos, observaciones)
+
+    assert not masivo, \
+        f'San Martín D{dia} no debe activar INTRADUP_MASIVO (masivo={masivo})'
+
+    # Sin masivo, ningún sabor debe producir PFIT_MASIVO
+    for nombre, sc in cont.sabores.items():
+        if sc.solo_dia or sc.solo_noche:
+            continue
+        obs = observaciones[nombre]
+        status, flags = _screening(nombre, sc, obs, modo='DIA_NOCHE', intradup_masivo=False)
+        hipotesis = generar_todas_hipotesis(nombre, sc, datos, obs, flags, turno_masivo=False)
+        masivo_h = [h for h in hipotesis if h.codigo_pf == 'PFIT_MASIVO']
+        assert len(masivo_h) == 0, \
+            f'San Martín D{dia} {nombre}: PFIT_MASIVO no debería aparecer sin turno_masivo'
+
+
+# ===================================================================
+# G) PFIT_MASIVO_AMBIGU — monto inequívoco, asignación bijéctiva ambigua
+# ===================================================================
+
+def test_pfit_masivo_ambigu_positivo_menta_d13():
+    """
+    POSITIVO (MENTA D13 Triunvirato = Viernes 13):
+    DIA cerradas=[6735, 6485, 6450], entrantes=[6485, 6450].
+    Cruce: |6485-6450|=35g ≤ 100 → _pares_no_conflictivos=False.
+    Pero: slots biyectivos, cerradas persisten en NOCHE=[6735,6485,6450],
+    sin rival de genealogía.
+    Esperado: 1 hipótesis PFIT_MASIVO_AMBIGU con delta=-(6485+6450)=-12935g.
+    Resolución final: CORREGIDO_C3_BAJA_CONFIANZA.
+    """
+    from pesaje_v3.capa1_parser import cargar_dia
+    from pesaje_v3.capa2_contrato import calcular_contabilidad
+    from pesaje_v3.capa3_motor import (clasificar, _observar, _screening,
+                                       _detectar_intradup_masivo,
+                                       canonicalizar_nombres, aplicar_canonicalizacion)
+    from pesaje_v3.generadores_c3 import generar_hipotesis_pfit
+    from pesaje_v3.modelos import ResolucionC3
+
+    if not os.path.exists(EXCEL_TRIUNVIRATO):
+        pytest.skip('Workbook Triunvirato no encontrado')
+
+    datos = cargar_dia(EXCEL_TRIUNVIRATO, 13)  # DIA=Viernes 13
+    canon = canonicalizar_nombres(datos)
+    aplicar_canonicalizacion(datos, canon)
+    cont = calcular_contabilidad(datos)
+    nombre = 'MENTA'
+
+    observaciones = {n: _observar(n, sc, datos) for n, sc in cont.sabores.items()}
+    masivo = _detectar_intradup_masivo(datos, observaciones)
+    assert masivo, 'D13 Triunvirato (Viernes 13) debe tener INTRADUP_MASIVO=True'
+
+    sc = cont.sabores[nombre]
+    obs = observaciones[nombre]
+    status, flags = _screening(nombre, sc, obs, modo='TURNO_UNICO', intradup_masivo=masivo)
+
+    hipotesis = generar_hipotesis_pfit(nombre, sc, datos, obs, flags, turno_masivo=masivo)
+    ambigu_h = [h for h in hipotesis if h.codigo_pf == 'PFIT_MASIVO_AMBIGU']
+
+    assert len(ambigu_h) == 1, \
+        f'Esperaba 1 PFIT_MASIVO_AMBIGU para MENTA, encontré {len(ambigu_h)}: ' \
+        f'{[h.codigo_pf for h in hipotesis]}'
+    h = ambigu_h[0]
+    assert h.delta_venta == -(6485 + 6450), \
+        f'delta esperado={-(6485+6450)}, obtenido={h.delta_venta}'
+    assert h.confianza == pytest.approx(0.70, abs=0.01), \
+        f'confianza={h.confianza}, esperaba 0.70 (CONFIANZA_MINIMA_VIABLE)'
+
+    # Resolución final: CORREGIDO_C3_BAJA_CONFIANZA (confianza < CONFIANZA_MINIMA_FUERTE)
+    resultado = clasificar(datos, cont)
+    sc_final = resultado.sabores[nombre]
+    assert sc_final.resolution_status == ResolucionC3.CORREGIDO_C3_BAJA_CONFIANZA, \
+        f'MENTA D13: esperaba CORREGIDO_C3_BAJA_CONFIANZA, got {sc_final.resolution_status}'
+    assert sc_final.venta_final_c3 == pytest.approx(sc.venta_raw - 12935, abs=5), \
+        f'venta_final_c3={sc_final.venta_final_c3}, esperaba aprox {sc.venta_raw - 12935}'
+
+
+def test_pfit_masivo_ambigu_positivo_tiramisu_d13():
+    """
+    POSITIVO (TIRAMISU D13 Triunvirato = Viernes 13):
+    DIA cerradas=[6340, 6330], entrantes=[6340, 6330].
+    Cruce: |6340-6330|=10g ≤ 100 → asignación ambigua.
+    Pero: slots biyectivos, cerradas persisten en NOCHE=[6340,6330],
+    sin rival de genealogía (NOCHE entrantes=[]).
+    Esperado: 1 PFIT_MASIVO_AMBIGU con delta=-(6340+6330)=-12670g.
+    """
+    from pesaje_v3.capa1_parser import cargar_dia
+    from pesaje_v3.capa2_contrato import calcular_contabilidad
+    from pesaje_v3.capa3_motor import (clasificar, _observar, _screening,
+                                       _detectar_intradup_masivo,
+                                       canonicalizar_nombres, aplicar_canonicalizacion)
+    from pesaje_v3.generadores_c3 import generar_hipotesis_pfit
+    from pesaje_v3.modelos import ResolucionC3
+
+    if not os.path.exists(EXCEL_TRIUNVIRATO):
+        pytest.skip('Workbook Triunvirato no encontrado')
+
+    datos = cargar_dia(EXCEL_TRIUNVIRATO, 13)
+    canon = canonicalizar_nombres(datos)
+    aplicar_canonicalizacion(datos, canon)
+    cont = calcular_contabilidad(datos)
+    nombre = 'TIRAMISU'
+
+    observaciones = {n: _observar(n, sc, datos) for n, sc in cont.sabores.items()}
+    masivo = _detectar_intradup_masivo(datos, observaciones)
+
+    sc = cont.sabores[nombre]
+    obs = observaciones[nombre]
+    status, flags = _screening(nombre, sc, obs, modo='TURNO_UNICO', intradup_masivo=masivo)
+
+    hipotesis = generar_hipotesis_pfit(nombre, sc, datos, obs, flags, turno_masivo=masivo)
+    ambigu_h = [h for h in hipotesis if h.codigo_pf == 'PFIT_MASIVO_AMBIGU']
+
+    assert len(ambigu_h) == 1, \
+        f'Esperaba 1 PFIT_MASIVO_AMBIGU para TIRAMISU, encontré {len(ambigu_h)}'
+    assert ambigu_h[0].delta_venta == -(6340 + 6330), \
+        f'delta={ambigu_h[0].delta_venta}, esperaba {-(6340+6330)}'
+
+    resultado = clasificar(datos, cont)
+    sc_final = resultado.sabores[nombre]
+    assert sc_final.resolution_status == ResolucionC3.CORREGIDO_C3_BAJA_CONFIANZA, \
+        f'TIRAMISU D13: esperaba CORREGIDO_C3_BAJA_CONFIANZA, got {sc_final.resolution_status}'
+
+
+def test_pfit_masivo_ambigu_negativo_cerrada_no_persiste():
+    """
+    NEGATIVO: cerrada ambigua que NO persiste en NOCHE (condición 4 falla).
+
+    Diseño: cerradas_dia=[5400, 5550], entrantes_dia=[5480, 5540].
+    - ent=5480 → cerr=5400 (|5480-5400|=80 ≤ 100, par 0).
+    - ent=5540 → cerr=5550 (|5540-5400|=140 > 100, salta; |5540-5550|=10 ≤ 100, par 1).
+    - Cross-match: |5480-5550|=70 ≤ 100 → _pares_no_conflictivos=False.
+    - Slots biyectivos: ent_slots=[0,1], cerr_slots=[0,1] → True.
+    - cerradas_noche=[5400]: 5550 ausente (|5550-5400|=150 > TOL_MATCH_CERRADA=30) → cond. 4 falla.
+    turno_masivo=True.
+
+    Resultado esperado: 0 PFIT_MASIVO_AMBIGU.
+    """
+    from pesaje_v3.generadores_c3 import (generar_hipotesis_pfit,
+                                          _cerradas_persisten_en_noche,
+                                          _slots_biyectivos)
+
+    # Verificar condición 4 directamente con mock
+    pares_test = [(0, 5480, 5400, 0), (1, 5540, 5550, 1)]
+    assert _slots_biyectivos(pares_test), 'slots deben ser biyectivos'
+
+    class _MockSabor:
+        def __init__(self, cerradas, entrantes=None):
+            self.cerradas = cerradas
+            self.entrantes = entrantes or []
+
+    n_mock = _MockSabor(cerradas=[5400])  # 5550 ausente
+    assert not _cerradas_persisten_en_noche(pares_test, n_mock), \
+        'Cond 4 debe fallar: 5550 (|5550-5400|=150 > 30g) no persiste en NOCHE'
+
+    # Con el generador completo: cond. 4 falla → sin PFIT_MASIVO_AMBIGU
+    # cerradas_noche=[5400]: 5550 desapareció entre DIA y NOCHE → monto no inequívoco
+    nombre, datos, sc, obs, flags = _fabricar_datos_pfit(
+        cerradas_dia=[5400, 5550],
+        entrantes_dia=[5480, 5540],
+        cerradas_noche=[5400],          # 5550 ausente en NOCHE
+        cerradas_previo=[5400, 5550],   # previo para temporal support
+    )
+    hipotesis = generar_hipotesis_pfit(nombre, sc, datos, obs, flags, turno_masivo=True)
+    ambigu_h = [h for h in hipotesis if h.codigo_pf == 'PFIT_MASIVO_AMBIGU']
+    assert len(ambigu_h) == 0, \
+        f'Cond. 4 falla (5550 ausente en NOCHE): no debe generarse PFIT_MASIVO_AMBIGU, ' \
+        f'pero se generó: {ambigu_h}'
+
+
+# ===================================================================
+# H) Contratos arquitecturales — invariantes de diseño, no de datos
+# ===================================================================
+
+def test_contrato_ambigu_y_c4d_comparten_tolerancia():
+    """
+    CONTRATO ARQUITECTURAL: condición 4 de AMBIGU y generación de C4d usan
+    la misma tolerancia (TOL_MATCH_CERRADA).
+
+    Por qué esto importa:
+    PF1 solo genera hipótesis para cerradas con flag C4d.
+    C4d solo se genera cuando la cerrada NO matchea ninguna cerrada NOCHE
+    dentro de TOL_MATCH_CERRADA.
+    Condición 4 de AMBIGU (cerradas persisten en NOCHE) usa la misma tolerancia.
+
+    Consecuencia: si una cerrada pasa condición 4, no tiene C4d, y PF1 no la
+    toca. Si tiene C4d, condición 4 falla y AMBIGU no nace. Ergo: PF1 y AMBIGU
+    no pueden coexistir sobre la misma cerrada — pero solo mientras ambas
+    tolerancias sean iguales.
+
+    Este test convierte esa coincidencia en contrato. Si alguien cambia la
+    tolerancia en un lado sin cambiar el otro, el test falla y obliga a decidir
+    si la protección cruzada sigue vigente.
+    """
+    from pesaje_v3.constantes_c3 import TOL_MATCH_CERRADA
+    from pesaje_v3 import capa3_motor, generadores_c3
+    import inspect
+
+    # Verificar que _screening usa TOL_MATCH_CERRADA para generar C4d
+    screening_src = inspect.getsource(capa3_motor._screening)
+    assert 'TOL_MATCH_CERRADA' in screening_src, (
+        '_screening ya no usa TOL_MATCH_CERRADA para generar C4d. '
+        'Si la tolerancia cambió, verificar que condición 4 de AMBIGU '
+        'siga siendo coherente con la generación de flags C4d.'
+    )
+
+    # Verificar que _cerradas_persisten_en_noche usa TOL_MATCH_CERRADA
+    persist_src = inspect.getsource(generadores_c3._cerradas_persisten_en_noche)
+    assert 'TOL_MATCH_CERRADA' in persist_src, (
+        '_cerradas_persisten_en_noche ya no usa TOL_MATCH_CERRADA. '
+        'Si la tolerancia cambió, la protección cruzada con C4d puede '
+        'estar rota: PF1 y AMBIGU podrían coexistir sobre la misma cerrada.'
+    )
+
+
+def test_contrato_pfit_ambigu_nace_en_piso_viable():
+    """
+    CONTRATO ARQUITECTURAL: PFIT_CONF_AMBIGU == CONFIANZA_MINIMA_VIABLE.
+
+    Esta igualdad no es casual — es una decisión de diseño:
+    AMBIGU nace exactamente en el piso viable del árbitro.
+
+    Por qué importa fijarlo como test:
+    - Si PFIT_CONF_AMBIGU < CONFIANZA_MINIMA_VIABLE: el árbitro la descarta
+      silenciosamente (0 viables → ESCALAR_C4). No hay error, no hay aviso.
+      La hipótesis se genera, nadie la ve morir.
+    - Si PFIT_CONF_AMBIGU > CONFIANZA_MINIMA_VIABLE pero < CONFIANZA_MINIMA_FUERTE:
+      el contrato sigue válido (CORREGIDO_C3_BAJA_CONFIANZA).
+      Pero entonces AMBIGU tendría más confianza que la mínima viable sin razón
+      semántica: el monto es inequívoco pero la asignación es ambigua — eso vale
+      exactamente el piso, no más.
+
+    Si CONFIANZA_MINIMA_VIABLE cambia algún día, este test fallará.
+    Ese fallo es la señal correcta: requiere una decisión consciente sobre
+    si AMBIGU debe seguir al piso o establecer su propio umbral documentado.
+
+    La falla silenciosa (AMBIGU muerta sin aviso) es peor que la falla ruidosa
+    (test rojo que pide decisión explícita).
+    """
+    from pesaje_v3.constantes_c3 import (
+        PFIT_CONF_AMBIGU,
+        CONFIANZA_MINIMA_VIABLE,
+        CONFIANZA_MINIMA_FUERTE,
+    )
+
+    assert PFIT_CONF_AMBIGU == CONFIANZA_MINIMA_VIABLE, (
+        f'PFIT_CONF_AMBIGU ({PFIT_CONF_AMBIGU}) debe ser exactamente '
+        f'CONFIANZA_MINIMA_VIABLE ({CONFIANZA_MINIMA_VIABLE}). '
+        f'AMBIGU nace en el piso viable por diseño — si ese piso cambió, '
+        f'decidir conscientemente si AMBIGU sigue al piso o se independiza.'
+    )
+
+    assert PFIT_CONF_AMBIGU < CONFIANZA_MINIMA_FUERTE, (
+        f'PFIT_CONF_AMBIGU ({PFIT_CONF_AMBIGU}) debe ser menor que '
+        f'CONFIANZA_MINIMA_FUERTE ({CONFIANZA_MINIMA_FUERTE}). '
+        f'AMBIGU siempre produce CORREGIDO_C3_BAJA_CONFIANZA, nunca CORREGIDO_C3.'
+    )
+
+
+# ===================================================================
 # MAIN
 # ===================================================================
 

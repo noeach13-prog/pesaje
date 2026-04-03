@@ -180,6 +180,7 @@ class ResultadoC3:
     """Output de Capa 3: todos los sabores clasificados."""
     dia_label: str
     sabores: Dict[str, SaborClasificado] = field(default_factory=dict)
+    warnings: List[str] = field(default_factory=list)  # avisos a nivel de día (ej: INTRADUP_MASIVO)
 
     @property
     def escalados(self) -> Dict[str, SaborClasificado]:
@@ -329,6 +330,9 @@ class ObservacionC3:
     sightings: Dict[int, Tuple[int, int]] = field(default_factory=dict)
     # Varianza: peso -> (mediana, stddev, n_observaciones)
     varianza_historica: Dict[int, Tuple[int, float, int]] = field(default_factory=dict)
+
+    # Señal de doble-registro intra-turno: True si hay entrante DIA que matchea cerrada DIA
+    intradup_candidato: bool = False
 
 
 # --- FuenteEvidencia ---

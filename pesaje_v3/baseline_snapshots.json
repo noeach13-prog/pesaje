@@ -95,8 +95,11 @@
       },
       "DULCE AMORES": {
         "status": "COMPUESTO",
-        "venta_final_c3": null,
-        "prototipo": null
+        "venta_final_c3": 720,
+        "prototipo": {
+          "codigo": "PFIT",
+          "delta": -6795
+        }
       },
       "DULCE C/NUEZ": {
         "status": "LIMPIO",
@@ -290,14 +293,6 @@
         ],
         "prototipo_is_none": true
       },
-      "DULCE AMORES": {
-        "status": "COMPUESTO",
-        "flags": [
-          "C4d:6555",
-          "HIGH"
-        ],
-        "prototipo_is_none": true
-      },
       "DULCE D LECHE": {
         "status": "COMPUESTO",
         "flags": [
@@ -342,11 +337,6 @@
         "banda": "CONFIRMADO"
       },
       {
-        "nombre": "DULCE AMORES",
-        "delta": -6835,
-        "banda": "CONFIRMADO"
-      },
-      {
         "nombre": "DULCE D LECHE",
         "delta": 6555,
         "banda": "CONFIRMADO"
@@ -385,8 +375,11 @@
       },
       "B, SPLIT": {
         "status": "COMPUESTO",
-        "venta_final_c3": null,
-        "prototipo": null
+        "venta_final_c3": 1545,
+        "prototipo": {
+          "codigo": "PFIT",
+          "delta": -6435
+        }
       },
       "BLANCO": {
         "status": "LIMPIO",
@@ -651,14 +644,6 @@
       }
     },
     "escalados": {
-      "B, SPLIT": {
-        "status": "COMPUESTO",
-        "flags": [
-          "C4d:6550",
-          "HIGH"
-        ],
-        "prototipo_is_none": true
-      },
       "CHOCOLATE": {
         "status": "COMPUESTO",
         "flags": [
@@ -729,11 +714,6 @@
       }
     },
     "correcciones_c4": [
-      {
-        "nombre": "B, SPLIT",
-        "delta": -6550,
-        "banda": "CONFIRMADO"
-      },
       {
         "nombre": "CHOCOLATE",
         "delta": -190,

@@ -81,10 +81,11 @@ _SITUACION_PRIORITY = {
     '~ Estimado':       1,
     '≈ Ajuste leve':    2,
     '✓ Sin cambios':    3,
+    '⚪ Sin resolver':   3,
     '⬜ Solo un turno': 4,
 }
 
-def _clasificar_fila(sc: SaborClasificado, corr: Optional[Correccion]):
+def _clasificar_fila(sc: SaborClasificado, corr: Optional[Correccion], venta_raw_fallback: int = 0):
     """Devuelve (situacion_str, color_hex, delta_display, venta_final)."""
     # SOLO un turno
     if sc.status in (StatusC3.SOLO_DIA, StatusC3.SOLO_NOCHE):
@@ -94,8 +95,10 @@ def _clasificar_fila(sc: SaborClasificado, corr: Optional[Correccion]):
     # Prototipo C3 (PF) sin corrección C4
     proto = sc.prototipo
     if corr is None and proto is None:
-        vf = sc.venta_final_c3 if sc.venta_final_c3 is not None else 0
-        return '✓ Sin cambios', C_LIMPIO, None, vf
+        if sc.venta_final_c3 is not None:
+            return '✓ Sin cambios', C_LIMPIO, None, sc.venta_final_c3
+        # ESCALAR_C4: venta_final_c3 no resuelta, mostrar raw para coherencia de columna
+        return '⚪ Sin resolver', C_ESTIMADO, None, venta_raw_fallback
 
     # Usar corrección C4 si existe, si no el prototipo
     if corr is not None:
@@ -377,9 +380,10 @@ def _write_resumen(ws, resultados, sheet_names: dict):
 # HOJA POR DÍA
 # ===================================================================
 
-def _write_dia(ws, label, c3, c4, resultado):
+def _write_dia(ws, label, c3, c4, resultado, cont=None):
     """Hoja de detalle del día: 5 columnas en lenguaje humano + resumen VDP."""
     corr_map = {c.nombre_norm: c for c in c4.correcciones}
+    contable_map = {n: s for n, s in cont.sabores.items()} if cont else {}
 
     ws.column_dimensions['A'].width = 24
     ws.column_dimensions['B'].width = 14
@@ -438,7 +442,8 @@ def _write_dia(ws, label, c3, c4, resultado):
     def _sort_key(item):
         nombre, sc = item
         corr = corr_map.get(nombre)
-        sit, _, _, _ = _clasificar_fila(sc, corr)
+        raw = contable_map[nombre].venta_raw if nombre in contable_map else 0
+        sit, _, _, _ = _clasificar_fila(sc, corr, raw)
         return (_SITUACION_PRIORITY.get(sit, 9), nombre)
 
     sabores_sorted = sorted(c3.sabores.items(), key=_sort_key)
@@ -446,7 +451,8 @@ def _write_dia(ws, label, c3, c4, resultado):
     # ── Filas de sabores ──────────────────────────────────────────
     for nombre, sc in sabores_sorted:
         corr = corr_map.get(nombre)
-        sit, color, delta, vf = _clasificar_fila(sc, corr)
+        raw = contable_map[nombre].venta_raw if nombre in contable_map else 0
+        sit, color, delta, vf = _clasificar_fila(sc, corr, raw)
         nota = _nota_legible(sc, corr)
         row_fill = _fill(color)
 
@@ -640,7 +646,7 @@ def exportar_multi(resultados, path_output: str):
     for datos, cont, c3, c4, resultado in resultados:
         nombre_hoja = sheet_names[resultado.dia_label]
         ws = wb.create_sheet(nombre_hoja)
-        _write_dia(ws, resultado.dia_label, c3, c4, resultado)
+        _write_dia(ws, resultado.dia_label, c3, c4, resultado, cont=cont)
 
     # ── Hoja final: Detalle técnico ───────────────────────────────
     ws_det = wb.create_sheet('Detalle técnico')
