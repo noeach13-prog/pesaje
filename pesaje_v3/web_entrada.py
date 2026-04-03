@@ -17,6 +17,7 @@ from .db import (
     get_db, obtener_sucursales, verificar_pin, crear_turno,
     guardar_sabores, obtener_turno, listar_turnos,
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
+    agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
 )
 
 entrada_bp = Blueprint(
@@ -221,3 +222,75 @@ def historial():
     db.close()
     return render_template('entrada/historial.html',
                            turnos=turnos, sucursal_nombre=nombre, mes=mes)
+
+
+# ─── APIs: VDP, Consumos, Notas, Agregar sabor ──────────────────────
+
+def _verificar_turno_editable(turno_id):
+    """Helper: verifica sesion + pertenencia + estado borrador. Retorna (db, turno) o (None, error_response)."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return None, (jsonify({'ok': False, 'error': 'No autenticado'}), 401)
+    db = get_db()
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno or turno['sucursal_id'] != sid:
+        db.close()
+        return None, (jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404)
+    if turno['estado'] == 'confirmado':
+        db.close()
+        return None, (jsonify({'ok': False, 'error': 'Turno ya confirmado'}), 400)
+    return db, turno
+
+
+@entrada_bp.route('/entrada/api/guardar-extras', methods=['POST'])
+def api_guardar_extras():
+    """Guarda VDP + consumos + notas de un turno."""
+    payload = request.get_json()
+    if not payload:
+        return jsonify({'ok': False, 'error': 'JSON vacio'}), 400
+
+    turno_id = payload.get('turno_id')
+    if not turno_id:
+        return jsonify({'ok': False, 'error': 'turno_id requerido'}), 400
+
+    db, turno_or_err = _verificar_turno_editable(turno_id)
+    if db is None:
+        return turno_or_err
+
+    vdp = payload.get('vdp', [])
+    consumos = payload.get('consumos', [])
+    notas = payload.get('notas', [])
+
+    guardar_vdp(db, turno_id, vdp)
+    guardar_consumos(db, turno_id, consumos)
+    guardar_notas(db, turno_id, notas)
+    db.close()
+
+    return jsonify({
+        'ok': True,
+        'n_vdp': len([v for v in vdp if (v.get('texto') or '').strip()]),
+        'n_consumos': len([c for c in consumos if (c.get('texto') or '').strip()]),
+        'n_notas': len([n for n in notas if (n.get('detalle') or '').strip()]),
+    })
+
+
+@entrada_bp.route('/entrada/api/agregar-sabor', methods=['POST'])
+def api_agregar_sabor():
+    """Agrega un sabor nuevo al catálogo de la sucursal activa."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+
+    payload = request.get_json()
+    nombre = (payload.get('nombre') or '').strip() if payload else ''
+    if not nombre:
+        return jsonify({'ok': False, 'error': 'Nombre vacio'}), 400
+
+    db = get_db()
+    nombre_norm = agregar_sabor_catalogo(db, sid, nombre)
+    db.close()
+
+    if not nombre_norm:
+        return jsonify({'ok': False, 'error': 'Nombre invalido'}), 400
+
+    return jsonify({'ok': True, 'nombre_norm': nombre_norm})

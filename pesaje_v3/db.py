@@ -150,7 +150,22 @@ CREATE TABLE IF NOT EXISTS vdp_turno (
     id INTEGER PRIMARY KEY,
     turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
     texto TEXT NOT NULL,
-    gramos INTEGER NOT NULL
+    gramos INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS consumo_turno (
+    id INTEGER PRIMARY KEY,
+    turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
+    texto TEXT NOT NULL,
+    gramos INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS notas_turno (
+    id INTEGER PRIMARY KEY,
+    turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
+    categoria TEXT NOT NULL,
+    detalle TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS catalogo_sabores (
@@ -339,6 +354,16 @@ def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:
         "SELECT * FROM sucursales WHERE id = ?", (turno['sucursal_id'],)
     ).fetchone()
 
+    vdp = db.execute(
+        "SELECT * FROM vdp_turno WHERE turno_id = ? ORDER BY id", (turno_id,)
+    ).fetchall()
+    consumos = db.execute(
+        "SELECT * FROM consumo_turno WHERE turno_id = ? ORDER BY id", (turno_id,)
+    ).fetchall()
+    notas = db.execute(
+        "SELECT * FROM notas_turno WHERE turno_id = ? ORDER BY id", (turno_id,)
+    ).fetchall()
+
     return {
         'turno': dict(turno),
         'sabores': [dict(s) for s in sabores],
@@ -346,6 +371,9 @@ def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:
         'nombre_hoja': derivar_nombre_hoja(
             turno['fecha'], turno['tipo_turno'], sucursal['modo']
         ),
+        'vdp': [dict(v) for v in vdp],
+        'consumos': [dict(c) for c in consumos],
+        'notas': [dict(n) for n in notas],
     }
 
 
@@ -389,6 +417,19 @@ def catalogo_sabores(db: sqlite3.Connection, sucursal_id: int) -> List[str]:
     return [r['nombre_norm'] for r in rows]
 
 
+def agregar_sabor_catalogo(db: sqlite3.Connection, sucursal_id: int, nombre: str) -> str:
+    """Agrega un sabor nuevo al catálogo. Retorna el nombre_norm."""
+    nombre_norm = normalize_name(nombre)
+    if not nombre_norm:
+        return ''
+    db.execute(
+        "INSERT OR IGNORE INTO catalogo_sabores (sucursal_id, nombre_norm) VALUES (?, ?)",
+        (sucursal_id, nombre_norm),
+    )
+    db.commit()
+    return nombre_norm
+
+
 def sabores_turno_anterior(db: sqlite3.Connection, sucursal_id: int,
                            fecha: str) -> List[str]:
     """
@@ -408,3 +449,63 @@ def sabores_turno_anterior(db: sqlite3.Connection, sucursal_id: int,
         (row['id'],),
     ).fetchall()
     return [s['nombre'] for s in sabores]
+
+
+# ─── VDP, Consumos, Notas ───────────────────────────────────────────
+
+def guardar_vdp(db: sqlite3.Connection, turno_id: int, items: List[dict]):
+    """Guarda VDP (ventas despues del peso). items: [{texto, gramos}]"""
+    db.execute("DELETE FROM vdp_turno WHERE turno_id = ?", (turno_id,))
+    for item in items:
+        texto = (item.get('texto') or '').strip()
+        if not texto:
+            continue
+        gramos = item.get('gramos', 0)
+        try:
+            gramos = int(gramos)
+        except (ValueError, TypeError):
+            gramos = 0
+        db.execute(
+            "INSERT INTO vdp_turno (turno_id, texto, gramos) VALUES (?, ?, ?)",
+            (turno_id, texto, gramos),
+        )
+    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
+    db.commit()
+
+
+def guardar_consumos(db: sqlite3.Connection, turno_id: int, items: List[dict]):
+    """Guarda consumos internos. items: [{texto, gramos}]"""
+    db.execute("DELETE FROM consumo_turno WHERE turno_id = ?", (turno_id,))
+    for item in items:
+        texto = (item.get('texto') or '').strip()
+        if not texto:
+            continue
+        gramos = item.get('gramos', 0)
+        try:
+            gramos = int(gramos)
+        except (ValueError, TypeError):
+            gramos = 0
+        db.execute(
+            "INSERT INTO consumo_turno (turno_id, texto, gramos) VALUES (?, ?, ?)",
+            (turno_id, texto, gramos),
+        )
+    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
+    db.commit()
+
+
+def guardar_notas(db: sqlite3.Connection, turno_id: int, notas: List[dict]):
+    """Guarda notas de caja. notas: [{categoria, detalle}]"""
+    db.execute("DELETE FROM notas_turno WHERE turno_id = ?", (turno_id,))
+    for nota in notas:
+        cat = (nota.get('categoria') or '').strip()
+        det = (nota.get('detalle') or '').strip()
+        if not det:
+            continue
+        if cat not in ('novedad', 'reclamo', 'faltante', 'otro'):
+            cat = 'otro'
+        db.execute(
+            "INSERT INTO notas_turno (turno_id, categoria, detalle) VALUES (?, ?, ?)",
+            (turno_id, cat, det),
+        )
+    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
+    db.commit()

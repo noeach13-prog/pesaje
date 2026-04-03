@@ -77,6 +77,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .status-err { background: #fce4ec; color: #c62828; }
 
 .counter { text-align: center; font-size: 0.8rem; color: #999; margin-bottom: 8px; }
+
+/* Secciones extra */
+.extra-section { background: #fff; border-radius: 8px; margin-top: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); overflow: hidden; }
+.extra-header {
+    padding: 10px 12px; font-weight: 600; font-size: 0.85rem; color: #555;
+    cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;
+}
+.extra-body { display: none; padding: 8px 12px 12px; }
+.extra-section.open .extra-body { display: block; }
+.extra-section.open .extra-header { border-bottom: 1px solid #eee; }
+.extra-count { background: #e3f2fd; color: #1565c0; padding: 1px 8px; border-radius: 10px; font-size: 0.75rem; }
+.extra-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.extra-row input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.extra-row input[type="number"] { width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: right; }
+.extra-row select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+.nota-row { flex-wrap: wrap; }
+.nota-row select { min-width: 100px; }
+.nota-row input { flex: 1; min-width: 150px; }
+.btn-small { padding: 6px 12px; background: #e3f2fd; color: #1565c0; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+.remove-btn { background: none; border: none; color: #c62828; cursor: pointer; font-size: 1.2rem; padding: 4px; }
 </style>
 </head>
 <body>
@@ -150,8 +170,80 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     {% endfor %}
     </div>
 
+    <!-- Agregar sabor nuevo -->
+    <div class="extra-section">
+        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
+            + Agregar sabor que no esta en la lista
+        </div>
+        <div class="extra-body">
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="nuevoSaborInput" placeholder="Nombre del sabor" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;">
+                <button class="btn-small" onclick="agregarSaborNuevo()">Agregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VDP: Ventas despues del peso -->
+    <div class="extra-section{{ ' open' if data.vdp else '' }}">
+        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
+            Ventas despues del peso (VDP)
+            <span class="extra-count" id="vdpCount">{{ data.vdp|length if data.vdp else 0 }}</span>
+        </div>
+        <div class="extra-body" id="vdpContainer">
+            {% for v in data.vdp %}
+            <div class="extra-row">
+                <input type="text" class="vdp-texto" value="{{ v.texto }}" placeholder="Ej: 2 vasitos frutilla">
+                <input type="number" class="vdp-gramos" value="{{ v.gramos }}" placeholder="g" inputmode="numeric">
+                <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+            {% endfor %}
+            <button class="btn-small" onclick="agregarVDP()">+ Agregar VDP</button>
+        </div>
+    </div>
+
+    <!-- Consumos internos -->
+    <div class="extra-section{{ ' open' if data.consumos else '' }}">
+        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
+            Consumos internos
+            <span class="extra-count" id="consumoCount">{{ data.consumos|length if data.consumos else 0 }}</span>
+        </div>
+        <div class="extra-body" id="consumoContainer">
+            {% for c in data.consumos %}
+            <div class="extra-row">
+                <input type="text" class="consumo-texto" value="{{ c.texto }}" placeholder="Ej: 1 cucurucho chocolate">
+                <input type="number" class="consumo-gramos" value="{{ c.gramos }}" placeholder="g" inputmode="numeric">
+                <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+            {% endfor %}
+            <button class="btn-small" onclick="agregarConsumo()">+ Agregar consumo</button>
+        </div>
+    </div>
+
+    <!-- Notas de caja -->
+    <div class="extra-section{{ ' open' if data.notas else '' }}">
+        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
+            Notas de caja
+            <span class="extra-count" id="notaCount">{{ data.notas|length if data.notas else 0 }}</span>
+        </div>
+        <div class="extra-body" id="notaContainer">
+            {% for n in data.notas %}
+            <div class="extra-row nota-row">
+                <select class="nota-cat">
+                    <option value="novedad" {{ 'selected' if n.categoria == 'novedad' }}>Novedad</option>
+                    <option value="reclamo" {{ 'selected' if n.categoria == 'reclamo' }}>Reclamo</option>
+                    <option value="faltante" {{ 'selected' if n.categoria == 'faltante' }}>Faltante</option>
+                    <option value="otro" {{ 'selected' if n.categoria == 'otro' }}>Otro</option>
+                </select>
+                <input type="text" class="nota-detalle" value="{{ n.detalle }}" placeholder="Detalle...">
+                <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+            </div>
+            {% endfor %}
+            <button class="btn-small" onclick="agregarNota()">+ Agregar nota</button>
+        </div>
+    </div>
+
     <div class="bottom-bar">
-        <button class="btn btn-save" onclick="guardar()" id="btnGuardar">Guardar borrador</button>
+        <button class="btn btn-save" onclick="guardarTodo()" id="btnGuardar">Guardar borrador</button>
     </div>
 </div>
 
@@ -226,29 +318,119 @@ function showStatus(msg, tipo) {
     setTimeout(() => bar.classList.remove('show'), 5000);
 }
 
-async function guardar() {
+// ─── Secciones extra ─────────────────────────────────────────
+
+function agregarVDP() {
+    const c = document.getElementById('vdpContainer');
+    c.insertAdjacentHTML('beforeend', `<div class="extra-row">
+        <input type="text" class="vdp-texto" placeholder="Ej: 2 vasitos frutilla">
+        <input type="number" class="vdp-gramos" placeholder="g" inputmode="numeric">
+        <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+    </div>`);
+}
+
+function agregarConsumo() {
+    const c = document.getElementById('consumoContainer');
+    c.insertAdjacentHTML('beforeend', `<div class="extra-row">
+        <input type="text" class="consumo-texto" placeholder="Ej: 1 cucurucho chocolate">
+        <input type="number" class="consumo-gramos" placeholder="g" inputmode="numeric">
+        <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+    </div>`);
+}
+
+function agregarNota() {
+    const c = document.getElementById('notaContainer');
+    c.insertAdjacentHTML('beforeend', `<div class="extra-row nota-row">
+        <select class="nota-cat">
+            <option value="novedad">Novedad</option>
+            <option value="reclamo">Reclamo</option>
+            <option value="faltante">Faltante</option>
+            <option value="otro">Otro</option>
+        </select>
+        <input type="text" class="nota-detalle" placeholder="Detalle...">
+        <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+    </div>`);
+}
+
+async function agregarSaborNuevo() {
+    const input = document.getElementById('nuevoSaborInput');
+    const nombre = input.value.trim();
+    if (!nombre) return;
+
+    const resp = await fetch('/entrada/api/agregar-sabor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre }),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+        showStatus('Sabor "' + data.nombre_norm + '" agregado. Recarga la pagina para verlo.', 'ok');
+        input.value = '';
+    } else {
+        showStatus('Error: ' + data.error, 'err');
+    }
+}
+
+function recogerExtras() {
+    const vdp = [];
+    document.querySelectorAll('#vdpContainer .extra-row').forEach(row => {
+        const texto = (row.querySelector('.vdp-texto') || {}).value || '';
+        const gramos = parseInt((row.querySelector('.vdp-gramos') || {}).value) || 0;
+        if (texto.trim()) vdp.push({ texto, gramos });
+    });
+    const consumos = [];
+    document.querySelectorAll('#consumoContainer .extra-row').forEach(row => {
+        const texto = (row.querySelector('.consumo-texto') || {}).value || '';
+        const gramos = parseInt((row.querySelector('.consumo-gramos') || {}).value) || 0;
+        if (texto.trim()) consumos.push({ texto, gramos });
+    });
+    const notas = [];
+    document.querySelectorAll('#notaContainer .extra-row').forEach(row => {
+        const cat = (row.querySelector('.nota-cat') || {}).value || 'otro';
+        const detalle = (row.querySelector('.nota-detalle') || {}).value || '';
+        if (detalle.trim()) notas.push({ categoria: cat, detalle });
+    });
+    return { vdp, consumos, notas };
+}
+
+async function guardarTodo() {
     const sabores = recogerDatos();
+    const extras = recogerExtras();
     const btn = document.getElementById('btnGuardar');
     btn.disabled = true;
     btn.textContent = 'Guardando...';
 
     try {
-        const resp = await fetch('/entrada/api/guardar', {
+        // Guardar sabores
+        const resp1 = await fetch('/entrada/api/guardar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ turno_id: TURNO_ID, sabores }),
         });
-        const data = await resp.json();
-        if (data.ok) {
-            let msg = 'Guardado: ' + data.n_sabores + ' sabores';
-            if (data.warnings && data.warnings.length > 0) {
-                msg += ' (' + data.warnings.length + ' advertencias)';
+        const d1 = await resp1.json();
+
+        // Guardar extras
+        const resp2 = await fetch('/entrada/api/guardar-extras', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ turno_id: TURNO_ID, ...extras }),
+        });
+        const d2 = await resp2.json();
+
+        if (d1.ok && d2.ok) {
+            let parts = [d1.n_sabores + ' sabores'];
+            if (d2.n_vdp) parts.push(d2.n_vdp + ' VDP');
+            if (d2.n_consumos) parts.push(d2.n_consumos + ' consumos');
+            if (d2.n_notas) parts.push(d2.n_notas + ' notas');
+            let msg = 'Guardado: ' + parts.join(', ');
+            if (d1.warnings && d1.warnings.length > 0) {
+                msg += ' (' + d1.warnings.length + ' advertencias)';
                 showStatus(msg, 'warn');
             } else {
                 showStatus(msg, 'ok');
             }
         } else {
-            showStatus('Error: ' + data.error, 'err');
+            showStatus('Error: ' + (d1.error || d2.error || 'desconocido'), 'err');
         }
     } catch (e) {
         showStatus('Error de conexion: ' + e.message, 'err');
