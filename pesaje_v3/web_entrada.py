@@ -30,6 +30,20 @@ entrada_bp = Blueprint(
 
 # ─── Acceso por PIN ─────────────────────────────────────────────────
 
+def _datos_turno_anterior(db, sucursal_id, fecha):
+    """Retorna dict {nombre_norm: {abierta, cerrada_1..6, entrante_1..2}} del turno anterior."""
+    row = db.execute(
+        "SELECT id FROM turnos WHERE sucursal_id = ? AND fecha < ? ORDER BY fecha DESC, tipo_turno DESC LIMIT 1",
+        (sucursal_id, fecha),
+    ).fetchone()
+    if not row:
+        return {}
+    sabores = db.execute(
+        "SELECT * FROM sabores_turno WHERE turno_id = ?", (row['id'],)
+    ).fetchall()
+    return {s['nombre_norm']: dict(s) for s in sabores}
+
+
 def _sucursal_activa():
     """Retorna (sucursal_id, nombre) de la sesion, o (None, None)."""
     sid = session.get('sucursal_id')
@@ -148,16 +162,19 @@ def editar_turno(turno_id):
         db.close()
         return "Turno no encontrado o no pertenece a esta sucursal", 404
 
-    previos = sabores_turno_anterior(db, sid, data['turno']['fecha'])
     catalogo = catalogo_sabores(db, sid)
+
+    # Datos del turno anterior: pesos completos para referencia visual
+    ref_turno = _datos_turno_anterior(db, sid, data['turno']['fecha'])
+
     db.close()
 
     # Sabores ya cargados en este turno (por nombre_norm)
-    cargados = {s['nombre_norm'] for s in data['sabores']}
+    cargados_dict = {s['nombre_norm']: s for s in data['sabores']}
 
     return render_template('entrada/turno_form.html',
-                           data=data, sabores_previos=previos,
-                           catalogo=catalogo, cargados=cargados)
+                           data=data, catalogo=catalogo,
+                           cargados=cargados_dict, ref=ref_turno)
 
 
 @entrada_bp.route('/entrada/api/guardar', methods=['POST'])

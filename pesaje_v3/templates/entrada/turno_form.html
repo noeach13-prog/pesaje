@@ -2,166 +2,161 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>{{ data.sucursal.nombre }} - {{ data.nombre_hoja }}</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
-.container { max-width: 600px; margin: 0 auto; padding: 12px; padding-bottom: 80px; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.header h1 { font-size: 1.1rem; }
-.header .meta { font-size: 0.8rem; color: #666; }
-.badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
-.badge-borrador { background: #fff3e0; color: #e65100; }
-.badge-confirmado { background: #e8f5e9; color: #2e7d32; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
+.top-bar { background: #1565c0; color: #fff; padding: 10px 16px; position: sticky; top: 0; z-index: 10; }
+.top-bar h1 { font-size: 1rem; font-weight: 600; }
+.top-bar .sub { font-size: 0.75rem; opacity: 0.8; }
+.top-bar .actions { display: flex; gap: 10px; align-items: center; }
+.top-bar a { color: #fff; opacity: 0.8; font-size: 0.75rem; text-decoration: none; }
+.top-row { display: flex; justify-content: space-between; align-items: center; }
+.progress { background: rgba(255,255,255,0.2); border-radius: 4px; height: 4px; margin-top: 6px; }
+.progress-fill { background: #fff; border-radius: 4px; height: 100%; transition: width 0.3s; }
 
-/* Buscador */
-.search-box { margin-bottom: 12px; }
-.search-box input {
-    width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px;
-    font-size: 16px; background: #fff;
-}
+.container { max-width: 600px; margin: 0 auto; padding: 8px 8px 90px; }
 
-/* Sabor card */
-.sabor-card {
-    background: #fff; border-radius: 8px; margin-bottom: 6px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.06); overflow: hidden;
-    border-left: 3px solid transparent;
-}
-.sabor-card.tiene-datos { border-left-color: #1565c0; }
-.sabor-card.hidden { display: none; }
-.sabor-header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 8px 12px; cursor: pointer; user-select: none; min-height: 40px;
-}
-.sabor-header .nombre { font-weight: 600; font-size: 0.85rem; }
-.sabor-header .total { font-size: 0.8rem; color: #999; }
-.sabor-body { padding: 4px 12px 12px; display: none; }
-.sabor-card.open .sabor-body { display: block; }
+/* Search */
+.search { margin: 8px 0; }
+.search input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: #fff; }
 
-/* Campos */
-.fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.field-item { display: flex; align-items: center; gap: 4px; }
-.field-item label { min-width: 38px; font-size: 0.7rem; color: #777; font-weight: 600; }
-.field-item input {
-    width: 100%; padding: 7px 4px; border: 1px solid #ddd; border-radius: 4px;
-    font-size: 16px; text-align: right;
+/* Flavor row */
+.flavor { background: #fff; margin-bottom: 2px; border-left: 3px solid transparent; }
+.flavor.has-data { border-left-color: #2e7d32; }
+.flavor.hidden { display: none; }
+.flavor-main { display: grid; grid-template-columns: 1fr 70px 70px 30px; align-items: center; padding: 6px 8px; gap: 4px; min-height: 44px; }
+.flavor-name { font-weight: 600; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flavor-input { position: relative; }
+.flavor-input input {
+    width: 100%; padding: 6px 2px; border: 1px solid #e0e0e0; border-radius: 4px;
+    font-size: 16px; text-align: right; background: #fafafa;
 }
-.field-item input:focus { border-color: #1565c0; outline: none; }
-.field-item input.warn { border-color: #e65100; background: #fff8e1; }
-.field-item input.err { border-color: #c62828; background: #fce4ec; }
-.field-item input.ok { border-color: #2e7d32; }
-.section-label {
-    grid-column: 1 / -1; font-size: 0.65rem; color: #aaa;
-    text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px;
+.flavor-input input:focus { border-color: #1565c0; background: #fff; outline: none; }
+.flavor-input input.ok { border-color: #2e7d32; background: #f1f8e9; }
+.flavor-input input.warn { border-color: #e65100; background: #fff8e1; }
+.flavor-input input.err { border-color: #c62828; background: #fce4ec; }
+.flavor-ref { position: absolute; bottom: -10px; right: 2px; font-size: 0.6rem; color: #aaa; }
+.flavor-expand { background: none; border: none; color: #999; font-size: 1rem; cursor: pointer; text-align: center; }
+.flavor-expand.active { color: #1565c0; }
+
+/* Expanded fields */
+.flavor-extra { display: none; padding: 4px 8px 8px; background: #f8f9fa; }
+.flavor.open .flavor-extra { display: block; }
+.extra-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.extra-field { position: relative; }
+.extra-field label { display: block; font-size: 0.6rem; color: #888; text-transform: uppercase; margin-bottom: 1px; }
+.extra-field input {
+    width: 100%; padding: 5px 2px; border: 1px solid #e0e0e0; border-radius: 3px;
+    font-size: 15px; text-align: right; background: #fff;
 }
+.extra-field input:focus { border-color: #1565c0; outline: none; }
+.extra-field .ref { font-size: 0.55rem; color: #bbb; text-align: right; }
 
-/* Barra fija abajo */
-.bottom-bar {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: #fff; padding: 10px 16px;
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
-    display: flex; gap: 8px; justify-content: center;
-    max-width: 600px; margin: 0 auto;
-}
-.btn { padding: 12px 20px; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
-.btn-save { background: #1565c0; color: #fff; flex: 1; }
-.btn-save:hover { background: #0d47a1; }
-.btn-back { background: #f5f5f5; color: #666; }
+/* Column headers */
+.col-headers { display: grid; grid-template-columns: 1fr 70px 70px 30px; padding: 4px 8px; font-size: 0.65rem; color: #999; text-transform: uppercase; font-weight: 600; }
+.col-headers span:nth-child(2), .col-headers span:nth-child(3) { text-align: right; }
 
-/* Status */
-.status-bar { padding: 8px 12px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; display: none; }
-.status-bar.show { display: block; }
-.status-ok { background: #e8f5e9; color: #2e7d32; }
-.status-warn { background: #fff3e0; color: #e65100; }
-.status-err { background: #fce4ec; color: #c62828; }
+/* Sections */
+.section { background: #fff; margin-top: 10px; border-radius: 8px; overflow: hidden; }
+.section-header { padding: 10px 12px; font-weight: 600; font-size: 0.85rem; color: #555; cursor: pointer; display: flex; justify-content: space-between; }
+.section-body { display: none; padding: 8px 12px 12px; }
+.section.open .section-body { display: block; }
+.section.open .section-header { border-bottom: 1px solid #eee; }
+.section-count { background: #e3f2fd; color: #1565c0; padding: 1px 8px; border-radius: 10px; font-size: 0.7rem; }
 
-.counter { text-align: center; font-size: 0.8rem; color: #999; margin-bottom: 8px; }
-
-/* Secciones extra */
-.extra-section { background: #fff; border-radius: 8px; margin-top: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); overflow: hidden; }
-.extra-header {
-    padding: 10px 12px; font-weight: 600; font-size: 0.85rem; color: #555;
-    cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;
-}
-.extra-body { display: none; padding: 8px 12px 12px; }
-.extra-section.open .extra-body { display: block; }
-.extra-section.open .extra-header { border-bottom: 1px solid #eee; }
-.extra-count { background: #e3f2fd; color: #1565c0; padding: 1px 8px; border-radius: 10px; font-size: 0.75rem; }
 .extra-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
 .extra-row input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-.extra-row input[type="number"] { width: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: right; }
+.extra-row input[type="number"] { width: 70px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; text-align: right; }
 .extra-row select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
-.nota-row { flex-wrap: wrap; }
-.nota-row select { min-width: 100px; }
-.nota-row input { flex: 1; min-width: 150px; }
-.btn-small { padding: 6px 12px; background: #e3f2fd; color: #1565c0; border: none; border-radius: 4px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
-.remove-btn { background: none; border: none; color: #c62828; cursor: pointer; font-size: 1.2rem; padding: 4px; }
+.btn-sm { padding: 5px 10px; background: #e3f2fd; color: #1565c0; border: none; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.rm-btn { background: none; border: none; color: #c62828; font-size: 1.1rem; cursor: pointer; padding: 2px 6px; }
+
+/* Bottom */
+.bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 10px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 10; }
+.bottom-inner { max-width: 600px; margin: 0 auto; display: flex; gap: 8px; }
+.btn-save { flex: 1; padding: 14px; background: #1565c0; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+.btn-save:hover { background: #0d47a1; }
+.btn-save:disabled { background: #ccc; }
+
+/* Status toast */
+.toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); padding: 8px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; z-index: 20; display: none; }
+.toast.show { display: block; animation: fadeout 3s forwards; }
+.toast-ok { background: #2e7d32; color: #fff; }
+.toast-warn { background: #e65100; color: #fff; }
+.toast-err { background: #c62828; color: #fff; }
+@keyframes fadeout { 0%,70% { opacity: 1; } 100% { opacity: 0; display: none; } }
 </style>
 </head>
 <body>
-<div class="container">
-    <div class="header">
+
+<div class="top-bar">
+    <div class="top-row">
         <div>
             <h1>{{ data.sucursal.nombre }}</h1>
-            <div class="meta">{{ data.nombre_hoja }} <span class="badge badge-{{ data.turno.estado }}">{{ data.turno.estado }}</span></div>
+            <div class="sub">{{ data.nombre_hoja }}</div>
         </div>
-        <a href="/entrada/seleccion" class="btn btn-back" style="font-size:0.8rem;padding:6px 12px;">Volver</a>
+        <div class="actions">
+            <span class="sub" id="statsText">0 sabores</span>
+            <a href="/entrada/seleccion">Volver</a>
+        </div>
+    </div>
+    <div class="progress"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div class="container">
+    <div class="search">
+        <input type="text" id="search" placeholder="Buscar sabor..." oninput="filtrar(this.value)">
     </div>
 
-    <div id="statusBar" class="status-bar"></div>
-
-    <div class="search-box">
-        <input type="text" id="buscador" placeholder="Buscar sabor..." oninput="filtrar(this.value)">
+    <div class="col-headers">
+        <span>Sabor</span><span>Abierta</span><span>Cerrada 1</span><span></span>
     </div>
 
-    <div class="counter" id="counter"></div>
-
-    <div id="saboresContainer">
-    {# Primero los que ya tienen datos, luego el resto del catalogo #}
-    {% set sabores_dict = {} %}
-    {% for s in data.sabores %}
-        {% set _ = sabores_dict.update({s.nombre_norm: s}) %}
-    {% endfor %}
-
+    <div id="flavors">
     {% for nombre in catalogo %}
-    {% set s = sabores_dict.get(nombre) %}
-    {% set tiene = nombre in cargados %}
-    <div class="sabor-card{{ ' tiene-datos open' if tiene else '' }}" data-nombre="{{ nombre }}">
-        <div class="sabor-header" onclick="toggleCard(this.parentElement)">
-            <span class="nombre">{{ nombre }}</span>
-            <span class="total" data-total>{{ '' }}</span>
+    {% set s = cargados.get(nombre) %}
+    {% set r = ref.get(nombre) %}
+    {% set has = s is not none %}
+    <div class="flavor{{ ' has-data' if has else '' }}" data-nombre="{{ nombre }}" id="f-{{ nombre | replace(' ', '_') | replace(',', '') }}">
+        <div class="flavor-main">
+            <div class="flavor-name">{{ nombre }}</div>
+            <div class="flavor-input">
+                <input type="number" data-field="abierta" inputmode="numeric" placeholder="-"
+                       value="{{ s.abierta if s and s.abierta is not none else '' }}"
+                       onblur="onBlur(this)" onfocus="onFoc(this)">
+                {% if r and r.abierta %}<span class="flavor-ref">{{ r.abierta }}</span>{% endif %}
+            </div>
+            <div class="flavor-input">
+                <input type="number" data-field="cerrada_1" inputmode="numeric" placeholder="-"
+                       value="{{ s.cerrada_1 if s and s.cerrada_1 is not none else '' }}"
+                       onblur="onBlur(this)" onfocus="onFoc(this)">
+                {% if r and r.cerrada_1 %}<span class="flavor-ref">{{ r.cerrada_1 }}</span>{% endif %}
+            </div>
+            <button class="flavor-expand{{ ' active' if has else '' }}" onclick="toggleExpand(this)">&#9660;</button>
         </div>
-        <div class="sabor-body">
-            <div class="fields-grid">
-                <div class="field-item">
-                    <label>Ab</label>
-                    <input type="number" class="peso-input" data-field="abierta"
-                           value="{{ s.abierta if s and s.abierta is not none else '' }}"
-                           placeholder="g" inputmode="numeric" onblur="validarCampo(this)">
+        <div class="flavor-extra">
+            <div class="extra-grid">
+                <div class="extra-field">
+                    <label>Celiaca</label>
+                    <input type="number" data-field="celiaca" inputmode="numeric" value="{{ s.celiaca if s and s.celiaca is not none else '' }}" onblur="onBlur(this)">
+                    {% if r and r.celiaca %}<div class="ref">ant: {{ r.celiaca }}</div>{% endif %}
                 </div>
-                <div class="field-item">
-                    <label>Cel</label>
-                    <input type="number" class="peso-input" data-field="celiaca"
-                           value="{{ s.celiaca if s and s.celiaca is not none else '' }}"
-                           placeholder="g" inputmode="numeric" onblur="validarCampo(this)">
-                </div>
-                <div class="section-label">Cerradas</div>
-                {% for i in range(1, 7) %}
-                <div class="field-item">
-                    <label>C{{ i }}</label>
-                    <input type="number" class="peso-input" data-field="cerrada_{{ i }}"
-                           value="{{ s['cerrada_' ~ i] if s and s['cerrada_' ~ i] is not none else '' }}"
-                           placeholder="g" inputmode="numeric" onblur="validarCampo(this)">
+                {% for i in range(2, 7) %}
+                <div class="extra-field">
+                    <label>Cerrada {{ i }}</label>
+                    <input type="number" data-field="cerrada_{{ i }}" inputmode="numeric" value="{{ s['cerrada_' ~ i] if s and s['cerrada_' ~ i] is not none else '' }}" onblur="onBlur(this)">
+                    {% if r and r['cerrada_' ~ i] %}<div class="ref">ant: {{ r['cerrada_' ~ i] }}</div>{% endif %}
                 </div>
                 {% endfor %}
-                <div class="section-label">Entrantes</div>
                 {% for i in range(1, 3) %}
-                <div class="field-item">
-                    <label>E{{ i }}</label>
-                    <input type="number" class="peso-input" data-field="entrante_{{ i }}"
-                           value="{{ s['entrante_' ~ i] if s and s['entrante_' ~ i] is not none else '' }}"
-                           placeholder="g" inputmode="numeric" onblur="validarCampo(this)">
+                <div class="extra-field">
+                    <label>Entrante {{ i }}</label>
+                    <input type="number" data-field="entrante_{{ i }}" inputmode="numeric" value="{{ s['entrante_' ~ i] if s and s['entrante_' ~ i] is not none else '' }}" onblur="onBlur(this)">
+                    {% if r and r['entrante_' ~ i] %}<div class="ref">ant: {{ r['entrante_' ~ i] }}</div>{% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -170,286 +165,213 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     {% endfor %}
     </div>
 
-    <!-- Agregar sabor nuevo -->
-    <div class="extra-section">
-        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
-            + Agregar sabor que no esta en la lista
-        </div>
-        <div class="extra-body">
-            <div style="display:flex;gap:8px;">
-                <input type="text" id="nuevoSaborInput" placeholder="Nombre del sabor" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:4px;font-size:16px;">
-                <button class="btn-small" onclick="agregarSaborNuevo()">Agregar</button>
+    <!-- Agregar sabor -->
+    <div class="section">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">+ Agregar sabor nuevo</div>
+        <div class="section-body">
+            <div class="extra-row">
+                <input type="text" id="nuevoSabor" placeholder="Nombre del sabor" style="font-size:16px;">
+                <button class="btn-sm" onclick="agregarSabor()">Agregar</button>
             </div>
         </div>
     </div>
 
-    <!-- VDP: Ventas despues del peso -->
-    <div class="extra-section{{ ' open' if data.vdp else '' }}">
-        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
-            Ventas despues del peso (VDP)
-            <span class="extra-count" id="vdpCount">{{ data.vdp|length if data.vdp else 0 }}</span>
+    <!-- VDP -->
+    <div class="section{{ ' open' if data.vdp else '' }}">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
+            Ventas despues del peso
+            <span class="section-count" id="vdpCount">{{ data.vdp|length }}</span>
         </div>
-        <div class="extra-body" id="vdpContainer">
+        <div class="section-body" id="vdpBox">
             {% for v in data.vdp %}
             <div class="extra-row">
-                <input type="text" class="vdp-texto" value="{{ v.texto }}" placeholder="Ej: 2 vasitos frutilla">
-                <input type="number" class="vdp-gramos" value="{{ v.gramos }}" placeholder="g" inputmode="numeric">
-                <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+                <input type="text" class="vdp-t" value="{{ v.texto }}" placeholder="Ej: 2 vasitos frutilla">
+                <input type="number" class="vdp-g" value="{{ v.gramos }}" placeholder="g" inputmode="numeric">
+                <button class="rm-btn" onclick="this.parentElement.remove()">&times;</button>
             </div>
             {% endfor %}
-            <button class="btn-small" onclick="agregarVDP()">+ Agregar VDP</button>
+            <button class="btn-sm" onclick="addVDP()">+ Agregar</button>
         </div>
     </div>
 
-    <!-- Consumos internos -->
-    <div class="extra-section{{ ' open' if data.consumos else '' }}">
-        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
+    <!-- Consumos -->
+    <div class="section{{ ' open' if data.consumos else '' }}">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
             Consumos internos
-            <span class="extra-count" id="consumoCount">{{ data.consumos|length if data.consumos else 0 }}</span>
+            <span class="section-count" id="conCount">{{ data.consumos|length }}</span>
         </div>
-        <div class="extra-body" id="consumoContainer">
+        <div class="section-body" id="conBox">
             {% for c in data.consumos %}
             <div class="extra-row">
-                <input type="text" class="consumo-texto" value="{{ c.texto }}" placeholder="Ej: 1 cucurucho chocolate">
-                <input type="number" class="consumo-gramos" value="{{ c.gramos }}" placeholder="g" inputmode="numeric">
-                <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+                <input type="text" class="con-t" value="{{ c.texto }}" placeholder="Ej: 1 cucurucho chocolate">
+                <input type="number" class="con-g" value="{{ c.gramos }}" placeholder="g" inputmode="numeric">
+                <button class="rm-btn" onclick="this.parentElement.remove()">&times;</button>
             </div>
             {% endfor %}
-            <button class="btn-small" onclick="agregarConsumo()">+ Agregar consumo</button>
+            <button class="btn-sm" onclick="addCon()">+ Agregar</button>
         </div>
     </div>
 
-    <!-- Notas de caja -->
-    <div class="extra-section{{ ' open' if data.notas else '' }}">
-        <div class="extra-header" onclick="this.parentElement.classList.toggle('open')">
+    <!-- Notas -->
+    <div class="section{{ ' open' if data.notas else '' }}">
+        <div class="section-header" onclick="this.parentElement.classList.toggle('open')">
             Notas de caja
-            <span class="extra-count" id="notaCount">{{ data.notas|length if data.notas else 0 }}</span>
+            <span class="section-count" id="notaCount">{{ data.notas|length }}</span>
         </div>
-        <div class="extra-body" id="notaContainer">
+        <div class="section-body" id="notaBox">
             {% for n in data.notas %}
-            <div class="extra-row nota-row">
-                <select class="nota-cat">
-                    <option value="novedad" {{ 'selected' if n.categoria == 'novedad' }}>Novedad</option>
-                    <option value="reclamo" {{ 'selected' if n.categoria == 'reclamo' }}>Reclamo</option>
-                    <option value="faltante" {{ 'selected' if n.categoria == 'faltante' }}>Faltante</option>
-                    <option value="otro" {{ 'selected' if n.categoria == 'otro' }}>Otro</option>
-                </select>
-                <input type="text" class="nota-detalle" value="{{ n.detalle }}" placeholder="Detalle...">
-                <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
+            <div class="extra-row" style="flex-wrap:wrap;">
+                <select class="nota-c"><option value="novedad" {{ 'selected' if n.categoria=='novedad' }}>Novedad</option><option value="reclamo" {{ 'selected' if n.categoria=='reclamo' }}>Reclamo</option><option value="faltante" {{ 'selected' if n.categoria=='faltante' }}>Faltante</option><option value="otro" {{ 'selected' if n.categoria=='otro' }}>Otro</option></select>
+                <input type="text" class="nota-d" value="{{ n.detalle }}" placeholder="Detalle..." style="flex:1;min-width:150px;">
+                <button class="rm-btn" onclick="this.parentElement.remove()">&times;</button>
             </div>
             {% endfor %}
-            <button class="btn-small" onclick="agregarNota()">+ Agregar nota</button>
+            <button class="btn-sm" onclick="addNota()">+ Agregar</button>
         </div>
     </div>
+</div>
 
-    <div class="bottom-bar">
-        <button class="btn btn-save" onclick="guardarTodo()" id="btnGuardar">Guardar borrador</button>
+<div class="bottom">
+    <div class="bottom-inner">
+        <button class="btn-save" id="btnSave" onclick="guardarTodo()">Guardar borrador</button>
     </div>
 </div>
 
 <script>
-const TURNO_ID = {{ data.turno.id }};
-const PESO_MAX = 7900;
+const TID = {{ data.turno.id }};
+const PMAX = 7900;
 
-function toggleCard(card) {
-    card.classList.toggle('open');
-}
-
-function filtrar(texto) {
-    const q = texto.toUpperCase().trim();
-    document.querySelectorAll('.sabor-card').forEach(card => {
-        const nombre = card.dataset.nombre;
-        card.classList.toggle('hidden', q && !nombre.includes(q));
+function filtrar(q) {
+    q = q.toUpperCase().trim();
+    document.querySelectorAll('.flavor').forEach(f => {
+        f.classList.toggle('hidden', q && !f.dataset.nombre.includes(q));
     });
 }
 
-function validarCampo(input) {
-    const val = input.value.trim();
-    input.classList.remove('ok', 'warn', 'err');
-    if (val === '') return;
-    const v = parseInt(val);
-    if (isNaN(v)) { input.classList.add('err'); return; }
-    if (v < 0) { input.classList.add('err'); return; }
-    if (v > PESO_MAX) { input.classList.add('err'); return; }
-    if (v > 0 && v < 50) { input.classList.add('warn'); return; }
-    if (v === 280) { input.classList.add('warn'); return; }
-    input.classList.add('ok');
-    // Actualizar total y marca de "tiene datos"
-    const card = input.closest('.sabor-card');
-    actualizarCard(card);
+function toggleExpand(btn) {
+    btn.closest('.flavor').classList.toggle('open');
+    btn.classList.toggle('active');
 }
 
-function actualizarCard(card) {
-    let total = 0;
-    let tieneAlgo = false;
-    card.querySelectorAll('.peso-input').forEach(inp => {
-        const v = parseInt(inp.value);
-        if (!isNaN(v) && v > 0) { total += v; tieneAlgo = true; }
+function onFoc(inp) { inp.select(); }
+
+function onBlur(inp) {
+    const v = inp.value.trim();
+    inp.classList.remove('ok','warn','err');
+    if (!v) { updateRow(inp); return; }
+    const n = parseInt(v);
+    if (isNaN(n) || n < 0) inp.classList.add('err');
+    else if (n > PMAX) inp.classList.add('err');
+    else if (n > 0 && n < 50) inp.classList.add('warn');
+    else if (n === 280) inp.classList.add('warn');
+    else if (n > 0) inp.classList.add('ok');
+    updateRow(inp);
+}
+
+function updateRow(inp) {
+    const fl = inp.closest('.flavor');
+    let has = false;
+    fl.querySelectorAll('input[type="number"]').forEach(i => {
+        if (i.value.trim()) has = true;
     });
-    const span = card.querySelector('[data-total]');
-    if (span) span.textContent = total > 0 ? total.toLocaleString('es') + 'g' : '';
-    card.classList.toggle('tiene-datos', tieneAlgo);
+    fl.classList.toggle('has-data', has);
+    updateStats();
 }
 
-function recogerDatos() {
+function updateStats() {
+    const total = document.querySelectorAll('.flavor').length;
+    const done = document.querySelectorAll('.flavor.has-data').length;
+    document.getElementById('statsText').textContent = done + '/' + total + ' sabores';
+    document.getElementById('progressFill').style.width = (done/total*100) + '%';
+}
+
+function collect() {
     const sabores = [];
-    document.querySelectorAll('.sabor-card').forEach(card => {
-        const nombre = card.dataset.nombre;
-        let tieneAlgo = false;
+    document.querySelectorAll('.flavor').forEach(fl => {
+        const nombre = fl.dataset.nombre;
+        let has = false;
         const row = { nombre };
-
-        card.querySelectorAll('.peso-input').forEach(inp => {
-            const field = inp.dataset.field;
-            const val = inp.value.trim();
-            if (val !== '') tieneAlgo = true;
-            row[field] = val === '' ? null : parseInt(val);
+        fl.querySelectorAll('input[type="number"]').forEach(inp => {
+            const v = inp.value.trim();
+            row[inp.dataset.field] = v === '' ? null : parseInt(v);
+            if (v) has = true;
         });
-
-        // Solo enviar sabores con algun dato
-        if (tieneAlgo) sabores.push(row);
+        if (has) sabores.push(row);
     });
     return sabores;
 }
 
-function showStatus(msg, tipo) {
-    const bar = document.getElementById('statusBar');
-    bar.textContent = msg;
-    bar.className = 'status-bar show status-' + tipo;
-    setTimeout(() => bar.classList.remove('show'), 5000);
-}
-
-// ─── Secciones extra ─────────────────────────────────────────
-
-function agregarVDP() {
-    const c = document.getElementById('vdpContainer');
-    c.insertAdjacentHTML('beforeend', `<div class="extra-row">
-        <input type="text" class="vdp-texto" placeholder="Ej: 2 vasitos frutilla">
-        <input type="number" class="vdp-gramos" placeholder="g" inputmode="numeric">
-        <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
-    </div>`);
-}
-
-function agregarConsumo() {
-    const c = document.getElementById('consumoContainer');
-    c.insertAdjacentHTML('beforeend', `<div class="extra-row">
-        <input type="text" class="consumo-texto" placeholder="Ej: 1 cucurucho chocolate">
-        <input type="number" class="consumo-gramos" placeholder="g" inputmode="numeric">
-        <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
-    </div>`);
-}
-
-function agregarNota() {
-    const c = document.getElementById('notaContainer');
-    c.insertAdjacentHTML('beforeend', `<div class="extra-row nota-row">
-        <select class="nota-cat">
-            <option value="novedad">Novedad</option>
-            <option value="reclamo">Reclamo</option>
-            <option value="faltante">Faltante</option>
-            <option value="otro">Otro</option>
-        </select>
-        <input type="text" class="nota-detalle" placeholder="Detalle...">
-        <button class="remove-btn" onclick="this.parentElement.remove()">&times;</button>
-    </div>`);
-}
-
-async function agregarSaborNuevo() {
-    const input = document.getElementById('nuevoSaborInput');
-    const nombre = input.value.trim();
-    if (!nombre) return;
-
-    const resp = await fetch('/entrada/api/agregar-sabor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre }),
+function collectExtras() {
+    const vdp = [], con = [], notas = [];
+    document.querySelectorAll('#vdpBox .extra-row').forEach(r => {
+        const t = (r.querySelector('.vdp-t')||{}).value||'';
+        const g = parseInt((r.querySelector('.vdp-g')||{}).value)||0;
+        if (t.trim()) vdp.push({texto:t,gramos:g});
     });
-    const data = await resp.json();
-    if (data.ok) {
-        showStatus('Sabor "' + data.nombre_norm + '" agregado. Recarga la pagina para verlo.', 'ok');
-        input.value = '';
-    } else {
-        showStatus('Error: ' + data.error, 'err');
-    }
+    document.querySelectorAll('#conBox .extra-row').forEach(r => {
+        const t = (r.querySelector('.con-t')||{}).value||'';
+        const g = parseInt((r.querySelector('.con-g')||{}).value)||0;
+        if (t.trim()) con.push({texto:t,gramos:g});
+    });
+    document.querySelectorAll('#notaBox .extra-row').forEach(r => {
+        const c = (r.querySelector('.nota-c')||{}).value||'otro';
+        const d = (r.querySelector('.nota-d')||{}).value||'';
+        if (d.trim()) notas.push({categoria:c,detalle:d});
+    });
+    return {vdp,consumos:con,notas};
 }
 
-function recogerExtras() {
-    const vdp = [];
-    document.querySelectorAll('#vdpContainer .extra-row').forEach(row => {
-        const texto = (row.querySelector('.vdp-texto') || {}).value || '';
-        const gramos = parseInt((row.querySelector('.vdp-gramos') || {}).value) || 0;
-        if (texto.trim()) vdp.push({ texto, gramos });
-    });
-    const consumos = [];
-    document.querySelectorAll('#consumoContainer .extra-row').forEach(row => {
-        const texto = (row.querySelector('.consumo-texto') || {}).value || '';
-        const gramos = parseInt((row.querySelector('.consumo-gramos') || {}).value) || 0;
-        if (texto.trim()) consumos.push({ texto, gramos });
-    });
-    const notas = [];
-    document.querySelectorAll('#notaContainer .extra-row').forEach(row => {
-        const cat = (row.querySelector('.nota-cat') || {}).value || 'otro';
-        const detalle = (row.querySelector('.nota-detalle') || {}).value || '';
-        if (detalle.trim()) notas.push({ categoria: cat, detalle });
-    });
-    return { vdp, consumos, notas };
+function showToast(msg, tipo) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show toast-' + tipo;
+    setTimeout(() => t.className = 'toast', 3500);
 }
 
 async function guardarTodo() {
-    const sabores = recogerDatos();
-    const extras = recogerExtras();
-    const btn = document.getElementById('btnGuardar');
-    btn.disabled = true;
-    btn.textContent = 'Guardando...';
-
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true; btn.textContent = 'Guardando...';
     try {
-        // Guardar sabores
-        const resp1 = await fetch('/entrada/api/guardar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ turno_id: TURNO_ID, sabores }),
-        });
-        const d1 = await resp1.json();
-
-        // Guardar extras
-        const resp2 = await fetch('/entrada/api/guardar-extras', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ turno_id: TURNO_ID, ...extras }),
-        });
-        const d2 = await resp2.json();
-
+        const [r1, r2] = await Promise.all([
+            fetch('/entrada/api/guardar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({turno_id:TID, sabores:collect()}) }),
+            fetch('/entrada/api/guardar-extras', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({turno_id:TID, ...collectExtras()}) }),
+        ]);
+        const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
         if (d1.ok && d2.ok) {
-            let parts = [d1.n_sabores + ' sabores'];
-            if (d2.n_vdp) parts.push(d2.n_vdp + ' VDP');
-            if (d2.n_consumos) parts.push(d2.n_consumos + ' consumos');
-            if (d2.n_notas) parts.push(d2.n_notas + ' notas');
-            let msg = 'Guardado: ' + parts.join(', ');
-            if (d1.warnings && d1.warnings.length > 0) {
-                msg += ' (' + d1.warnings.length + ' advertencias)';
-                showStatus(msg, 'warn');
-            } else {
-                showStatus(msg, 'ok');
-            }
-        } else {
-            showStatus('Error: ' + (d1.error || d2.error || 'desconocido'), 'err');
-        }
-    } catch (e) {
-        showStatus('Error de conexion: ' + e.message, 'err');
-    }
-
-    btn.disabled = false;
-    btn.textContent = 'Guardar borrador';
-    actualizarContador();
+            let p = [d1.n_sabores+' sabores'];
+            if (d2.n_vdp) p.push(d2.n_vdp+' VDP');
+            if (d2.n_consumos) p.push(d2.n_consumos+' consumos');
+            if (d2.n_notas) p.push(d2.n_notas+' notas');
+            showToast('Guardado: '+p.join(', '), d1.warnings?.length ? 'warn' : 'ok');
+        } else { showToast('Error: '+(d1.error||d2.error), 'err'); }
+    } catch(e) { showToast('Sin conexion', 'err'); }
+    btn.disabled = false; btn.textContent = 'Guardar borrador';
 }
 
-function actualizarContador() {
-    const total = document.querySelectorAll('.sabor-card.tiene-datos').length;
-    const todos = document.querySelectorAll('.sabor-card').length;
-    document.getElementById('counter').textContent = total + ' de ' + todos + ' sabores con datos';
+function addVDP() {
+    document.getElementById('vdpBox').insertAdjacentHTML('beforeend',
+        '<div class="extra-row"><input type="text" class="vdp-t" placeholder="Ej: 2 vasitos"><input type="number" class="vdp-g" placeholder="g" inputmode="numeric"><button class="rm-btn" onclick="this.parentElement.remove()">&times;</button></div>');
+}
+function addCon() {
+    document.getElementById('conBox').insertAdjacentHTML('beforeend',
+        '<div class="extra-row"><input type="text" class="con-t" placeholder="Ej: 1 cucurucho"><input type="number" class="con-g" placeholder="g" inputmode="numeric"><button class="rm-btn" onclick="this.parentElement.remove()">&times;</button></div>');
+}
+function addNota() {
+    document.getElementById('notaBox').insertAdjacentHTML('beforeend',
+        '<div class="extra-row" style="flex-wrap:wrap;"><select class="nota-c"><option value="novedad">Novedad</option><option value="reclamo">Reclamo</option><option value="faltante">Faltante</option><option value="otro">Otro</option></select><input type="text" class="nota-d" placeholder="Detalle..." style="flex:1;min-width:150px;"><button class="rm-btn" onclick="this.parentElement.remove()">&times;</button></div>');
+}
+async function agregarSabor() {
+    const inp = document.getElementById('nuevoSabor');
+    const n = inp.value.trim();
+    if (!n) return;
+    const r = await fetch('/entrada/api/agregar-sabor', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});
+    const d = await r.json();
+    if (d.ok) { showToast(d.nombre_norm+' agregado. Recarga para verlo.', 'ok'); inp.value=''; }
+    else showToast(d.error, 'err');
 }
 
 // Init
-document.querySelectorAll('.sabor-card').forEach(actualizarCard);
-actualizarContador();
+updateStats();
 </script>
 </body>
 </html>
