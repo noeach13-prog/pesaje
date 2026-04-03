@@ -82,6 +82,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .rm { background: none; border: none; color: #ccc; font-size: 1.1rem; cursor: pointer; }
 .rm:hover { color: var(--red); }
 
+/* Product grid for VDP/Consumos */
+.prod-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.prod-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 10px 4px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px;
+    font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+}
+.prod-btn:active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.prod-btn span { font-size: 0.6rem; color: var(--gray); font-weight: 400; margin-top: 2px; }
+.prod-btn:active span { color: rgba(255,255,255,0.7); }
+
+/* VDP items */
+.vdp-item {
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+    background: #f5f5f5; border-radius: 6px; margin-bottom: 4px;
+}
+.vdp-name { flex: 1; font-size: 0.8rem; font-weight: 500; }
+.vdp-g { font-size: 0.75rem; color: var(--gray); min-width: 40px; text-align: right; }
+.vdp-qty { display: flex; align-items: center; gap: 0; }
+.qty-btn {
+    width: 28px; height: 28px; border: 1px solid #ddd; background: #fff;
+    font-size: 1rem; font-weight: 700; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+}
+.qty-btn:first-child { border-radius: 4px 0 0 4px; }
+.qty-btn:last-child { border-radius: 0 4px 4px 0; }
+.qty-btn:active { background: #e3f2fd; }
+.qty-n { width: 28px; height: 28px; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; }
+
 /* Bottom */
 .bot { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 8px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 20; }
 .bot-in { max-width: 500px; margin: 0 auto; }
@@ -193,12 +222,76 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="sec-b"><div class="xrow"><input type="text" id="newFlav" placeholder="Nombre" style="font-size:16px;" onclick="event.stopPropagation()"><button class="btn-s" onclick="addFlav()">Agregar</button></div></div></div>
 
     <!-- VDP -->
-    <div class="sec{{ ' open' if data.vdp else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Ventas despues del peso <span class="sec-badge">{{ data.vdp|length }}</span></div>
-        <div class="sec-b" id="vB">{% for v in data.vdp %}<div class="xrow"><input type="text" class="vt" value="{{ v.texto }}"><input type="number" class="vg" value="{{ v.gramos }}" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>{% endfor %}<button class="btn-s" onclick="addV()">+ Agregar</button></div></div>
+    <div class="sec open"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Ventas despues del peso <span class="sec-badge" id="vdpBadge">{{ data.vdp|length }}</span></div>
+        <div class="sec-b">
+            <div class="prod-grid">
+                <button class="prod-btn" onclick="addVDP('1 Kg', 1000)">1 Kg<span>1000g</span></button>
+                <button class="prod-btn" onclick="addVDP('1/2 Kg', 500)">1/2 Kg<span>500g</span></button>
+                <button class="prod-btn" onclick="addVDP('1/4 Kg', 250)">1/4 Kg<span>250g</span></button>
+                <button class="prod-btn" onclick="addVDP('Cucurucho', 220)">Cucurucho<span>220g</span></button>
+                <button class="prod-btn" onclick="addVDP('Vaso 65', 180)">Vaso 65<span>180g</span></button>
+                <button class="prod-btn" onclick="addVDP('Vasito', 140)">Vasito<span>140g</span></button>
+                <button class="prod-btn" onclick="addVDP('Cucuruchon', 140)">Cucuruchon<span>140g</span></button>
+                <button class="prod-btn" onclick="addVDP('Milkshake', 140)">Milkshake<span>140g</span></button>
+                <button class="prod-btn" onclick="addVDP('Bocha', 70)">Bocha<span>70g</span></button>
+            </div>
+            <div id="vB" style="margin-top:8px;">
+                {% for v in data.vdp %}
+                <div class="vdp-item">
+                    <span class="vdp-name">{{ v.texto }}</span>
+                    <span class="vdp-g">{{ v.gramos }}g</span>
+                    <div class="vdp-qty">
+                        <button class="qty-btn" onclick="vdpQty(this,-1)">-</button>
+                        <span class="qty-n" data-texto="{{ v.texto }}" data-gunit="{{ v.gramos }}">1</span>
+                        <button class="qty-btn" onclick="vdpQty(this,1)">+</button>
+                    </div>
+                    <button class="rm" onclick="this.parentElement.remove();updVdpBadge()">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
+                <div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Producto no listado:</div>
+                <div class="xrow">
+                    <input type="text" id="vdpCustomTxt" placeholder="Descripcion" style="flex:1;">
+                    <input type="number" id="vdpCustomG" placeholder="g" inputmode="numeric" style="width:65px;">
+                    <button class="btn-s" onclick="addVDPCustom()">Agregar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Consumos -->
     <div class="sec{{ ' open' if data.consumos else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Consumos internos <span class="sec-badge">{{ data.consumos|length }}</span></div>
-        <div class="sec-b" id="cB">{% for c in data.consumos %}<div class="xrow"><input type="text" class="ct" value="{{ c.texto }}"><input type="number" class="cg" value="{{ c.gramos }}" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>{% endfor %}<button class="btn-s" onclick="addC()">+ Agregar</button></div></div>
+        <div class="sec-b">
+            <div class="prod-grid">
+                <button class="prod-btn" onclick="addCon('Cucurucho', 220)">Cucurucho<span>220g</span></button>
+                <button class="prod-btn" onclick="addCon('Vasito', 140)">Vasito<span>140g</span></button>
+                <button class="prod-btn" onclick="addCon('Bocha', 70)">Bocha<span>70g</span></button>
+            </div>
+            <div id="cB" style="margin-top:8px;">
+                {% for c in data.consumos %}
+                <div class="vdp-item">
+                    <span class="vdp-name">{{ c.texto }}</span>
+                    <span class="vdp-g">{{ c.gramos }}g</span>
+                    <div class="vdp-qty">
+                        <button class="qty-btn" onclick="vdpQty(this,-1)">-</button>
+                        <span class="qty-n" data-texto="{{ c.texto }}" data-gunit="{{ c.gramos }}">1</span>
+                        <button class="qty-btn" onclick="vdpQty(this,1)">+</button>
+                    </div>
+                    <button class="rm" onclick="this.parentElement.remove()">&times;</button>
+                </div>
+                {% endfor %}
+            </div>
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
+                <div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Consumo no listado:</div>
+                <div class="xrow">
+                    <input type="text" id="conCustomTxt" placeholder="Descripcion" style="flex:1;">
+                    <input type="number" id="conCustomG" placeholder="g" inputmode="numeric" style="width:65px;">
+                    <button class="btn-s" onclick="addConCustom()">Agregar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Notas -->
     <div class="sec{{ ' open' if data.notas else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Notas de caja <span class="sec-badge">{{ data.notas|length }}</span></div>
@@ -305,8 +398,19 @@ function collect() {
 
 function collectX() {
     const vdp=[],con=[],notas=[];
-    document.querySelectorAll('#vB .xrow').forEach(r=>{const t=(r.querySelector('.vt')||{}).value||'',g=parseInt((r.querySelector('.vg')||{}).value)||0;if(t.trim())vdp.push({texto:t,gramos:g});});
-    document.querySelectorAll('#cB .xrow').forEach(r=>{const t=(r.querySelector('.ct')||{}).value||'',g=parseInt((r.querySelector('.cg')||{}).value)||0;if(t.trim())con.push({texto:t,gramos:g});});
+    // VDP: cada item con cantidad -> expandir a N lineas
+    document.querySelectorAll('#vB .vdp-item').forEach(it=>{
+        const span=it.querySelector('.qty-n');
+        const texto=span.dataset.texto, gunit=parseInt(span.dataset.gunit), qty=parseInt(span.textContent);
+        for(let i=0;i<qty;i++) vdp.push({texto:texto, gramos:gunit});
+    });
+    // Consumos: igual
+    document.querySelectorAll('#cB .vdp-item').forEach(it=>{
+        const span=it.querySelector('.qty-n');
+        const texto=span.dataset.texto, gunit=parseInt(span.dataset.gunit), qty=parseInt(span.textContent);
+        for(let i=0;i<qty;i++) con.push({texto:texto, gramos:gunit});
+    });
+    // Notas: sin cambio
     document.querySelectorAll('#nB .xrow').forEach(r=>{const c=(r.querySelector('.nc')||{}).value||'otro',d=(r.querySelector('.nd')||{}).value||'';if(d.trim())notas.push({categoria:c,detalle:d});});
     return{vdp,consumos:con,notas};
 }
@@ -331,8 +435,77 @@ async function save() {
     btn.disabled=false; btn.textContent='Guardar borrador';
 }
 
-function addV(){document.getElementById('vB').insertAdjacentHTML('beforeend','<div class="xrow"><input type="text" class="vt" placeholder="Ej: 2 vasitos"><input type="number" class="vg" placeholder="g" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
-function addC(){document.getElementById('cB').insertAdjacentHTML('beforeend','<div class="xrow"><input type="text" class="ct" placeholder="Ej: 1 cucurucho"><input type="number" class="cg" placeholder="g" inputmode="numeric"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
+// VDP: tap producto -> aparece como item con cantidad +-
+function addVDP(texto, gramos) {
+    // Si ya existe, incrementar cantidad
+    const existing = document.querySelector('#vB .qty-n[data-texto="'+texto+'"]');
+    if (existing) {
+        const n = parseInt(existing.textContent) + 1;
+        existing.textContent = n;
+        existing.closest('.vdp-item').querySelector('.vdp-g').textContent = (n * gramos) + 'g';
+        updVdpBadge(); return;
+    }
+    document.getElementById('vB').insertAdjacentHTML('beforeend',
+        '<div class="vdp-item"><span class="vdp-name">'+texto+'</span><span class="vdp-g">'+gramos+'g</span>' +
+        '<div class="vdp-qty"><button class="qty-btn" onclick="vdpQty(this,-1)">-</button>' +
+        '<span class="qty-n" data-texto="'+texto+'" data-gunit="'+gramos+'">1</span>' +
+        '<button class="qty-btn" onclick="vdpQty(this,1)">+</button></div>' +
+        '<button class="rm" onclick="this.parentElement.remove();updVdpBadge()">&times;</button></div>');
+    updVdpBadge();
+}
+
+function addVDPCustom() {
+    const txt = document.getElementById('vdpCustomTxt').value.trim();
+    const g = parseInt(document.getElementById('vdpCustomG').value) || 0;
+    if (!txt || !g) { toast('Completar descripcion y gramos', 'warn'); return; }
+    addVDP(txt, g);
+    document.getElementById('vdpCustomTxt').value = '';
+    document.getElementById('vdpCustomG').value = '';
+}
+
+function addCon(texto, gramos) {
+    const existing = document.querySelector('#cB .qty-n[data-texto="'+texto+'"]');
+    if (existing) {
+        const n = parseInt(existing.textContent) + 1;
+        existing.textContent = n;
+        existing.closest('.vdp-item').querySelector('.vdp-g').textContent = (n * gramos) + 'g';
+        return;
+    }
+    document.getElementById('cB').insertAdjacentHTML('beforeend',
+        '<div class="vdp-item"><span class="vdp-name">'+texto+'</span><span class="vdp-g">'+gramos+'g</span>' +
+        '<div class="vdp-qty"><button class="qty-btn" onclick="vdpQty(this,-1)">-</button>' +
+        '<span class="qty-n" data-texto="'+texto+'" data-gunit="'+gramos+'">1</span>' +
+        '<button class="qty-btn" onclick="vdpQty(this,1)">+</button></div>' +
+        '<button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');
+}
+
+function addConCustom() {
+    const txt = document.getElementById('conCustomTxt').value.trim();
+    const g = parseInt(document.getElementById('conCustomG').value) || 0;
+    if (!txt || !g) { toast('Completar descripcion y gramos', 'warn'); return; }
+    addCon(txt, g);
+    document.getElementById('conCustomTxt').value = '';
+    document.getElementById('conCustomG').value = '';
+}
+
+function vdpQty(btn, delta) {
+    const span = btn.parentElement.querySelector('.qty-n');
+    const n = Math.max(1, parseInt(span.textContent) + delta);
+    span.textContent = n;
+    const gunit = parseInt(span.dataset.gunit);
+    btn.closest('.vdp-item').querySelector('.vdp-g').textContent = (n * gunit) + 'g';
+    updVdpBadge();
+}
+
+function updVdpBadge() {
+    const items = document.querySelectorAll('#vB .vdp-item');
+    let total = 0;
+    items.forEach(it => {
+        const span = it.querySelector('.qty-n');
+        total += parseInt(span.textContent) * parseInt(span.dataset.gunit);
+    });
+    document.getElementById('vdpBadge').textContent = items.length ? items.length + ' (' + total + 'g)' : '0';
+}
 function addN(){document.getElementById('nB').insertAdjacentHTML('beforeend','<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad">Novedad</option><option value="reclamo">Reclamo</option><option value="faltante">Faltante</option><option value="otro">Otro</option></select><input type="text" class="nd" placeholder="Detalle..." style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
 async function addFlav(){const inp=document.getElementById('newFlav'),n=inp.value.trim();if(!n)return;const r=await fetch('/entrada/api/agregar-sabor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});const d=await r.json();if(d.ok){toast(d.nombre_norm+' agregado. Recarga para verlo.','ok');inp.value='';}else toast(d.error,'err');}
 
