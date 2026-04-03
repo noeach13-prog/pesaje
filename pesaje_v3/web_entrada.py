@@ -16,7 +16,7 @@ from flask import (
 from .db import (
     get_db, obtener_sucursales, verificar_pin, crear_turno,
     guardar_sabores, obtener_turno, listar_turnos,
-    sabores_turno_anterior, derivar_nombre_hoja,
+    sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
 )
 
 entrada_bp = Blueprint(
@@ -148,10 +148,15 @@ def editar_turno(turno_id):
         return "Turno no encontrado o no pertenece a esta sucursal", 404
 
     previos = sabores_turno_anterior(db, sid, data['turno']['fecha'])
+    catalogo = catalogo_sabores(db, sid)
     db.close()
 
+    # Sabores ya cargados en este turno (por nombre_norm)
+    cargados = {s['nombre_norm'] for s in data['sabores']}
+
     return render_template('entrada/turno_form.html',
-                           data=data, sabores_previos=previos)
+                           data=data, sabores_previos=previos,
+                           catalogo=catalogo, cargados=cargados)
 
 
 @entrada_bp.route('/entrada/api/guardar', methods=['POST'])

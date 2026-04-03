@@ -60,8 +60,54 @@ def init_db():
             "UPDATE sucursales SET pin = ? WHERE nombre = ? AND pin = '0000'",
             (pin, nombre),
         )
+
+    # Semilla: catálogo de sabores por sucursal (extraídos de workbooks reales)
+    _sembrar_catalogo(conn)
     conn.commit()
     conn.close()
+
+
+# Catálogo base: sabores comunes a todas las sucursales
+_SABORES_BASE = [
+    'AMARGO', 'AMERICANA', 'ANANA', 'B, SPLIT', 'BANANITA', 'BLANCO',
+    'BOSQUE', 'CABSHA', 'CADBURY', 'CEREZA', 'CH AMORES', 'CH C/ALM',
+    'CHOCOLATE', 'CHOCOLATE DUBAI', 'CHOCOLATE SUIZO', 'CIELO', 'COCO',
+    'COOKIES', 'CREMA DE FRAMBUESAS', 'D. GRANIZADO', 'D. PATAGONICO',
+    'DOS CORAZONES', 'DULCE AMORES', 'DULCE C/NUEZ', 'DULCE D LECHE',
+    'DURAZNO', 'FERRERO', 'FLAN', 'FRAMBUEZA', 'FRANUI',
+    'FRUTILLA AGUA', 'FRUTILLA CREMA', 'FRUTILLA REINA', 'GRANIZADO',
+    'IRLANDESA', 'KINDER', 'KITKAT', 'LEMON PIE', 'LIMON',
+    'MANTECOL', 'MANZANA', 'MARACUYA', 'MARROC', 'MASCARPONE',
+    'MENTA', 'MIX DE FRUTA', 'MOUSSE LIMON', 'NUTE', 'PISTACHO',
+    'RUSA', 'SAMBAYON', 'SAMBAYON AMORES', 'SUPER', 'TIRAMISU',
+    'TRAMONTANA', 'VAINILLA', 'YOGURT',
+]
+
+# Sabores adicionales por sucursal
+_SABORES_EXTRA = {
+    'Unión': [
+        'FRAMORE', 'HAVANNA', 'LEMON COOKIE', 'LUCUMA', 'MANGO',
+        'NARANJA', 'NUTELLA', 'OREO', 'PERA', 'PRALINE',
+        'QUINOA', 'RICOTTA', 'SANDIA', 'TOBLERONE', 'TORTUFA',
+    ],
+}
+
+
+def _sembrar_catalogo(conn):
+    """Inserta catálogo de sabores si la tabla está vacía."""
+    count = conn.execute("SELECT COUNT(*) FROM catalogo_sabores").fetchone()[0]
+    if count > 0:
+        return  # ya sembrado
+
+    sucursales = {r[1]: r[0] for r in conn.execute("SELECT id, nombre FROM sucursales").fetchall()}
+    for suc_nombre, suc_id in sucursales.items():
+        sabores = list(_SABORES_BASE)
+        sabores.extend(_SABORES_EXTRA.get(suc_nombre, []))
+        for s in sorted(set(sabores)):
+            conn.execute(
+                "INSERT OR IGNORE INTO catalogo_sabores (sucursal_id, nombre_norm) VALUES (?, ?)",
+                (suc_id, s),
+            )
 
 
 _SCHEMA = """
@@ -105,6 +151,14 @@ CREATE TABLE IF NOT EXISTS vdp_turno (
     turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
     texto TEXT NOT NULL,
     gramos INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS catalogo_sabores (
+    id INTEGER PRIMARY KEY,
+    sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
+    nombre_norm TEXT NOT NULL,
+    activo INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(sucursal_id, nombre_norm)
 );
 """
 
@@ -324,6 +378,15 @@ def obtener_sucursales(db: sqlite3.Connection) -> List[dict]:
     """Lista todas las sucursales (sin exponer el PIN)."""
     rows = db.execute("SELECT id, nombre, modo FROM sucursales ORDER BY nombre").fetchall()
     return [dict(r) for r in rows]
+
+
+def catalogo_sabores(db: sqlite3.Connection, sucursal_id: int) -> List[str]:
+    """Retorna lista ordenada de sabores del catálogo para esta sucursal."""
+    rows = db.execute(
+        "SELECT nombre_norm FROM catalogo_sabores WHERE sucursal_id = ? AND activo = 1 ORDER BY nombre_norm",
+        (sucursal_id,),
+    ).fetchall()
+    return [r['nombre_norm'] for r in rows]
 
 
 def sabores_turno_anterior(db: sqlite3.Connection, sucursal_id: int,
