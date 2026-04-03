@@ -111,6 +111,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .qty-btn:active { background: #e3f2fd; }
 .qty-n { width: 28px; height: 28px; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; }
 
+/* Alert modal */
+.alert-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: center; justify-content: center; }
+.alert-box { background: #fff; border-radius: 12px; padding: 20px; max-width: 320px; width: 90%; text-align: center; }
+.alert-icon { font-size: 2rem; margin-bottom: 8px; }
+.alert-title { font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
+.alert-msg { font-size: 0.85rem; color: #555; margin-bottom: 16px; line-height: 1.4; }
+.alert-btns { display: flex; gap: 8px; justify-content: center; }
+.alert-btn { padding: 10px 20px; border: none; border-radius: 6px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.alert-btn-ok { background: var(--blue); color: #fff; }
+.alert-btn-fix { background: #f5f5f5; color: #333; }
+
+/* Comparison badge */
+.cmp-badge {
+    display: inline-block; font-size: 0.6rem; font-weight: 600;
+    padding: 1px 5px; border-radius: 8px; margin-left: 4px; vertical-align: middle;
+}
+.cmp-new { background: #e3f2fd; color: var(--blue); }
+.cmp-gone { background: #fce4ec; color: var(--red); }
+.cmp-up { background: #fff8e1; color: var(--orange); }
+.cmp-down { background: #e8f5e9; color: var(--green); }
+
 /* Bottom */
 .bot { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 8px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 20; }
 .bot-in { max-width: 500px; margin: 0 auto; }
@@ -317,16 +338,96 @@ function buscar(q) {
     document.querySelectorAll('.fl').forEach(f=>f.classList.toggle('hidden',q&&!f.dataset.n.includes(q)));
 }
 
+// Referencia del turno anterior (inyectado por el template)
+const REF = {{ ref | tojson }};
+
 function v(inp) {
     const s=inp.value.trim(); inp.classList.remove('ok','warn','err');
     if(!s){upd(inp);return;}
     const n=parseInt(s);
-    if(isNaN(n)||n<0)inp.classList.add('err');
-    else if(n>MX)inp.classList.add('err');
-    else if(n>0&&n<50)inp.classList.add('warn');
-    else if(n===280)inp.classList.add('warn');
-    else if(n>0)inp.classList.add('ok');
+    const field=inp.dataset.f;
+    const nombre=inp.closest('.fl').dataset.n;
+
+    // Errores duros: alerta bloqueante
+    if(isNaN(n)||n<0){
+        inp.classList.add('err');
+        showAlert('Peso invalido','El valor "'+s+'" no es un peso valido.','error',inp);
+        return;
+    }
+    if(n>MX){
+        inp.classList.add('err');
+        showAlert('Peso excede maximo',''+n+'g supera el maximo fisico de '+MX+'g. Revisar el valor.','error',inp);
+        return;
+    }
+
+    // Warnings: alerta con opcion de confirmar
+    if(n>0&&n<50){
+        inp.classList.add('warn');
+        showAlert('Peso muy bajo',''+n+'g parece una cantidad en vez de un peso. Si es correcto, confirmar.','warning',inp);
+        upd(inp); return;
+    }
+    if(n===280){
+        inp.classList.add('warn');
+        showAlert('Peso = tara','280g es exactamente el peso de la tapa. Verificar si es correcto.','warning',inp);
+        upd(inp); return;
+    }
+
+    // Comparacion con turno anterior
+    const refData=REF[nombre];
+    if(refData && field && refData[field]!=null){
+        const prev=refData[field];
+        const diff=n-prev;
+        const pct=Math.abs(diff/prev*100);
+        // Alerta si difiere >30% y >500g (cambio significativo)
+        if(pct>30 && Math.abs(diff)>500){
+            inp.classList.add('warn');
+            const dir=diff>0?'subio':'bajo';
+            showAlert('Cambio vs turno anterior',
+                nombre+' '+field+': '+dir+' '+Math.abs(diff)+'g respecto al turno anterior ('+prev+'g -> '+n+'g). Verificar.',
+                'compare',inp);
+            upd(inp); return;
+        }
+    }
+
+    if(n>0)inp.classList.add('ok');
     upd(inp);
+}
+
+function showAlert(title, msg, tipo, inp) {
+    // tipo: 'error' (solo Corregir), 'warning'/'compare' (OK o Corregir)
+    const icon = tipo==='error' ? '&#9888;' : tipo==='compare' ? '&#128269;' : '&#9888;';
+    const iconColor = tipo==='error' ? 'var(--red)' : 'var(--orange)';
+    const btns = tipo==='error'
+        ? '<button class="alert-btn alert-btn-fix" onclick="closeAlert(true)">Corregir</button>'
+        : '<button class="alert-btn alert-btn-ok" onclick="closeAlert(false)">OK, es correcto</button>' +
+          '<button class="alert-btn alert-btn-fix" onclick="closeAlert(true)">Corregir</button>';
+
+    const html = '<div class="alert-overlay" id="alertModal">' +
+        '<div class="alert-box">' +
+        '<div class="alert-icon" style="color:'+iconColor+'">'+icon+'</div>' +
+        '<div class="alert-title">'+title+'</div>' +
+        '<div class="alert-msg">'+msg+'</div>' +
+        '<div class="alert-btns">'+btns+'</div>' +
+        '</div></div>';
+
+    // Remover alerta anterior si existe
+    const prev = document.getElementById('alertModal');
+    if(prev) prev.remove();
+
+    document.body.insertAdjacentHTML('beforeend', html);
+    window._alertInput = inp;
+}
+
+function closeAlert(goBack) {
+    const modal = document.getElementById('alertModal');
+    if(modal) modal.remove();
+    if(goBack && window._alertInput) {
+        window._alertInput.value = '';
+        window._alertInput.classList.remove('ok','warn','err');
+        window._alertInput.focus();
+        upd(window._alertInput);
+    }
+    window._alertInput = null;
 }
 
 function upd(inp) {
