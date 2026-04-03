@@ -58,20 +58,17 @@ input[type="date"], input[type="text"] {
 
         <label>Turno</label>
         <div class="turno-btns" id="turnoBtns">
-            {% if modo == 'TURNO_UNICO' %}
-            <div class="turno-btn active" data-val="UNICO">TURNO UNICO</div>
-            {% else %}
-            <div class="turno-btn" data-val="DIA" onclick="selTurno(this)">DIA</div>
+            <div class="turno-btn{{ ' active' if modo == 'DIA_NOCHE' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
             <div class="turno-btn" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
-            {% endif %}
+            <div class="turno-btn{{ ' active' if modo == 'TURNO_UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
         </div>
-        <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ 'UNICO' if modo == 'TURNO_UNICO' else '' }}">
+        <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ 'DIA' if modo == 'DIA_NOCHE' else 'UNICO' }}">
 
         <label>Quien carga (opcional)</label>
         <input type="text" name="ingresado_por" placeholder="Nombre">
     </div>
 
-    <button type="submit" class="btn-primary" id="btnCrear" {{ 'disabled' if modo != 'TURNO_UNICO' }}>Crear turno</button>
+    <button type="submit" class="btn-primary" id="btnCrear">Crear turno</button>
     </form>
 
     <div class="links">
