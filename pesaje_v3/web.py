@@ -17,8 +17,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, request, render_template_string, send_file
 
+from datetime import timedelta
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'pesaje-dev-key-cambiar-en-prod')
+app.permanent_session_lifetime = timedelta(days=30)  # sesion dura 30 dias
 _outputs: dict = {}
 
 # --- Blueprint de carga manual ---

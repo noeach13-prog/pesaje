@@ -879,6 +879,74 @@ async function ejecutarDesbloqueo() {
 }
 
 stats();
+
+// ─── Autoguardado ───────────────────────────────────────────
+// Guarda en servidor cada 2 min si hubo cambios.
+// Guarda en localStorage como backup inmediato ante cada cambio.
+
+let _dirty = false;
+let _lastAutoSave = Date.now();
+const _LS_KEY = 'pesaje_draft_' + TID;
+
+// Marcar dirty ante cualquier cambio en inputs
+document.addEventListener('input', function(e) {
+    if (e.target.matches('input[type="number"], input[type="text"], select')) {
+        _dirty = true;
+        guardarLocal();
+    }
+});
+
+function guardarLocal() {
+    if (CONFIRMADO) return;
+    try {
+        const data = { sabores: collect(), extras: collectX(), ts: Date.now() };
+        localStorage.setItem(_LS_KEY, JSON.stringify(data));
+    } catch(e) {}
+}
+
+function restaurarLocal() {
+    try {
+        const raw = localStorage.getItem(_LS_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        // Solo restaurar si es reciente (< 24hs) y tiene datos
+        if (Date.now() - data.ts > 86400000) { localStorage.removeItem(_LS_KEY); return false; }
+        if (!data.sabores || data.sabores.length === 0) return false;
+        return data;
+    } catch(e) { return false; }
+}
+
+// Autoguardado al servidor cada 2 minutos
+if (!CONFIRMADO) {
+    setInterval(async function() {
+        if (!_dirty) return;
+        _dirty = false;
+        const btn = document.getElementById('btnS');
+        const origText = btn ? btn.textContent : '';
+        if (btn) btn.textContent = 'Autoguardando...';
+        try {
+            const r = await fetch('/entrada/api/guardar', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({turno_id: TID, sabores: collect(), timestamp: clientTS()})
+            });
+            const d = await r.json();
+            if (d.ok) {
+                toast('Autoguardado: ' + d.n_sabores + ' sabores', 'ok');
+                localStorage.removeItem(_LS_KEY); // limpio backup local
+            }
+        } catch(e) { /* silencioso, el backup local sigue */ }
+        if (btn) btn.textContent = origText;
+    }, 120000); // 2 minutos
+
+    // Al cargar: verificar si hay backup local mas reciente que la DB
+    const backup = restaurarLocal();
+    if (backup && backup.sabores.length > 0) {
+        const dbCount = document.querySelectorAll('.fl.done').length;
+        if (backup.sabores.length > dbCount) {
+            toast('Hay un borrador local con ' + backup.sabores.length + ' sabores. Guardar para sincronizar.', 'warn');
+        }
+    }
+}
 </script>
 </body>
 </html>

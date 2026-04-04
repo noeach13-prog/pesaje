@@ -103,6 +103,7 @@ def login():
         return render_template('entrada/login.html',
                                sucursales=sucursales, error='Codigo incorrecto')
 
+    session.permanent = True  # sesion larga (30 dias)
     session['sucursal_id'] = sucursal['id']
     session['sucursal_nombre'] = sucursal['nombre']
     session['sucursal_modo'] = sucursal['modo']
