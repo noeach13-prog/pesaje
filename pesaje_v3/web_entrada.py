@@ -19,7 +19,7 @@ from .db import (
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
     registrar_inicio_carga, confirmar_turno, registrar_actividad,
-    desbloquear_turno,
+    desbloquear_turno, obtener_turno,
 )
 
 entrada_bp = Blueprint(
@@ -439,6 +439,27 @@ def api_desbloquear():
     return jsonify(resultado)
 
 
+@entrada_bp.route('/entrada/revision/<int:turno_id>')
+def revision(turno_id):
+    """Página de revisión con resultados de validación."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return redirect(url_for('entrada.index'))
+
+    db = get_db()
+    data = obtener_turno(db, turno_id)
+    if not data or data['turno']['sucursal_id'] != sid:
+        db.close()
+        return redirect(url_for('entrada.seleccion'))
+
+    from .validacion_entrada import validar_turno_completo
+    validacion = validar_turno_completo(db, turno_id)
+    db.close()
+
+    return render_template('entrada/revision.html',
+                           data=data, validacion=validacion)
+
+
 @entrada_bp.route('/entrada/api/inicio-carga', methods=['POST'])
 def api_inicio_carga():
     """Registra timestamp del dispositivo cuando abre el form (solo la primera vez)."""
@@ -478,9 +499,23 @@ def api_confirmar():
         db.close()
         return jsonify({'ok': False, 'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.'}), 404
 
+    # Correr validación antes de confirmar
+    from .validacion_entrada import validar_turno_completo
+    validacion = validar_turno_completo(db, turno_id)
+
+    # Si hay errores duros, no confirmar
+    if validacion['n_errores'] > 0:
+        db.close()
+        return jsonify({
+            'ok': False,
+            'error': f'{validacion["n_errores"]} errores detectados. Revisar antes de confirmar.',
+            'validacion': validacion,
+        })
+
     resultado = confirmar_turno(db, turno_id, ts, nombre)
     if resultado.get('ok'):
         registrar_actividad(db, turno_id, ts, 'confirmar',
                             f'{resultado["n_sabores"]} sabores, {resultado["total_peso"]}g')
+        resultado['validacion'] = validacion
     db.close()
     return jsonify(resultado)

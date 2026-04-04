@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ data.sucursal.nombre }} - Revision {{ data.nombre_hoja }}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
+.container { max-width: 600px; margin: 0 auto; padding: 12px; }
+.header { background: #1565c0; color: #fff; padding: 12px 16px; }
+.header h1 { font-size: 1.1rem; }
+.header .sub { font-size: 0.75rem; opacity: 0.8; }
+
+.summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }
+.sum-card { background: #fff; border-radius: 8px; padding: 12px; text-align: center; }
+.sum-num { font-size: 1.5rem; font-weight: 700; }
+.sum-label { font-size: 0.7rem; color: #888; text-transform: uppercase; }
+.sum-ok .sum-num { color: #2e7d32; }
+.sum-warn .sum-num { color: #e65100; }
+.sum-err .sum-num { color: #c62828; }
+
+.section { background: #fff; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.section-h { padding: 10px 12px; font-weight: 600; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
+.section-body { padding: 0; }
+
+.alerta { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #f5f5f5; align-items: flex-start; }
+.alerta:last-child { border-bottom: none; }
+.alerta-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+.alerta-content { flex: 1; }
+.alerta-sabor { font-weight: 600; font-size: 0.8rem; }
+.alerta-codigo { font-size: 0.65rem; color: #999; background: #f5f5f5; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
+.alerta-detalle { font-size: 0.8rem; color: #555; margin-top: 2px; }
+
+.alerta-error .alerta-icon { color: #c62828; }
+.alerta-error { background: #fef2f2; }
+.alerta-warning .alerta-icon { color: #e65100; }
+.alerta-warning { background: #fffbf0; }
+.alerta-info .alerta-icon { color: #1565c0; }
+
+.badge { padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+.badge-err { background: #fce4ec; color: #c62828; }
+.badge-warn { background: #fff3e0; color: #e65100; }
+.badge-ok { background: #e8f5e9; color: #2e7d32; }
+
+.actions { display: flex; gap: 8px; margin-top: 12px; }
+.btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
+.btn-back { background: #f5f5f5; color: #333; }
+.btn-primary { background: #1565c0; color: #fff; }
+
+.empty { text-align: center; padding: 20px; color: #999; font-size: 0.85rem; }
+
+/* Timestamps */
+.ts { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 12px; background: #fff; border-radius: 8px; margin-bottom: 8px; }
+.ts-item { font-size: 0.75rem; }
+.ts-label { color: #999; } .ts-val { font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>{{ data.sucursal.nombre }}</h1>
+    <div class="sub">Revision: {{ data.nombre_hoja }} {% if data.turno.estado == 'confirmado' %}(Confirmado){% endif %}</div>
+</div>
+
+<div class="container">
+    <div class="ts">
+        <div class="ts-item"><span class="ts-label">Fecha:</span> <span class="ts-val">{{ data.turno.fecha }}</span></div>
+        {% if data.turno.inicio_carga %}<div class="ts-item"><span class="ts-label">Inicio:</span> <span class="ts-val">{{ data.turno.inicio_carga }}</span></div>{% endif %}
+        {% if data.turno.fin_carga %}<div class="ts-item"><span class="ts-label">Fin:</span> <span class="ts-val">{{ data.turno.fin_carga }}</span></div>{% endif %}
+    </div>
+
+    <div class="summary">
+        <div class="sum-card sum-ok">
+            <div class="sum-num">{{ data.sabores|length }}</div>
+            <div class="sum-label">Sabores</div>
+        </div>
+        <div class="sum-card sum-warn">
+            <div class="sum-num">{{ validacion.n_warnings }}</div>
+            <div class="sum-label">Advertencias</div>
+        </div>
+        <div class="sum-card sum-err">
+            <div class="sum-num">{{ validacion.n_errores }}</div>
+            <div class="sum-label">Errores</div>
+        </div>
+    </div>
+
+    {% set errores = validacion.alertas | selectattr('severidad', 'eq', 'error') | list %}
+    {% set warnings = validacion.alertas | selectattr('severidad', 'eq', 'warning') | list %}
+    {% set infos = validacion.alertas | selectattr('severidad', 'eq', 'info') | list %}
+
+    {% if errores %}
+    <div class="section">
+        <div class="section-h">Errores <span class="badge badge-err">{{ errores|length }}</span></div>
+        <div class="section-body">
+            {% for a in errores %}
+            <div class="alerta alerta-error">
+                <div class="alerta-icon">&#9888;</div>
+                <div class="alerta-content">
+                    {% if a.sabor %}<div class="alerta-sabor">{{ a.sabor }} <span class="alerta-codigo">{{ a.codigo }}</span></div>{% endif %}
+                    <div class="alerta-detalle">{{ a.detalle }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if warnings %}
+    <div class="section">
+        <div class="section-h">Advertencias <span class="badge badge-warn">{{ warnings|length }}</span></div>
+        <div class="section-body">
+            {% for a in warnings %}
+            <div class="alerta alerta-warning">
+                <div class="alerta-icon">&#9888;</div>
+                <div class="alerta-content">
+                    {% if a.sabor %}<div class="alerta-sabor">{{ a.sabor }} <span class="alerta-codigo">{{ a.codigo }}</span></div>{% endif %}
+                    <div class="alerta-detalle">{{ a.detalle }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if infos %}
+    <div class="section">
+        <div class="section-h">Info <span class="badge badge-ok">{{ infos|length }}</span></div>
+        <div class="section-body">
+            {% for a in infos %}
+            <div class="alerta alerta-info">
+                <div class="alerta-icon">&#9432;</div>
+                <div class="alerta-content">
+                    {% if a.sabor %}<div class="alerta-sabor">{{ a.sabor }} <span class="alerta-codigo">{{ a.codigo }}</span></div>{% endif %}
+                    <div class="alerta-detalle">{{ a.detalle }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if not validacion.alertas %}
+    <div class="section">
+        <div class="empty">Sin alertas. Todo en orden.</div>
+    </div>
+    {% endif %}
+
+    <div class="actions">
+        <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Volver al turno</a>
+        <a href="/entrada/seleccion" class="btn btn-primary">Nuevo turno</a>
+    </div>
+</div>
+</body>
+</html>

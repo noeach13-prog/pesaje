@@ -730,9 +730,15 @@ async function doConfirm() {
         const d=await r.json();
         if(d.ok){
             toast('Turno confirmado: '+d.n_sabores+' sabores, '+d.total_peso+'g total','ok');
-            setTimeout(()=>location.reload(), 1500);
+            setTimeout(()=>{ window.location.href='/entrada/revision/'+TID; }, 1000);
         }else{
-            toast('Error al confirmar: '+d.error,'err');
+            // Si hay validacion con errores, mostrar detalle
+            if(d.validacion && d.validacion.n_errores > 0){
+                let msgs = d.validacion.alertas.filter(a=>a.severidad==='error').map(a=>(a.sabor||'')+': '+a.detalle);
+                toast('Errores: '+msgs.join('; ').substring(0,150),'err');
+            }else{
+                toast('Error al confirmar: '+d.error,'err');
+            }
         }
     }catch(e){
         toast('Sin conexion al confirmar. Intentar de nuevo.','err');
