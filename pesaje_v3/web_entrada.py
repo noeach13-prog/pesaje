@@ -7,7 +7,7 @@ El PIN identifica la sucursal; la sesion recuerda el acceso.
 Rutas /entrada/* — coexiste con el sistema de analisis en /.
 """
 import json
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, jsonify, session,
@@ -128,7 +128,9 @@ def seleccion():
 
     db = get_db()
     modo = session.get('sucursal_modo', 'DIA_NOCHE')
-    hoy = date.today().isoformat()
+    # Hora Argentina (UTC-3), no UTC del servidor
+    _AR = timezone(timedelta(hours=-3))
+    hoy = datetime.now(_AR).date().isoformat()
     recientes = listar_turnos(db, sucursal_id=sid)[:10]
     db.close()
 
