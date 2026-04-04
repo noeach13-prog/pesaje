@@ -19,6 +19,7 @@ from .db import (
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
     registrar_inicio_carga, confirmar_turno, registrar_actividad,
+    desbloquear_turno,
 )
 
 entrada_bp = Blueprint(
@@ -407,6 +408,34 @@ def api_agregar_sabor():
         return jsonify({'ok': False, 'error': 'Nombre invalido'}), 400
 
     return jsonify({'ok': True, 'nombre_norm': nombre_norm})
+
+
+@entrada_bp.route('/entrada/api/desbloquear', methods=['POST'])
+def api_desbloquear():
+    """Desbloquea turno confirmado con PIN de supervisor."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+
+    payload = request.get_json() or {}
+    turno_id = payload.get('turno_id')
+    pin = payload.get('pin_supervisor', '')
+    ts = payload.get('timestamp', '')
+
+    if not turno_id or not pin:
+        return jsonify({'ok': False, 'error': 'Faltan datos'}), 400
+
+    db = get_db()
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno or turno['sucursal_id'] != sid:
+        db.close()
+        return jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404
+
+    resultado = desbloquear_turno(db, turno_id, pin)
+    if resultado.get('ok') and ts:
+        registrar_actividad(db, turno_id, ts, 'desbloquear', 'Desbloqueado por supervisor')
+    db.close()
+    return jsonify(resultado)
 
 
 @entrada_bp.route('/entrada/api/inicio-carga', methods=['POST'])

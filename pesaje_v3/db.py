@@ -44,6 +44,8 @@ def init_db():
     cols_suc = [r[1] for r in conn.execute("PRAGMA table_info(sucursales)").fetchall()]
     if 'pin' not in cols_suc:
         conn.execute("ALTER TABLE sucursales ADD COLUMN pin TEXT NOT NULL DEFAULT '0000'")
+    if 'pin_supervisor' not in cols_suc:
+        conn.execute("ALTER TABLE sucursales ADD COLUMN pin_supervisor TEXT NOT NULL DEFAULT '0000'")
 
     cols_turno = [r[1] for r in conn.execute("PRAGMA table_info(turnos)").fetchall()]
     if 'inicio_carga' not in cols_turno:
@@ -55,20 +57,19 @@ def init_db():
     if cols_consumo and 'empleado' not in cols_consumo:
         conn.execute("ALTER TABLE consumo_turno ADD COLUMN empleado TEXT")
 
-    # Semilla: sucursales conocidas con PIN de acceso
-    for nombre, modo, pin in [
-        ('San Martín', 'DIA_NOCHE', '1234'),
-        ('Triunvirato', 'TURNO_UNICO', '5678'),
-        ('Unión', 'TURNO_UNICO', '9012'),
+    # Semilla: sucursales con PIN empleado + PIN supervisor
+    for nombre, modo, pin, pin_sup in [
+        ('San Martín', 'DIA_NOCHE', '1234', '4321'),
+        ('Triunvirato', 'TURNO_UNICO', '5678', '8765'),
+        ('Unión', 'TURNO_UNICO', '9012', '2109'),
     ]:
         conn.execute(
-            "INSERT OR IGNORE INTO sucursales (nombre, modo, pin) VALUES (?, ?, ?)",
-            (nombre, modo, pin),
+            "INSERT OR IGNORE INTO sucursales (nombre, modo, pin, pin_supervisor) VALUES (?, ?, ?, ?)",
+            (nombre, modo, pin, pin_sup),
         )
-        # Actualizar PIN si sucursal ya existía sin PIN
         conn.execute(
-            "UPDATE sucursales SET pin = ? WHERE nombre = ? AND pin = '0000'",
-            (pin, nombre),
+            "UPDATE sucursales SET pin = ?, pin_supervisor = ? WHERE nombre = ? AND (pin = '0000' OR pin_supervisor = '0000')",
+            (pin, pin_sup, nombre),
         )
 
     # Semilla: catálogo de sabores por sucursal (extraídos de workbooks reales)
@@ -126,6 +127,7 @@ CREATE TABLE IF NOT EXISTS sucursales (
     nombre TEXT NOT NULL UNIQUE,
     modo TEXT NOT NULL DEFAULT 'DIA_NOCHE',
     pin TEXT NOT NULL DEFAULT '0000',
+    pin_supervisor TEXT NOT NULL DEFAULT '0000',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -420,6 +422,31 @@ def confirmar_turno(db: sqlite3.Connection, turno_id: int,
         'inicio_carga': turno['inicio_carga'],
         'fin_carga': timestamp_cliente,
     }
+
+
+def desbloquear_turno(db: sqlite3.Connection, turno_id: int,
+                      pin_supervisor: str) -> dict:
+    """Desbloquea un turno confirmado para editar. Requiere PIN de supervisor."""
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno:
+        return {'ok': False, 'error': 'Turno no encontrado'}
+    if turno['estado'] != 'confirmado':
+        return {'ok': False, 'error': 'El turno no esta confirmado'}
+
+    # Verificar PIN supervisor de la sucursal
+    suc = db.execute(
+        "SELECT pin_supervisor FROM sucursales WHERE id = ?",
+        (turno['sucursal_id'],),
+    ).fetchone()
+    if not suc or suc['pin_supervisor'] != pin_supervisor.strip():
+        return {'ok': False, 'error': 'PIN de supervisor incorrecto'}
+
+    db.execute(
+        "UPDATE turnos SET estado = 'borrador', updated_at = datetime('now') WHERE id = ?",
+        (turno_id,),
+    )
+    db.commit()
+    return {'ok': True}
 
 
 def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:

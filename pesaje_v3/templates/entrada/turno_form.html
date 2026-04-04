@@ -213,6 +213,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     {% if data.turno.estado == 'confirmado' %}
     <div class="confirmed-banner">
         Este turno fue confirmado y no se puede modificar.
+        <div style="margin-top:8px;">
+            <button class="btn-s" onclick="pedirDesbloqueo()" style="background:#fff3e0;color:#e65100;">Desbloquear con PIN supervisor</button>
+        </div>
     </div>
     {% endif %}
 
@@ -833,6 +836,41 @@ function updVdpBadge() {
 }
 function addN(){document.getElementById('nB').insertAdjacentHTML('beforeend','<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad">Novedad</option><option value="reclamo">Reclamo</option><option value="faltante">Faltante</option><option value="otro">Otro</option></select><input type="text" class="nd" placeholder="Detalle..." style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
 async function addFlav(){const inp=document.getElementById('newFlav'),n=inp.value.trim();if(!n)return;const r=await fetch('/entrada/api/agregar-sabor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});const d=await r.json();if(d.ok){toast(d.nombre_norm+' agregado. Recarga para verlo.','ok');inp.value='';}else toast(d.error,'err');}
+
+function pedirDesbloqueo() {
+    // Modal con input de PIN supervisor
+    const html = '<div class="alert-overlay" id="alertModal"><div class="alert-box">' +
+        '<div class="alert-icon" style="color:var(--orange)">&#128274;</div>' +
+        '<div class="alert-title">Desbloquear turno</div>' +
+        '<div class="alert-msg">Ingresa el PIN de supervisor para volver a editar este turno.</div>' +
+        '<input type="text" id="pinSupInput" maxlength="6" inputmode="numeric" pattern="[0-9]*" ' +
+        'style="text-align:center;font-size:24px;font-weight:700;letter-spacing:8px;padding:12px;border:1px solid #ddd;border-radius:8px;width:100%;margin-bottom:12px;" ' +
+        'placeholder="----" autocomplete="off">' +
+        '<div class="alert-btns">' +
+        '<button class="alert-btn alert-btn-ok" onclick="ejecutarDesbloqueo()">Desbloquear</button>' +
+        '<button class="alert-btn alert-btn-fix" onclick="document.getElementById(\'alertModal\').remove()">Cancelar</button>' +
+        '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+    setTimeout(() => document.getElementById('pinSupInput').focus(), 100);
+}
+
+async function ejecutarDesbloqueo() {
+    const pin = (document.getElementById('pinSupInput') || {}).value || '';
+    if (!pin) { toast('Ingresa el PIN', 'warn'); return; }
+    try {
+        const r = await fetch('/entrada/api/desbloquear', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({turno_id: TID, pin_supervisor: pin, timestamp: clientTS()})
+        });
+        const d = await r.json();
+        if (d.ok) {
+            toast('Turno desbloqueado', 'ok');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            toast(d.error, 'err');
+        }
+    } catch(e) { toast('Error de conexion', 'err'); }
+}
 
 stats();
 </script>
