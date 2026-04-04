@@ -139,6 +139,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .ts-val { font-size: 0.8rem; font-weight: 500; }
 .confirmed-banner { background: #e8f5e9; color: var(--green); padding: 10px; border-radius: 8px; text-align: center; font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; }
 
+/* Activity log */
+.log-timeline { }
+.log-entry { padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+.log-entry:last-child { border-bottom: none; }
+.log-row { display: flex; gap: 8px; align-items: center; font-size: 0.8rem; }
+.log-time { color: var(--gray); font-size: 0.7rem; min-width: 80px; font-family: monospace; }
+.log-action { font-weight: 600; font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; text-transform: uppercase; }
+.log-abrir { background: #e3f2fd; color: var(--blue); }
+.log-guardar { background: #fff8e1; color: var(--orange); }
+.log-confirmar { background: #e8f5e9; color: var(--green); }
+.log-detail { color: #555; font-size: 0.75rem; flex: 1; }
+.log-gap { }
+.log-gap-badge { background: #fce4ec; color: var(--red); font-size: 0.65rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; display: inline-block; margin: 4px 0 2px; }
+
 /* Bottom */
 .bot { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 8px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 20; }
 .bot-in { max-width: 500px; margin: 0 auto; }
@@ -348,6 +362,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
                     <button class="btn-s" onclick="addConCustom()">Agregar</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Log de actividad -->
+    <div class="sec{{ ' open' if data.log else '' }}">
+        <div class="sec-h" onclick="this.parentElement.classList.toggle('open')">
+            Registro de actividad <span class="sec-badge">{{ data.log|length }}</span>
+        </div>
+        <div class="sec-b">
+            {% if data.log %}
+            <div class="log-timeline">
+                {% for entry in data.log %}
+                <div class="log-entry{{ ' log-gap' if entry.gap_minutos and entry.gap_minutos >= 30 else '' }}">
+                    {% if entry.gap_minutos and entry.gap_minutos >= 30 %}
+                    <div class="log-gap-badge">{{ entry.gap_minutos }} min sin actividad</div>
+                    {% endif %}
+                    <div class="log-row">
+                        <span class="log-time">{{ entry.timestamp_cliente }}</span>
+                        <span class="log-action log-{{ entry.accion }}">{{ entry.accion }}</span>
+                        <span class="log-detail">{{ entry.detalle }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div style="color:#999;font-size:0.8rem;text-align:center;padding:8px;">Sin actividad registrada</div>
+            {% endif %}
         </div>
     </div>
 
@@ -610,7 +651,7 @@ async function save() {
     btn.disabled=true; btn.textContent='Guardando...';
     try{
         const[r1,r2]=await Promise.all([
-            fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect()})}),
+            fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect(),timestamp:clientTS()})}),
             fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,...collectX()})}),
         ]);
         const[d1,d2]=await Promise.all([r1.json(),r2.json()]);

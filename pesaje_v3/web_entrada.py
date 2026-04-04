@@ -18,7 +18,7 @@ from .db import (
     guardar_sabores, obtener_turno, listar_turnos,
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
-    registrar_inicio_carga, confirmar_turno,
+    registrar_inicio_carga, confirmar_turno, registrar_actividad,
 )
 
 entrada_bp = Blueprint(
@@ -206,6 +206,12 @@ def api_guardar():
         return jsonify({'ok': False, 'error': 'Turno ya confirmado'}), 400
 
     warnings = guardar_sabores(db, turno_id, sabores)
+
+    # Registrar actividad con timestamp del dispositivo
+    ts = payload.get('timestamp', '')
+    if ts:
+        registrar_actividad(db, turno_id, ts, 'guardar', f'{len(sabores)} sabores')
+
     db.close()
 
     return jsonify({
@@ -326,6 +332,7 @@ def api_inicio_carga():
     if turno_id and ts:
         db = get_db()
         registrar_inicio_carga(db, turno_id, ts)
+        registrar_actividad(db, turno_id, ts, 'abrir', 'Inicio de carga')
         db.close()
     return jsonify({'ok': True})
 
@@ -353,5 +360,8 @@ def api_confirmar():
         return jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404
 
     resultado = confirmar_turno(db, turno_id, ts, nombre)
+    if resultado.get('ok'):
+        registrar_actividad(db, turno_id, ts, 'confirmar',
+                            f'{resultado["n_sabores"]} sabores, {resultado["total_peso"]}g')
     db.close()
     return jsonify(resultado)

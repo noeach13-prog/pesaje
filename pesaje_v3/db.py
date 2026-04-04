@@ -183,6 +183,16 @@ CREATE TABLE IF NOT EXISTS catalogo_sabores (
     activo INTEGER NOT NULL DEFAULT 1,
     UNIQUE(sucursal_id, nombre_norm)
 );
+
+CREATE TABLE IF NOT EXISTS log_actividad (
+    id INTEGER PRIMARY KEY,
+    turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
+    timestamp_cliente TEXT NOT NULL,        -- hora del dispositivo
+    accion TEXT NOT NULL,                   -- 'guardar', 'confirmar', 'abrir'
+    detalle TEXT,                           -- 'N sabores', 'inactivo 45 min', etc
+    gap_minutos INTEGER,                   -- minutos desde la ultima actividad (NULL si primera)
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -442,6 +452,7 @@ def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:
         'vdp': [dict(v) for v in vdp],
         'consumos': [dict(c) for c in consumos],
         'notas': [dict(n) for n in notas],
+        'log': obtener_log_actividad(db, turno_id),
     }
 
 
@@ -520,6 +531,59 @@ def sabores_turno_anterior(db: sqlite3.Connection, sucursal_id: int,
 
 
 # ─── VDP, Consumos, Notas ───────────────────────────────────────────
+
+def registrar_actividad(db: sqlite3.Connection, turno_id: int,
+                        timestamp_cliente: str, accion: str,
+                        detalle: str = ''):
+    """Registra una accion en el log. Calcula gap vs ultima actividad."""
+    # Buscar ultima actividad de este turno
+    ultima = db.execute(
+        "SELECT timestamp_cliente FROM log_actividad WHERE turno_id = ? ORDER BY id DESC LIMIT 1",
+        (turno_id,),
+    ).fetchone()
+
+    gap = None
+    gap_texto = ''
+    if ultima:
+        gap = _calcular_gap_minutos(ultima['timestamp_cliente'], timestamp_cliente)
+        if gap is not None and gap >= 30:
+            gap_texto = f' (inactivo {gap} min)'
+
+    db.execute(
+        """INSERT INTO log_actividad (turno_id, timestamp_cliente, accion, detalle, gap_minutos)
+           VALUES (?, ?, ?, ?, ?)""",
+        (turno_id, timestamp_cliente, accion, (detalle + gap_texto).strip(), gap),
+    )
+    db.commit()
+    return gap
+
+
+def _calcular_gap_minutos(ts_anterior: str, ts_actual: str) -> Optional[int]:
+    """Calcula diferencia en minutos entre dos timestamps DD/MM/YYYY HH:MM."""
+    from datetime import datetime as dt
+    formatos = ['%d/%m/%Y %H:%M', '%d/%m/%Y %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S']
+    def _parse(s):
+        for fmt in formatos:
+            try:
+                return dt.strptime(s.strip(), fmt)
+            except ValueError:
+                continue
+        return None
+    a, b = _parse(ts_anterior), _parse(ts_actual)
+    if a and b:
+        diff = (b - a).total_seconds() / 60
+        return max(0, int(diff))
+    return None
+
+
+def obtener_log_actividad(db: sqlite3.Connection, turno_id: int) -> List[dict]:
+    """Retorna log de actividad ordenado cronologicamente."""
+    rows = db.execute(
+        "SELECT * FROM log_actividad WHERE turno_id = ? ORDER BY id",
+        (turno_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
 
 def guardar_vdp(db: sqlite3.Connection, turno_id: int, items: List[dict]):
     """Guarda VDP (ventas despues del peso). items: [{texto, gramos}]"""
