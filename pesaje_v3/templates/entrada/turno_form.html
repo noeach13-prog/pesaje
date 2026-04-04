@@ -674,25 +674,31 @@ async function save() {
     if(btn){btn.disabled=true; btn.textContent='Guardando...';}
     let ok=false;
     try{
-        const[r1,r2]=await Promise.all([
-            fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect(),timestamp:clientTS()})}),
-            fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,...collectX()})}),
-        ]);
-        const[d1,d2]=await Promise.all([r1.json(),r2.json()]);
-        if(d1.ok&&d2.ok){
-            ok=true;
-            let p=[d1.n_sabores+' sabores'];
-            if(d2.n_vdp)p.push(d2.n_vdp+' VDP');if(d2.n_consumos)p.push(d2.n_consumos+' consumos');if(d2.n_notas)p.push(d2.n_notas+' notas');
-            toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');
-        }else toast('Error al guardar: '+(d1.error||d2.error),'err');
-    }catch(e){toast('Sin conexion','err');}
+        // Secuencial: primero sabores, despues extras
+        const r1=await fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect(),timestamp:clientTS()})});
+        let d1;
+        try{ d1=await r1.json(); }catch(e){ toast('Error del servidor al guardar sabores ('+r1.status+')','err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
+
+        if(!d1.ok){ toast('Error sabores: '+d1.error,'err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
+
+        const r2=await fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,...collectX()})});
+        let d2;
+        try{ d2=await r2.json(); }catch(e){ toast('Error del servidor al guardar extras ('+r2.status+')','err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
+
+        if(!d2.ok){ toast('Error extras: '+d2.error,'err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
+
+        ok=true;
+        let p=[d1.n_sabores+' sabores'];
+        if(d2.n_vdp)p.push(d2.n_vdp+' VDP');if(d2.n_consumos)p.push(d2.n_consumos+' consumos');if(d2.n_notas)p.push(d2.n_notas+' notas');
+        toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');
+    }catch(e){toast('Sin conexion: '+e.message,'err');}
     if(btn){btn.disabled=false; btn.textContent='Guardar';}
     return ok;
 }
 
 async function confirmarTurno() {
     const ok = await save();
-    if(!ok){ toast('No se pudo guardar. Corregir antes de confirmar.','err'); return; }
+    if(!ok) return; // save() ya mostro el error especifico
     const done = document.querySelectorAll('.fl.done').length;
     if(done===0){ toast('Carga al menos un sabor antes de confirmar','warn'); return; }
     showAlert('Confirmar turno',
