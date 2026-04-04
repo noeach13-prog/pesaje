@@ -648,7 +648,8 @@ function toast(msg,t){const el=document.getElementById('toast');el.textContent=m
 
 async function save() {
     const btn=document.getElementById('btnS');
-    btn.disabled=true; btn.textContent='Guardando...';
+    if(btn){btn.disabled=true; btn.textContent='Guardando...';}
+    let ok=false;
     try{
         const[r1,r2]=await Promise.all([
             fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect(),timestamp:clientTS()})}),
@@ -656,21 +657,21 @@ async function save() {
         ]);
         const[d1,d2]=await Promise.all([r1.json(),r2.json()]);
         if(d1.ok&&d2.ok){
+            ok=true;
             let p=[d1.n_sabores+' sabores'];
             if(d2.n_vdp)p.push(d2.n_vdp+' VDP');if(d2.n_consumos)p.push(d2.n_consumos+' consumos');if(d2.n_notas)p.push(d2.n_notas+' notas');
             toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');
-        }else toast('Error: '+(d1.error||d2.error),'err');
+        }else toast('Error al guardar: '+(d1.error||d2.error),'err');
     }catch(e){toast('Sin conexion','err');}
-    btn.disabled=false; btn.textContent='Guardar';
+    if(btn){btn.disabled=false; btn.textContent='Guardar';}
+    return ok;
 }
 
 async function confirmarTurno() {
-    // Primero guardar todo
-    await save();
-    // Verificar que hay sabores
+    const ok = await save();
+    if(!ok){ toast('No se pudo guardar. Corregir antes de confirmar.','err'); return; }
     const done = document.querySelectorAll('.fl.done').length;
     if(done===0){ toast('Carga al menos un sabor antes de confirmar','warn'); return; }
-    // Pedir confirmacion con alerta modal
     showAlert('Confirmar turno',
         'Una vez confirmado no se puede modificar. Hay '+done+' sabores cargados. Confirmar?',
         'confirm', null);
@@ -701,8 +702,12 @@ async function doConfirm() {
         if(d.ok){
             toast('Turno confirmado: '+d.n_sabores+' sabores, '+d.total_peso+'g total','ok');
             setTimeout(()=>location.reload(), 1500);
-        }else toast('Error: '+d.error,'err');
-    }catch(e){toast('Sin conexion','err');}
+        }else{
+            toast('Error al confirmar: '+d.error,'err');
+        }
+    }catch(e){
+        toast('Sin conexion al confirmar. Intentar de nuevo.','err');
+    }
     if(btn){btn.disabled=false; btn.textContent='Confirmar';}
 }
 
