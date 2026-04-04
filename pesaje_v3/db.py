@@ -59,9 +59,9 @@ def init_db():
 
     # Semilla: sucursales con PIN empleado + PIN supervisor
     for nombre, modo, pin, pin_sup in [
-        ('San Martín', 'DIA_NOCHE', '1234', '4321'),
-        ('Triunvirato', 'TURNO_UNICO', '5678', '8765'),
-        ('Unión', 'TURNO_UNICO', '9012', '2109'),
+        ('San Martín', 'DIA_NOCHE', '2512', '2512'),
+        ('Triunvirato', 'TURNO_UNICO', '2512', '2512'),
+        ('Unión', 'TURNO_UNICO', '2512', '2512'),
     ]:
         conn.execute(
             "INSERT OR IGNORE INTO sucursales (nombre, modo, pin, pin_supervisor) VALUES (?, ?, ?, ?)",
