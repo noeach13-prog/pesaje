@@ -67,8 +67,9 @@ def init_db():
             "INSERT OR IGNORE INTO sucursales (nombre, modo, pin, pin_supervisor) VALUES (?, ?, ?, ?)",
             (nombre, modo, pin, pin_sup),
         )
+        # Siempre actualizar PINs al valor configurado
         conn.execute(
-            "UPDATE sucursales SET pin = ?, pin_supervisor = ? WHERE nombre = ? AND (pin = '0000' OR pin_supervisor = '0000')",
+            "UPDATE sucursales SET pin = ?, pin_supervisor = ? WHERE nombre = ?",
             (pin, pin_sup, nombre),
         )
 
