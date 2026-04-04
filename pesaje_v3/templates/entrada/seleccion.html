@@ -24,12 +24,17 @@ input[type="date"], input[type="text"] {
     text-align: center; transition: all 0.15s;
 }
 .turno-btn.active { border-color: #1565c0; background: #e3f2fd; color: #1565c0; }
+.turno-btn.exists { border-color: #2e7d32; background: #e8f5e9; color: #2e7d32; cursor: default; }
+.turno-btn.exists::after { content: ' (cargado)'; font-size: 0.65rem; font-weight: 400; }
 .btn-primary {
     width: 100%; padding: 14px; background: #1565c0; color: #fff; border: none;
     border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer;
 }
 .btn-primary:disabled { background: #ccc; }
 .btn-primary:hover:not(:disabled) { background: #0d47a1; }
+.hint { font-size: 0.75rem; color: #888; margin-bottom: 8px; }
+.hint-next { background: #e3f2fd; color: #1565c0; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; margin-bottom: 12px; font-weight: 500; }
+.warn-box { background: #fff3e0; color: #e65100; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; margin-bottom: 12px; display: none; }
 .recientes { margin-top: 20px; }
 .recientes h2 { font-size: 1rem; margin-bottom: 8px; }
 .turno-item {
@@ -51,18 +56,26 @@ input[type="date"], input[type="text"] {
         <a href="/entrada/salir">Cambiar sucursal</a>
     </div>
 
-    <form method="POST" action="/entrada/turno/nuevo">
+    {% if prox_fecha %}
+    <div class="hint-next">
+        Proximo turno: <strong>{{ prox_fecha }}</strong> - {{ prox_tipo }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/entrada/turno/nuevo" id="frmNuevo">
     <div class="card">
         <label>Fecha</label>
-        <input type="date" name="fecha" id="fecha" value="{{ hoy }}" required>
+        <input type="date" name="fecha" id="fecha" value="{{ prox_fecha or hoy }}" required onchange="checkFecha()">
 
         <label>Turno</label>
         <div class="turno-btns" id="turnoBtns">
-            <div class="turno-btn{{ ' active' if modo == 'DIA_NOCHE' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
-            <div class="turno-btn" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
-            <div class="turno-btn{{ ' active' if modo == 'TURNO_UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
+            <div class="turno-btn{{ ' active' if prox_tipo == 'DIA' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
+            <div class="turno-btn{{ ' active' if prox_tipo == 'NOCHE' else '' }}" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
+            <div class="turno-btn{{ ' active' if prox_tipo == 'UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
         </div>
-        <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ 'DIA' if modo == 'DIA_NOCHE' else 'UNICO' }}">
+        <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ prox_tipo }}">
+
+        <div class="warn-box" id="warnBox"></div>
 
         <label>Quien carga (opcional)</label>
         <input type="text" name="ingresado_por" placeholder="Nombre">
@@ -89,12 +102,73 @@ input[type="date"], input[type="text"] {
 </div>
 
 <script>
+const EXISTENTES = {{ turnos_existentes | tojson }};
+const MODO = "{{ modo }}";
+
 function selTurno(el) {
-    document.querySelectorAll('.turno-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.turno-btn').forEach(b => { b.classList.remove('active'); b.classList.remove('exists'); });
     el.classList.add('active');
     document.getElementById('tipoTurno').value = el.dataset.val;
-    document.getElementById('btnCrear').disabled = false;
+    checkFecha();
 }
+
+function checkFecha() {
+    const fecha = document.getElementById('fecha').value;
+    const tipo = document.getElementById('tipoTurno').value;
+    const warn = document.getElementById('warnBox');
+    const btn = document.getElementById('btnCrear');
+
+    warn.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = 'Crear turno';
+
+    if (!fecha || !tipo) return;
+
+    // Marcar turnos que ya existen para esta fecha
+    document.querySelectorAll('.turno-btn').forEach(b => {
+        b.classList.remove('exists');
+        const ex = EXISTENTES.find(e => e.fecha === fecha && e.tipo === b.dataset.val);
+        if (ex) {
+            b.classList.add('exists');
+            if (b.dataset.val === tipo) {
+                btn.textContent = 'Abrir turno existente';
+            }
+        }
+    });
+
+    // Verificar secuencia
+    if (EXISTENTES.length > 0) {
+        const ult = EXISTENTES[EXISTENTES.length - 1];
+        const ultDate = new Date(ult.fecha + 'T00:00:00');
+        const newDate = new Date(fecha + 'T00:00:00');
+        const diffDays = Math.round((newDate - ultDate) / 86400000);
+
+        if (diffDays < 0) {
+            warn.textContent = 'Esta fecha es anterior al ultimo turno cargado (' + ult.fecha + '). Respetar el orden cronologico.';
+            warn.style.display = 'block';
+            btn.disabled = true;
+            return;
+        }
+
+        if (MODO === 'DIA_NOCHE' && ult.tipo === 'DIA' && !(fecha === ult.fecha && tipo === 'NOCHE')) {
+            if (diffDays > 0) {
+                warn.textContent = 'Falta cargar el turno NOCHE de ' + ult.fecha + ' antes de avanzar al siguiente dia.';
+                warn.style.display = 'block';
+                btn.disabled = true;
+                return;
+            }
+        }
+
+        if (MODO !== 'DIA_NOCHE' && diffDays > 3) {
+            warn.textContent = 'Hay ' + diffDays + ' dias de diferencia con el ultimo turno (' + ult.fecha + '). Maximo 3 dias de salto.';
+            warn.style.display = 'block';
+            btn.disabled = true;
+            return;
+        }
+    }
+}
+
+checkFecha();
 </script>
 </body>
 </html>

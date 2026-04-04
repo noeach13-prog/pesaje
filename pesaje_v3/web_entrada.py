@@ -128,15 +128,47 @@ def seleccion():
 
     db = get_db()
     modo = session.get('sucursal_modo', 'DIA_NOCHE')
-    # Hora Argentina (UTC-3), no UTC del servidor
     _AR = timezone(timedelta(hours=-3))
     hoy = datetime.now(_AR).date().isoformat()
     recientes = listar_turnos(db, sucursal_id=sid)[:10]
+
+    # Determinar proximo turno en secuencia
+    ultimo = db.execute(
+        "SELECT fecha, tipo_turno FROM turnos WHERE sucursal_id = ? ORDER BY fecha DESC, tipo_turno DESC LIMIT 1",
+        (sid,),
+    ).fetchone()
+
+    if ultimo:
+        ult_fecha = ultimo['fecha']
+        ult_tipo = ultimo['tipo_turno']
+        if modo == 'DIA_NOCHE' and ult_tipo == 'DIA':
+            # Siguiente: NOCHE del mismo dia
+            prox_fecha = ult_fecha
+            prox_tipo = 'NOCHE'
+        else:
+            # Siguiente: dia siguiente
+            from datetime import date as date_cls
+            d = date_cls.fromisoformat(ult_fecha) + timedelta(days=1)
+            prox_fecha = d.isoformat()
+            prox_tipo = 'DIA' if modo == 'DIA_NOCHE' else 'UNICO'
+    else:
+        prox_fecha = hoy
+        prox_tipo = 'DIA' if modo == 'DIA_NOCHE' else 'UNICO'
+
+    # Turnos ya creados para esta sucursal (para bloquear duplicados en el form)
+    existentes = db.execute(
+        "SELECT fecha, tipo_turno, estado FROM turnos WHERE sucursal_id = ? ORDER BY fecha, tipo_turno",
+        (sid,),
+    ).fetchall()
+    turnos_existentes = [{'fecha': r['fecha'], 'tipo': r['tipo_turno'], 'estado': r['estado']} for r in existentes]
+
     db.close()
 
     return render_template('entrada/seleccion.html',
                            sucursal_nombre=nombre, sucursal_id=sid,
-                           modo=modo, hoy=hoy, recientes=recientes)
+                           modo=modo, hoy=hoy, recientes=recientes,
+                           prox_fecha=prox_fecha, prox_tipo=prox_tipo,
+                           turnos_existentes=turnos_existentes)
 
 
 @entrada_bp.route('/entrada/turno/nuevo', methods=['POST'])
@@ -150,7 +182,9 @@ def nuevo_turno():
     fecha = request.form['fecha']
     tipo_turno = request.form['tipo_turno']
     ingresado_por = request.form.get('ingresado_por', '').strip() or None
+    modo = session.get('sucursal_modo', 'DIA_NOCHE')
 
+    # Si ya existe, redirigir al existente
     existente = db.execute(
         "SELECT id FROM turnos WHERE sucursal_id=? AND fecha=? AND tipo_turno=?",
         (sid, fecha, tipo_turno),
@@ -159,6 +193,35 @@ def nuevo_turno():
     if existente:
         db.close()
         return redirect(url_for('entrada.editar_turno', turno_id=existente['id']))
+
+    # Validar secuencia: no saltar dias sin turno
+    ultimo = db.execute(
+        "SELECT fecha, tipo_turno FROM turnos WHERE sucursal_id = ? ORDER BY fecha DESC, tipo_turno DESC LIMIT 1",
+        (sid,),
+    ).fetchone()
+
+    if ultimo:
+        from datetime import date as date_cls
+        ult_d = date_cls.fromisoformat(ultimo['fecha'])
+        nueva_d = date_cls.fromisoformat(fecha)
+
+        # No permitir fechas anteriores a la ultima cargada
+        if nueva_d < ult_d:
+            db.close()
+            return redirect(url_for('entrada.seleccion'))
+
+        # No permitir saltar mas de 1 dia (salvo si es el mismo dia con otro turno)
+        if modo == 'DIA_NOCHE':
+            # Si el ultimo fue DIA, el siguiente puede ser NOCHE del mismo dia o DIA del dia siguiente
+            if ultimo['tipo_turno'] == 'DIA' and not (fecha == ultimo['fecha'] and tipo_turno == 'NOCHE'):
+                if nueva_d > ult_d:
+                    db.close()
+                    return redirect(url_for('entrada.seleccion'))
+        else:
+            # TURNO_UNICO: no saltar mas de 3 dias (fines de semana, feriados)
+            if (nueva_d - ult_d).days > 3:
+                db.close()
+                return redirect(url_for('entrada.seleccion'))
 
     turno_id = crear_turno(db, sid, fecha, tipo_turno, ingresado_por)
     db.close()
