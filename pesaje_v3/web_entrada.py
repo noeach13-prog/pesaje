@@ -18,6 +18,7 @@ from .db import (
     guardar_sabores, obtener_turno, listar_turnos,
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
+    registrar_inicio_carga, confirmar_turno,
 )
 
 entrada_bp = Blueprint(
@@ -311,3 +312,46 @@ def api_agregar_sabor():
         return jsonify({'ok': False, 'error': 'Nombre invalido'}), 400
 
     return jsonify({'ok': True, 'nombre_norm': nombre_norm})
+
+
+@entrada_bp.route('/entrada/api/inicio-carga', methods=['POST'])
+def api_inicio_carga():
+    """Registra timestamp del dispositivo cuando abre el form (solo la primera vez)."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False}), 401
+    payload = request.get_json() or {}
+    turno_id = payload.get('turno_id')
+    ts = payload.get('timestamp', '')
+    if turno_id and ts:
+        db = get_db()
+        registrar_inicio_carga(db, turno_id, ts)
+        db.close()
+    return jsonify({'ok': True})
+
+
+@entrada_bp.route('/entrada/api/confirmar', methods=['POST'])
+def api_confirmar():
+    """Confirma el turno. No se puede editar después."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+
+    payload = request.get_json() or {}
+    turno_id = payload.get('turno_id')
+    ts = payload.get('timestamp', '')
+    nombre = payload.get('confirmado_por', '')
+
+    if not turno_id:
+        return jsonify({'ok': False, 'error': 'turno_id requerido'}), 400
+
+    db = get_db()
+    # Verificar pertenencia
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno or turno['sucursal_id'] != sid:
+        db.close()
+        return jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404
+
+    resultado = confirmar_turno(db, turno_id, ts, nombre)
+    db.close()
+    return jsonify(resultado)

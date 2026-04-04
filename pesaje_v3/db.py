@@ -40,10 +40,16 @@ def init_db():
     conn = get_db()
     conn.executescript(_SCHEMA)
 
-    # Migration: agregar columna pin si no existe (DB creada antes de este cambio)
-    cols = [r[1] for r in conn.execute("PRAGMA table_info(sucursales)").fetchall()]
-    if 'pin' not in cols:
+    # Migrations
+    cols_suc = [r[1] for r in conn.execute("PRAGMA table_info(sucursales)").fetchall()]
+    if 'pin' not in cols_suc:
         conn.execute("ALTER TABLE sucursales ADD COLUMN pin TEXT NOT NULL DEFAULT '0000'")
+
+    cols_turno = [r[1] for r in conn.execute("PRAGMA table_info(turnos)").fetchall()]
+    if 'inicio_carga' not in cols_turno:
+        conn.execute("ALTER TABLE turnos ADD COLUMN inicio_carga TEXT")
+    if 'fin_carga' not in cols_turno:
+        conn.execute("ALTER TABLE turnos ADD COLUMN fin_carga TEXT")
 
     # Semilla: sucursales conocidas con PIN de acceso
     for nombre, modo, pin in [
@@ -127,6 +133,8 @@ CREATE TABLE IF NOT EXISTS turnos (
     estado TEXT NOT NULL DEFAULT 'borrador',-- 'borrador' o 'confirmado'
     ingresado_por TEXT,
     confirmado_por TEXT,
+    inicio_carga TEXT,                      -- timestamp dispositivo: cuando abrio el form
+    fin_carga TEXT,                         -- timestamp dispositivo: cuando confirmo
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(sucursal_id, fecha, tipo_turno)
@@ -337,6 +345,66 @@ def guardar_sabores(db: sqlite3.Connection, turno_id: int,
     )
     db.commit()
     return warnings
+
+
+def registrar_inicio_carga(db: sqlite3.Connection, turno_id: int, timestamp_cliente: str):
+    """Registra cuándo el empleado abrió el form (timestamp del dispositivo).
+    Solo se escribe una vez — si ya tiene inicio_carga, no sobreescribe."""
+    db.execute(
+        "UPDATE turnos SET inicio_carga = ? WHERE id = ? AND inicio_carga IS NULL",
+        (timestamp_cliente, turno_id),
+    )
+    db.commit()
+
+
+def confirmar_turno(db: sqlite3.Connection, turno_id: int,
+                    timestamp_cliente: str, confirmado_por: str = None) -> dict:
+    """Marca turno como confirmado. Registra fin_carga. No reversible.
+    Retorna resumen del turno confirmado."""
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno:
+        return {'ok': False, 'error': 'Turno no encontrado'}
+    if turno['estado'] == 'confirmado':
+        return {'ok': False, 'error': 'Turno ya confirmado'}
+
+    # Verificar que tenga al menos 1 sabor con datos
+    n_sabores = db.execute(
+        "SELECT COUNT(*) FROM sabores_turno WHERE turno_id = ?", (turno_id,)
+    ).fetchone()[0]
+    if n_sabores == 0:
+        return {'ok': False, 'error': 'No hay sabores cargados'}
+
+    db.execute(
+        """UPDATE turnos SET estado = 'confirmado', fin_carga = ?,
+           confirmado_por = ?, updated_at = datetime('now')
+           WHERE id = ?""",
+        (timestamp_cliente, confirmado_por, turno_id),
+    )
+    db.commit()
+
+    # Resumen
+    total_peso = db.execute(
+        """SELECT COALESCE(SUM(
+            COALESCE(abierta,0)+COALESCE(celiaca,0)+
+            COALESCE(cerrada_1,0)+COALESCE(cerrada_2,0)+COALESCE(cerrada_3,0)+
+            COALESCE(cerrada_4,0)+COALESCE(cerrada_5,0)+COALESCE(cerrada_6,0)+
+            COALESCE(entrante_1,0)+COALESCE(entrante_2,0)
+        ), 0) FROM sabores_turno WHERE turno_id = ?""",
+        (turno_id,),
+    ).fetchone()[0]
+
+    n_vdp = db.execute("SELECT COUNT(*) FROM vdp_turno WHERE turno_id=?", (turno_id,)).fetchone()[0]
+    total_vdp = db.execute("SELECT COALESCE(SUM(gramos),0) FROM vdp_turno WHERE turno_id=?", (turno_id,)).fetchone()[0]
+
+    return {
+        'ok': True,
+        'n_sabores': n_sabores,
+        'total_peso': total_peso,
+        'n_vdp': n_vdp,
+        'total_vdp': total_vdp,
+        'inicio_carga': turno['inicio_carga'],
+        'fin_carga': timestamp_cliente,
+    }
 
 
 def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:

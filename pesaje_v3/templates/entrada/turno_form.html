@@ -132,6 +132,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .cmp-up { background: #fff8e1; color: var(--orange); }
 .cmp-down { background: #e8f5e9; color: var(--green); }
 
+/* Turno status panel */
+.turno-status { background: #fff; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.ts-row { display: flex; gap: 6px; align-items: center; }
+.ts-label { font-size: 0.65rem; color: var(--gray); text-transform: uppercase; font-weight: 600; }
+.ts-val { font-size: 0.8rem; font-weight: 500; }
+.confirmed-banner { background: #e8f5e9; color: var(--green); padding: 10px; border-radius: 8px; text-align: center; font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; }
+
 /* Bottom */
 .bot { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 8px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 20; }
 .bot-in { max-width: 500px; margin: 0 auto; }
@@ -149,7 +156,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 <div class="top">
     <div class="top-row">
-        <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">{{ data.nombre_hoja }}</div></div>
+        <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">{{ data.nombre_hoja }}{% if data.turno.estado == 'confirmado' %} <span style="background:#2e7d32;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.65rem;">CONFIRMADO</span>{% endif %}</div></div>
         <div style="display:flex;gap:12px;align-items:center;">
             <span class="sub" id="stats">0</span>
             <a href="/entrada/seleccion">Salir</a>
@@ -160,6 +167,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <div id="toast" class="toast"></div>
 
 <div class="wrap">
+    <!-- Panel de estado del turno -->
+    <div class="turno-status">
+        <div class="ts-row">
+            <span class="ts-label">Fecha</span>
+            <span class="ts-val">{{ data.turno.fecha }}</span>
+        </div>
+        <div class="ts-row">
+            <span class="ts-label">Inicio</span>
+            <span class="ts-val" id="tsInicio">{{ data.turno.inicio_carga or 'Al abrir' }}</span>
+        </div>
+        {% if data.turno.estado == 'confirmado' %}
+        <div class="ts-row">
+            <span class="ts-label">Confirmado</span>
+            <span class="ts-val">{{ data.turno.fin_carga or '-' }}</span>
+        </div>
+        {% endif %}
+        {% if data.turno.ingresado_por %}
+        <div class="ts-row">
+            <span class="ts-label">Carga</span>
+            <span class="ts-val">{{ data.turno.ingresado_por }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if data.turno.estado == 'confirmado' %}
+    <div class="confirmed-banner">
+        Este turno fue confirmado y no se puede modificar.
+    </div>
+    {% endif %}
+
     <div class="search"><input type="text" id="q" placeholder="Buscar sabor..." oninput="buscar(this.value)"></div>
 
     <div id="list">
@@ -319,11 +356,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="sec-b" id="nB">{% for n in data.notas %}<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad"{{ ' selected' if n.categoria=='novedad' }}>Novedad</option><option value="reclamo"{{ ' selected' if n.categoria=='reclamo' }}>Reclamo</option><option value="faltante"{{ ' selected' if n.categoria=='faltante' }}>Faltante</option><option value="otro"{{ ' selected' if n.categoria=='otro' }}>Otro</option></select><input type="text" class="nd" value="{{ n.detalle }}" style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>{% endfor %}<button class="btn-s" onclick="addN()">+ Agregar</button></div></div>
 </div>
 
-<div class="bot"><div class="bot-in"><button class="btn-main" id="btnS" onclick="save()">Guardar borrador</button></div></div>
+{% if data.turno.estado != 'confirmado' %}
+<div class="bot"><div class="bot-in" style="display:flex;gap:8px;">
+    <button class="btn-main" id="btnS" onclick="save()" style="flex:2;">Guardar</button>
+    <button class="btn-main" id="btnC" onclick="confirmarTurno()" style="flex:1;background:var(--green);">Confirmar</button>
+</div></div>
+{% endif %}
 
 <script>
 const TID={{data.turno.id}}, MX=7900;
+const CONFIRMADO = {{ 'true' if data.turno.estado == 'confirmado' else 'false' }};
 let active=null;
+
+// Timestamp del dispositivo
+function clientTS() {
+    const d = new Date();
+    return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+}
+
+// Registrar inicio de carga (solo una vez)
+if (!CONFIRMADO) {
+    fetch('/entrada/api/inicio-carga', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({turno_id:TID, timestamp:clientTS()})
+    }).then(()=>{
+        const el=document.getElementById('tsInicio');
+        if(el && el.textContent==='Al abrir') el.textContent=clientTS();
+    });
+}
+
+// Si confirmado, deshabilitar todos los inputs
+if (CONFIRMADO) {
+    document.querySelectorAll('input,button,select').forEach(el => {
+        if(!el.closest('.top') && !el.closest('.search') && el.id!=='q') el.disabled=true;
+    });
+}
 
 function toggle(fl, e) {
     if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON'||e.target.tagName==='SELECT') return;
@@ -407,13 +474,20 @@ function v(inp) {
 }
 
 function showAlert(title, msg, tipo, inp) {
-    // tipo: 'error' (solo Corregir), 'warning'/'compare' (OK o Corregir)
-    const icon = tipo==='error' ? '&#9888;' : tipo==='compare' ? '&#128269;' : '&#9888;';
-    const iconColor = tipo==='error' ? 'var(--red)' : 'var(--orange)';
-    const btns = tipo==='error'
-        ? '<button class="alert-btn alert-btn-fix" onclick="closeAlert(true)">Corregir</button>'
-        : '<button class="alert-btn alert-btn-ok" onclick="closeAlert(false)">OK, es correcto</button>' +
-          '<button class="alert-btn alert-btn-fix" onclick="closeAlert(true)">Corregir</button>';
+    // tipo: 'error' (solo Corregir), 'warning'/'compare' (OK o Corregir), 'confirm' (Si/Cancelar)
+    let icon, iconColor, btns;
+    if(tipo==='error'){
+        icon='&#9888;'; iconColor='var(--red)';
+        btns='<button class="alert-btn alert-btn-fix" onclick="closeAlert(true)">Corregir</button>';
+    } else if(tipo==='confirm'){
+        icon='&#9989;'; iconColor='var(--green)';
+        btns='<button class="alert-btn alert-btn-ok" data-confirm-btn onclick="closeAlert(false)">Si, confirmar</button>'+
+             '<button class="alert-btn alert-btn-fix" onclick="closeAlert(true)">Cancelar</button>';
+    } else {
+        icon = tipo==='compare' ? '&#128269;' : '&#9888;'; iconColor='var(--orange)';
+        btns='<button class="alert-btn alert-btn-ok" onclick="closeAlert(false)">OK, es correcto</button>'+
+             '<button class="alert-btn alert-btn-fix" onclick="closeAlert(true)">Corregir</button>';
+    }
 
     const html = '<div class="alert-overlay" id="alertModal">' +
         '<div class="alert-box">' +
@@ -546,7 +620,49 @@ async function save() {
             toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');
         }else toast('Error: '+(d1.error||d2.error),'err');
     }catch(e){toast('Sin conexion','err');}
-    btn.disabled=false; btn.textContent='Guardar borrador';
+    btn.disabled=false; btn.textContent='Guardar';
+}
+
+async function confirmarTurno() {
+    // Primero guardar todo
+    await save();
+    // Verificar que hay sabores
+    const done = document.querySelectorAll('.fl.done').length;
+    if(done===0){ toast('Carga al menos un sabor antes de confirmar','warn'); return; }
+    // Pedir confirmacion con alerta modal
+    showAlert('Confirmar turno',
+        'Una vez confirmado no se puede modificar. Hay '+done+' sabores cargados. Confirmar?',
+        'confirm', null);
+}
+
+// Override closeAlert para manejar confirmacion
+const _origCloseAlert = closeAlert;
+closeAlert = function(goBack) {
+    const modal = document.getElementById('alertModal');
+    // Detectar si es modal de confirmacion (tiene el boton especial)
+    const isConfirm = modal && modal.querySelector('[data-confirm-btn]');
+    if(isConfirm && !goBack) {
+        // Proceder con confirmacion
+        modal.remove();
+        doConfirm();
+        return;
+    }
+    _origCloseAlert(goBack);
+};
+
+async function doConfirm() {
+    const btn=document.getElementById('btnC');
+    if(btn){btn.disabled=true; btn.textContent='Confirmando...';}
+    try{
+        const r=await fetch('/entrada/api/confirmar',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({turno_id:TID, timestamp:clientTS(), confirmado_por:''})});
+        const d=await r.json();
+        if(d.ok){
+            toast('Turno confirmado: '+d.n_sabores+' sabores, '+d.total_peso+'g total','ok');
+            setTimeout(()=>location.reload(), 1500);
+        }else toast('Error: '+d.error,'err');
+    }catch(e){toast('Sin conexion','err');}
+    if(btn){btn.disabled=false; btn.textContent='Confirmar';}
 }
 
 // VDP: tap producto -> aparece como item con cantidad +-
