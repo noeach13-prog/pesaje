@@ -196,35 +196,6 @@ def nuevo_turno():
         db.close()
         return redirect(url_for('entrada.editar_turno', turno_id=existente['id']))
 
-    # Validar secuencia: no saltar dias sin turno
-    ultimo = db.execute(
-        "SELECT fecha, tipo_turno FROM turnos WHERE sucursal_id = ? ORDER BY fecha DESC, tipo_turno DESC LIMIT 1",
-        (sid,),
-    ).fetchone()
-
-    if ultimo:
-        from datetime import date as date_cls
-        ult_d = date_cls.fromisoformat(ultimo['fecha'])
-        nueva_d = date_cls.fromisoformat(fecha)
-
-        # No permitir fechas anteriores a la ultima cargada
-        if nueva_d < ult_d:
-            db.close()
-            return redirect(url_for('entrada.seleccion'))
-
-        # No permitir saltar mas de 1 dia (salvo si es el mismo dia con otro turno)
-        if modo == 'DIA_NOCHE':
-            # Si el ultimo fue DIA, el siguiente puede ser NOCHE del mismo dia o DIA del dia siguiente
-            if ultimo['tipo_turno'] == 'DIA' and not (fecha == ultimo['fecha'] and tipo_turno == 'NOCHE'):
-                if nueva_d > ult_d:
-                    db.close()
-                    return redirect(url_for('entrada.seleccion'))
-        else:
-            # TURNO_UNICO: no saltar mas de 3 dias (fines de semana, feriados)
-            if (nueva_d - ult_d).days > 3:
-                db.close()
-                return redirect(url_for('entrada.seleccion'))
-
     turno_id = crear_turno(db, sid, fecha, tipo_turno, ingresado_por)
     db.close()
     return redirect(url_for('entrada.editar_turno', turno_id=turno_id))

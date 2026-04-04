@@ -135,37 +135,6 @@ function checkFecha() {
             }
         }
     });
-
-    // Verificar secuencia
-    if (EXISTENTES.length > 0) {
-        const ult = EXISTENTES[EXISTENTES.length - 1];
-        const ultDate = new Date(ult.fecha + 'T00:00:00');
-        const newDate = new Date(fecha + 'T00:00:00');
-        const diffDays = Math.round((newDate - ultDate) / 86400000);
-
-        if (diffDays < 0) {
-            warn.textContent = 'Esta fecha es anterior al ultimo turno cargado (' + ult.fecha + '). Respetar el orden cronologico.';
-            warn.style.display = 'block';
-            btn.disabled = true;
-            return;
-        }
-
-        if (MODO === 'DIA_NOCHE' && ult.tipo === 'DIA' && !(fecha === ult.fecha && tipo === 'NOCHE')) {
-            if (diffDays > 0) {
-                warn.textContent = 'Falta cargar el turno NOCHE de ' + ult.fecha + ' antes de avanzar al siguiente dia.';
-                warn.style.display = 'block';
-                btn.disabled = true;
-                return;
-            }
-        }
-
-        if (MODO !== 'DIA_NOCHE' && diffDays > 3) {
-            warn.textContent = 'Hay ' + diffDays + ' dias de diferencia con el ultimo turno (' + ult.fecha + '). Maximo 3 dias de salto.';
-            warn.style.display = 'block';
-            btn.disabled = true;
-            return;
-        }
-    }
 }
 
 checkFecha();
