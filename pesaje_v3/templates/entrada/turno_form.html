@@ -153,6 +153,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .log-gap { }
 .log-gap-badge { background: #fce4ec; color: var(--red); font-size: 0.65rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; display: inline-block; margin: 4px 0 2px; }
 
+/* Consumo items con empleado */
+.con-item { background: #f5f5f5; border-radius: 6px; margin-bottom: 4px; padding: 6px 8px; }
+.con-main { display: flex; align-items: center; gap: 6px; }
+.con-emp { font-size: 0.65rem; color: var(--blue); font-weight: 500; margin-top: 2px; padding-left: 4px; }
+
 /* Bottom */
 .bot { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 8px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); z-index: 20; }
 .bot-in { max-width: 500px; margin: 0 auto; }
@@ -333,29 +338,43 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
 
     <!-- Consumos -->
-    <div class="sec{{ ' open' if data.consumos else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Consumos internos <span class="sec-badge">{{ data.consumos|length }}</span></div>
+    <div class="sec{{ ' open' if data.consumos else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Consumos internos <span class="sec-badge" id="conBadge">{{ data.consumos|length }}</span></div>
         <div class="sec-b">
+            <div style="margin-bottom:8px;">
+                <label style="font-size:0.7rem;color:#888;margin-bottom:4px;">Empleado</label>
+                <input type="text" id="conEmpleado" placeholder="Nombre del empleado" list="empleadosList" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;">
+                <datalist id="empleadosList"></datalist>
+            </div>
             <div class="prod-grid">
+                <button class="prod-btn" onclick="addCon('1 Kg', 1000)">1 Kg<span>1000g</span></button>
+                <button class="prod-btn" onclick="addCon('1/2 Kg', 500)">1/2 Kg<span>500g</span></button>
+                <button class="prod-btn" onclick="addCon('1/4 Kg', 250)">1/4 Kg<span>250g</span></button>
                 <button class="prod-btn" onclick="addCon('Cucurucho', 220)">Cucurucho<span>220g</span></button>
+                <button class="prod-btn" onclick="addCon('Vaso 65', 180)">Vaso 65<span>180g</span></button>
                 <button class="prod-btn" onclick="addCon('Vasito', 140)">Vasito<span>140g</span></button>
+                <button class="prod-btn" onclick="addCon('Cucuruchon', 140)">Cucuruchon<span>140g</span></button>
+                <button class="prod-btn" onclick="addCon('Milkshake', 140)">Milkshake<span>140g</span></button>
                 <button class="prod-btn" onclick="addCon('Bocha', 70)">Bocha<span>70g</span></button>
             </div>
             <div id="cB" style="margin-top:8px;">
                 {% for c in data.consumos %}
-                <div class="vdp-item">
-                    <span class="vdp-name">{{ c.texto }}</span>
-                    <span class="vdp-g">{{ c.gramos }}g</span>
-                    <div class="vdp-qty">
-                        <button class="qty-btn" onclick="vdpQty(this,-1)">-</button>
-                        <span class="qty-n" data-texto="{{ c.texto }}" data-gunit="{{ c.gramos }}">1</span>
-                        <button class="qty-btn" onclick="vdpQty(this,1)">+</button>
+                <div class="con-item">
+                    <div class="con-main">
+                        <span class="vdp-name">{{ c.texto }}</span>
+                        <span class="vdp-g">{{ c.gramos }}g</span>
+                        <div class="vdp-qty">
+                            <button class="qty-btn" onclick="conQty(this,-1)">-</button>
+                            <span class="qty-n" data-texto="{{ c.texto }}" data-gunit="{{ c.gramos }}" data-empleado="{{ c.empleado or '' }}">1</span>
+                            <button class="qty-btn" onclick="conQty(this,1)">+</button>
+                        </div>
+                        <button class="rm" onclick="this.closest('.con-item').remove();updConBadge()">&times;</button>
                     </div>
-                    <button class="rm" onclick="this.parentElement.remove()">&times;</button>
+                    {% if c.empleado %}<div class="con-emp">{{ c.empleado }}</div>{% endif %}
                 </div>
                 {% endfor %}
             </div>
             <div style="margin-top:8px;padding-top:8px;border-top:1px solid #eee;">
-                <div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Consumo no listado:</div>
+                <div style="font-size:0.7rem;color:#888;margin-bottom:4px;">Producto no listado:</div>
                 <div class="xrow">
                     <input type="text" id="conCustomTxt" placeholder="Descripcion" style="flex:1;">
                     <input type="number" id="conCustomG" placeholder="g" inputmode="numeric" style="width:65px;">
@@ -634,10 +653,11 @@ function collectX() {
         for(let i=0;i<qty;i++) vdp.push({texto:texto, gramos:gunit});
     });
     // Consumos: igual
-    document.querySelectorAll('#cB .vdp-item').forEach(it=>{
+    document.querySelectorAll('#cB .con-item').forEach(it=>{
         const span=it.querySelector('.qty-n');
         const texto=span.dataset.texto, gunit=parseInt(span.dataset.gunit), qty=parseInt(span.textContent);
-        for(let i=0;i<qty;i++) con.push({texto:texto, gramos:gunit});
+        const emp=span.dataset.empleado||'';
+        for(let i=0;i<qty;i++) con.push({texto:texto, gramos:gunit, empleado:emp});
     });
     // Notas: sin cambio
     document.querySelectorAll('#nB .xrow').forEach(r=>{const c=(r.querySelector('.nc')||{}).value||'otro',d=(r.querySelector('.nd')||{}).value||'';if(d.trim())notas.push({categoria:c,detalle:d});});
@@ -739,20 +759,49 @@ function addVDPCustom() {
     document.getElementById('vdpCustomG').value = '';
 }
 
-function addCon(texto, gramos) {
-    const existing = document.querySelector('#cB .qty-n[data-texto="'+texto+'"]');
-    if (existing) {
-        const n = parseInt(existing.textContent) + 1;
-        existing.textContent = n;
-        existing.closest('.vdp-item').querySelector('.vdp-g').textContent = (n * gramos) + 'g';
-        return;
+function getConEmpleado() {
+    const inp = document.getElementById('conEmpleado');
+    const nombre = (inp ? inp.value.trim() : '');
+    // Guardar en datalist para autocompletar proxima vez
+    if (nombre) {
+        const dl = document.getElementById('empleadosList');
+        const exists = Array.from(dl.options).some(o => o.value === nombre);
+        if (!exists) dl.insertAdjacentHTML('beforeend', '<option value="'+nombre+'">');
     }
+    return nombre;
+}
+
+function addCon(texto, gramos) {
+    const emp = getConEmpleado();
+    if (!emp) { toast('Seleccionar empleado antes de agregar consumo', 'warn'); return; }
     document.getElementById('cB').insertAdjacentHTML('beforeend',
-        '<div class="vdp-item"><span class="vdp-name">'+texto+'</span><span class="vdp-g">'+gramos+'g</span>' +
-        '<div class="vdp-qty"><button class="qty-btn" onclick="vdpQty(this,-1)">-</button>' +
-        '<span class="qty-n" data-texto="'+texto+'" data-gunit="'+gramos+'">1</span>' +
-        '<button class="qty-btn" onclick="vdpQty(this,1)">+</button></div>' +
-        '<button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');
+        '<div class="con-item">' +
+        '<div class="con-main"><span class="vdp-name">'+texto+'</span><span class="vdp-g">'+gramos+'g</span>' +
+        '<div class="vdp-qty"><button class="qty-btn" onclick="conQty(this,-1)">-</button>' +
+        '<span class="qty-n" data-texto="'+texto+'" data-gunit="'+gramos+'" data-empleado="'+emp+'">1</span>' +
+        '<button class="qty-btn" onclick="conQty(this,1)">+</button></div>' +
+        '<button class="rm" onclick="this.closest(\'.con-item\').remove();updConBadge()">&times;</button></div>' +
+        '<div class="con-emp">'+emp+'</div></div>');
+    updConBadge();
+}
+
+function conQty(btn, delta) {
+    const span = btn.parentElement.querySelector('.qty-n');
+    const n = Math.max(1, parseInt(span.textContent) + delta);
+    span.textContent = n;
+    const gunit = parseInt(span.dataset.gunit);
+    btn.closest('.con-main').querySelector('.vdp-g').textContent = (n * gunit) + 'g';
+    updConBadge();
+}
+
+function updConBadge() {
+    const items = document.querySelectorAll('#cB .con-item');
+    let total = 0;
+    items.forEach(it => {
+        const span = it.querySelector('.qty-n');
+        total += parseInt(span.textContent) * parseInt(span.dataset.gunit);
+    });
+    document.getElementById('conBadge').textContent = items.length ? items.length + ' (' + total + 'g)' : '0';
 }
 
 function addConCustom() {

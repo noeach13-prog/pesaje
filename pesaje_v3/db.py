@@ -51,6 +51,10 @@ def init_db():
     if 'fin_carga' not in cols_turno:
         conn.execute("ALTER TABLE turnos ADD COLUMN fin_carga TEXT")
 
+    cols_consumo = [r[1] for r in conn.execute("PRAGMA table_info(consumo_turno)").fetchall()]
+    if cols_consumo and 'empleado' not in cols_consumo:
+        conn.execute("ALTER TABLE consumo_turno ADD COLUMN empleado TEXT")
+
     # Semilla: sucursales conocidas con PIN de acceso
     for nombre, modo, pin in [
         ('San Martín', 'DIA_NOCHE', '1234'),
@@ -165,7 +169,8 @@ CREATE TABLE IF NOT EXISTS consumo_turno (
     id INTEGER PRIMARY KEY,
     turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
     texto TEXT NOT NULL,
-    gramos INTEGER NOT NULL DEFAULT 0
+    gramos INTEGER NOT NULL DEFAULT 0,
+    empleado TEXT
 );
 
 CREATE TABLE IF NOT EXISTS notas_turno (
@@ -606,7 +611,7 @@ def guardar_vdp(db: sqlite3.Connection, turno_id: int, items: List[dict]):
 
 
 def guardar_consumos(db: sqlite3.Connection, turno_id: int, items: List[dict]):
-    """Guarda consumos internos. items: [{texto, gramos}]"""
+    """Guarda consumos internos. items: [{texto, gramos, empleado}]"""
     db.execute("DELETE FROM consumo_turno WHERE turno_id = ?", (turno_id,))
     for item in items:
         texto = (item.get('texto') or '').strip()
@@ -617,9 +622,10 @@ def guardar_consumos(db: sqlite3.Connection, turno_id: int, items: List[dict]):
             gramos = int(gramos)
         except (ValueError, TypeError):
             gramos = 0
+        empleado = (item.get('empleado') or '').strip() or None
         db.execute(
-            "INSERT INTO consumo_turno (turno_id, texto, gramos) VALUES (?, ?, ?)",
-            (turno_id, texto, gramos),
+            "INSERT INTO consumo_turno (turno_id, texto, gramos, empleado) VALUES (?, ?, ?, ?)",
+            (turno_id, texto, gramos, empleado),
         )
     db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
     db.commit()
