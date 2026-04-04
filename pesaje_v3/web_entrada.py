@@ -31,6 +31,19 @@ entrada_bp = Blueprint(
 
 # ─── Acceso por PIN ─────────────────────────────────────────────────
 
+@entrada_bp.before_request
+def _validar_sesion():
+    """Si la sesion tiene una sucursal_id que ya no existe en la DB
+    (porque Railway recreo la DB), limpiar sesion silenciosamente."""
+    sid = session.get('sucursal_id')
+    if sid:
+        db = get_db()
+        existe = db.execute("SELECT 1 FROM sucursales WHERE id = ?", (sid,)).fetchone()
+        db.close()
+        if not existe:
+            session.clear()
+
+
 def _datos_turno_anterior(db, sucursal_id, fecha):
     """Retorna dict {nombre_norm: {abierta, cerrada_1..6, entrante_1..2}} del turno anterior."""
     row = db.execute(
@@ -158,10 +171,21 @@ def editar_turno(turno_id):
         return redirect(url_for('entrada.index'))
 
     db = get_db()
-    data = obtener_turno(db, turno_id)
-    if not data or data['turno']['sucursal_id'] != sid:
+
+    # Verificar que la sesion sigue valida (sucursal existe en DB)
+    suc_check = db.execute("SELECT id FROM sucursales WHERE id = ?", (sid,)).fetchone()
+    if not suc_check:
         db.close()
-        return "Turno no encontrado o no pertenece a esta sucursal", 404
+        session.clear()
+        return redirect(url_for('entrada.index'))
+
+    data = obtener_turno(db, turno_id)
+    if not data:
+        db.close()
+        return redirect(url_for('entrada.seleccion'))
+    if data['turno']['sucursal_id'] != sid:
+        db.close()
+        return redirect(url_for('entrada.seleccion'))
 
     catalogo = catalogo_sabores(db, sid)
 
@@ -199,7 +223,7 @@ def api_guardar():
     turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
     if not turno or turno['sucursal_id'] != sid:
         db.close()
-        return jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404
+        return jsonify({'ok': False, 'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.'}), 404
 
     if turno['estado'] == 'confirmado':
         db.close()
@@ -259,7 +283,7 @@ def _verificar_turno_editable(turno_id):
     turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
     if not turno or turno['sucursal_id'] != sid:
         db.close()
-        return None, (jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404)
+        return None, (jsonify({'ok': False, 'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.'}), 404)
     if turno['estado'] == 'confirmado':
         db.close()
         return None, (jsonify({'ok': False, 'error': 'Turno ya confirmado'}), 400)
@@ -357,7 +381,7 @@ def api_confirmar():
     turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
     if not turno or turno['sucursal_id'] != sid:
         db.close()
-        return jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404
+        return jsonify({'ok': False, 'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.'}), 404
 
     resultado = confirmar_turno(db, turno_id, ts, nombre)
     if resultado.get('ok'):
