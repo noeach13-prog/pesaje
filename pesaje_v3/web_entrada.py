@@ -423,12 +423,12 @@ def revision(turno_id):
         db.close()
         return redirect(url_for('entrada.seleccion'))
 
-    from .validacion_entrada import validar_turno_completo
-    validacion = validar_turno_completo(db, turno_id)
+    from .validacion_entrada import analizar_turno
+    analisis = analizar_turno(db, turno_id)
     db.close()
 
     return render_template('entrada/revision.html',
-                           data=data, validacion=validacion)
+                           data=data, analisis=analisis)
 
 
 @entrada_bp.route('/entrada/api/inicio-carga', methods=['POST'])
@@ -470,23 +470,14 @@ def api_confirmar():
         db.close()
         return jsonify({'ok': False, 'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.'}), 404
 
-    # Correr validación antes de confirmar
-    from .validacion_entrada import validar_turno_completo
-    validacion = validar_turno_completo(db, turno_id)
-
-    # Si hay errores duros, no confirmar
-    if validacion['n_errores'] > 0:
-        db.close()
-        return jsonify({
-            'ok': False,
-            'error': f'{validacion["n_errores"]} errores detectados. Revisar antes de confirmar.',
-            'validacion': validacion,
-        })
+    # Correr analisis completo antes de confirmar
+    from .validacion_entrada import analizar_turno
+    analisis = analizar_turno(db, turno_id)
 
     resultado = confirmar_turno(db, turno_id, ts, nombre)
     if resultado.get('ok'):
         registrar_actividad(db, turno_id, ts, 'confirmar',
                             f'{resultado["n_sabores"]} sabores, {resultado["total_peso"]}g')
-        resultado['validacion'] = validacion
+        resultado['analisis'] = analisis
     db.close()
     return jsonify(resultado)

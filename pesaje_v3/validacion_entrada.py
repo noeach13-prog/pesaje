@@ -17,6 +17,149 @@ from .db_to_pipeline import armar_datos_dia
 from .db import get_db
 
 
+def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
+    """
+    Corre el pipeline completo sobre un turno y retorna:
+    - alertas de validación (niveles 3-5)
+    - ventas por sabor (raw + corregida + delta)
+    - totales del día
+    - correcciones aplicadas
+
+    Es lo que se muestra al confirmar. Reusa el pipeline existente
+    sin duplicar nada.
+    """
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno:
+        return {'ok': False, 'error': 'Turno no encontrado'}
+
+    suc = db.execute("SELECT * FROM sucursales WHERE id = ?", (turno['sucursal_id'],)).fetchone()
+
+    resultado = {
+        'ok': True,
+        'alertas': [],
+        'sabores': [],
+        'totales': {},
+        'tiene_analisis': False,
+    }
+
+    # Nivel 3: validaciones de turno
+    alertas_turno = _validar_nivel3_turno(db, turno_id, turno, suc)
+    resultado['alertas'].extend(alertas_turno)
+
+    # Armar DatosDia para pipeline
+    datos_dia = armar_datos_dia(db, turno['sucursal_id'], turno['fecha'])
+    if not datos_dia:
+        resultado['alertas'].append({
+            'nivel': 'info', 'severidad': 'info', 'sabor': None,
+            'codigo': 'SIN_PAR',
+            'detalle': 'Falta el turno par (DIA/NOCHE) o turno anterior para analisis completo.',
+        })
+        return resultado
+
+    # Correr pipeline completo
+    try:
+        from .capa2_contrato import calcular_contabilidad
+        from .capa3_motor import clasificar, canonicalizar_nombres, aplicar_canonicalizacion
+        from .capa4_expediente import resolver_escalados
+        from .modelos import ResolucionC3
+
+        canon = canonicalizar_nombres(datos_dia)
+        aplicar_canonicalizacion(datos_dia, canon)
+        cont = calcular_contabilidad(datos_dia)
+        c3 = clasificar(datos_dia, cont)
+        c4 = resolver_escalados(datos_dia, cont, c3)
+
+        resultado['tiene_analisis'] = True
+
+        # Ventas por sabor
+        venta_total = 0
+        latas_total = 0
+        n_corregidos = 0
+        n_h0 = 0
+
+        for nombre in sorted(c3.sabores.keys()):
+            sc3 = c3.sabores[nombre]
+            sc = sc3.contable
+            if sc.solo_dia or sc.solo_noche:
+                continue
+
+            res = sc3.resolution_status
+            vf = sc3.venta_final_c3 if sc3.venta_final_c3 is not None else sc.venta_raw
+
+            # Corrección de C4
+            c4_corr = next((c for c in c4.correcciones if c.nombre_norm == nombre), None)
+            if c4_corr:
+                vf = c4_corr.venta_corregida
+
+            proto = sc3.prototipo
+            delta = proto.delta if proto else (c4_corr.delta if c4_corr else 0)
+
+            if res and res == ResolucionC3.ESCALAR_C4:
+                status = 'H0'
+                n_h0 += 1
+            elif proto or c4_corr:
+                status = 'CORREGIDO'
+                n_corregidos += 1
+            else:
+                status = 'OK'
+
+            sabor_info = {
+                'nombre': nombre,
+                'raw': sc.venta_raw,
+                'final': vf,
+                'delta': delta,
+                'status': status,
+                'n_latas': sc.n_latas,
+                'ajuste_latas': sc.ajuste_latas,
+            }
+
+            if proto:
+                sabor_info['correccion'] = proto.descripcion[:80]
+                sabor_info['confianza'] = proto.confianza
+            elif c4_corr:
+                sabor_info['correccion'] = c4_corr.motivo[:80]
+                sabor_info['confianza'] = c4_corr.confianza
+
+            # Alerta si hay problema
+            if vf < -200:
+                resultado['alertas'].append({
+                    'nivel': 'analisis', 'severidad': 'error', 'sabor': nombre,
+                    'codigo': 'VENTA_NEG', 'detalle': f'Venta = {vf}g (negativa)',
+                })
+            elif status == 'H0' and abs(vf) > 1000:
+                resultado['alertas'].append({
+                    'nivel': 'analisis', 'severidad': 'warning', 'sabor': nombre,
+                    'codigo': 'H0', 'detalle': f'Sin resolver: venta raw = {sc.venta_raw}g',
+                })
+
+            venta_total += vf
+            latas_total += sc.ajuste_latas
+            resultado['sabores'].append(sabor_info)
+
+        resultado['totales'] = {
+            'venta': venta_total,
+            'latas': latas_total,
+            'n_latas': latas_total // 280 if latas_total else 0,
+            'vdp': cont.vdp_total,
+            'neto': venta_total - latas_total - cont.vdp_total,
+            'n_sabores': len(resultado['sabores']),
+            'n_corregidos': n_corregidos,
+            'n_h0': n_h0,
+        }
+
+    except Exception as e:
+        resultado['alertas'].append({
+            'nivel': 'analisis', 'severidad': 'info', 'sabor': None,
+            'codigo': 'PIPELINE_ERROR', 'detalle': f'Error en analisis: {str(e)[:120]}',
+        })
+
+    # Conteo de alertas
+    resultado['n_errores'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'error')
+    resultado['n_warnings'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'warning')
+
+    return resultado
+
+
 def validar_turno_completo(db: sqlite3.Connection, turno_id: int) -> Dict:
     """
     Corre todos los niveles de validación posibles para un turno.

@@ -3,146 +3,190 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ data.sucursal.nombre }} - Revision {{ data.nombre_hoja }}</title>
+<title>{{ data.sucursal.nombre }} - Analisis {{ data.nombre_hoja }}</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
-.container { max-width: 600px; margin: 0 auto; padding: 12px; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
 .header { background: #1565c0; color: #fff; padding: 12px 16px; }
-.header h1 { font-size: 1.1rem; }
-.header .sub { font-size: 0.75rem; opacity: 0.8; }
+.header h1 { font-size: 1.1rem; } .header .sub { font-size: 0.75rem; opacity: 0.8; }
+.container { max-width: 600px; margin: 0 auto; padding: 8px; }
 
-.summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }
-.sum-card { background: #fff; border-radius: 8px; padding: 12px; text-align: center; }
-.sum-num { font-size: 1.5rem; font-weight: 700; }
-.sum-label { font-size: 0.7rem; color: #888; text-transform: uppercase; }
-.sum-ok .sum-num { color: #2e7d32; }
-.sum-warn .sum-num { color: #e65100; }
-.sum-err .sum-num { color: #c62828; }
+/* Totales */
+.totals { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0; }
+.tot { background: #fff; border-radius: 8px; padding: 10px 12px; }
+.tot-num { font-size: 1.3rem; font-weight: 700; }
+.tot-label { font-size: 0.65rem; color: #888; text-transform: uppercase; }
+.tot-green .tot-num { color: #2e7d32; }
+.tot-blue .tot-num { color: #1565c0; }
+.tot-orange .tot-num { color: #e65100; }
+.tot-red .tot-num { color: #c62828; }
 
-.section { background: #fff; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
-.section-h { padding: 10px 12px; font-weight: 600; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
-.section-body { padding: 0; }
-
-.alerta { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #f5f5f5; align-items: flex-start; }
-.alerta:last-child { border-bottom: none; }
-.alerta-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
-.alerta-content { flex: 1; }
-.alerta-sabor { font-weight: 600; font-size: 0.8rem; }
-.alerta-codigo { font-size: 0.65rem; color: #999; background: #f5f5f5; padding: 1px 6px; border-radius: 3px; margin-left: 4px; }
-.alerta-detalle { font-size: 0.8rem; color: #555; margin-top: 2px; }
-
-.alerta-error .alerta-icon { color: #c62828; }
-.alerta-error { background: #fef2f2; }
-.alerta-warning .alerta-icon { color: #e65100; }
-.alerta-warning { background: #fffbf0; }
-.alerta-info .alerta-icon { color: #1565c0; }
-
-.badge { padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
-.badge-err { background: #fce4ec; color: #c62828; }
-.badge-warn { background: #fff3e0; color: #e65100; }
+/* Tabla de sabores */
+.table-wrap { background: #fff; border-radius: 8px; overflow-x: auto; margin-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th { background: #1e3a5f; color: #fff; padding: 8px 6px; text-align: left; font-size: 0.7rem; text-transform: uppercase; position: sticky; top: 0; }
+th:nth-child(n+2) { text-align: right; }
+td { padding: 6px; border-bottom: 1px solid #f0f0f0; }
+td:nth-child(n+2) { text-align: right; font-variant-numeric: tabular-nums; }
+tr.row-h0 { background: #fff3e0; }
+tr.row-corr { background: #e3f2fd; }
+tr.row-neg { background: #fce4ec; }
+.delta-pos { color: #c62828; } .delta-neg { color: #2e7d32; }
+.badge { padding: 1px 6px; border-radius: 8px; font-size: 0.6rem; font-weight: 600; }
 .badge-ok { background: #e8f5e9; color: #2e7d32; }
+.badge-corr { background: #e3f2fd; color: #1565c0; }
+.badge-h0 { background: #fff3e0; color: #e65100; }
 
-.actions { display: flex; gap: 8px; margin-top: 12px; }
+/* Alertas */
+.sec { background: #fff; border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.sec-h { padding: 10px 12px; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid #eee; }
+.sec-b { display: none; padding: 0; } .sec.open .sec-b { display: block; }
+.sec-badge { padding: 1px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+.sec-badge-err { background: #fce4ec; color: #c62828; }
+.sec-badge-warn { background: #fff3e0; color: #e65100; }
+.sec-badge-ok { background: #e8f5e9; color: #2e7d32; }
+
+.alerta { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #f5f5f5; }
+.alerta:last-child { border-bottom: none; }
+.al-icon { flex-shrink: 0; margin-top: 2px; }
+.al-error .al-icon { color: #c62828; }
+.al-warning .al-icon { color: #e65100; }
+.al-info .al-icon { color: #1565c0; }
+.al-text { flex: 1; }
+.al-sabor { font-weight: 600; font-size: 0.8rem; }
+.al-det { font-size: 0.75rem; color: #555; }
+
+/* Timestamps */
+.ts { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 12px; background: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 0.75rem; }
+.ts-l { color: #999; } .ts-v { font-weight: 500; }
+
+.actions { display: flex; gap: 8px; margin: 12px 0; }
 .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
 .btn-back { background: #f5f5f5; color: #333; }
 .btn-primary { background: #1565c0; color: #fff; }
-
-.empty { text-align: center; padding: 20px; color: #999; font-size: 0.85rem; }
-
-/* Timestamps */
-.ts { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 12px; background: #fff; border-radius: 8px; margin-bottom: 8px; }
-.ts-item { font-size: 0.75rem; }
-.ts-label { color: #999; } .ts-val { font-weight: 500; }
+.empty { text-align: center; padding: 20px; color: #999; }
 </style>
 </head>
 <body>
 <div class="header">
     <h1>{{ data.sucursal.nombre }}</h1>
-    <div class="sub">Revision: {{ data.nombre_hoja }} {% if data.turno.estado == 'confirmado' %}(Confirmado){% endif %}</div>
+    <div class="sub">Analisis: {{ data.nombre_hoja }}{% if data.turno.estado == 'confirmado' %} — Confirmado{% endif %}</div>
 </div>
 
 <div class="container">
     <div class="ts">
-        <div class="ts-item"><span class="ts-label">Fecha:</span> <span class="ts-val">{{ data.turno.fecha }}</span></div>
-        {% if data.turno.inicio_carga %}<div class="ts-item"><span class="ts-label">Inicio:</span> <span class="ts-val">{{ data.turno.inicio_carga }}</span></div>{% endif %}
-        {% if data.turno.fin_carga %}<div class="ts-item"><span class="ts-label">Fin:</span> <span class="ts-val">{{ data.turno.fin_carga }}</span></div>{% endif %}
+        <div><span class="ts-l">Fecha:</span> <span class="ts-v">{{ data.turno.fecha }}</span></div>
+        {% if data.turno.inicio_carga %}<div><span class="ts-l">Inicio:</span> <span class="ts-v">{{ data.turno.inicio_carga }}</span></div>{% endif %}
+        {% if data.turno.fin_carga %}<div><span class="ts-l">Fin:</span> <span class="ts-v">{{ data.turno.fin_carga }}</span></div>{% endif %}
     </div>
 
-    <div class="summary">
-        <div class="sum-card sum-ok">
-            <div class="sum-num">{{ data.sabores|length }}</div>
-            <div class="sum-label">Sabores</div>
+    {% if analisis.tiene_analisis %}
+    <!-- Totales -->
+    <div class="totals">
+        <div class="tot tot-green">
+            <div class="tot-num">{{ "{:,.0f}".format(analisis.totales.venta) }}g</div>
+            <div class="tot-label">Venta total</div>
         </div>
-        <div class="sum-card sum-warn">
-            <div class="sum-num">{{ validacion.n_warnings }}</div>
-            <div class="sum-label">Advertencias</div>
+        <div class="tot tot-blue">
+            <div class="tot-num">{{ analisis.totales.n_sabores }}</div>
+            <div class="tot-label">Sabores</div>
         </div>
-        <div class="sum-card sum-err">
-            <div class="sum-num">{{ validacion.n_errores }}</div>
-            <div class="sum-label">Errores</div>
+        <div class="tot tot-orange">
+            <div class="tot-num">{{ analisis.totales.n_corregidos }}</div>
+            <div class="tot-label">Corregidos</div>
+        </div>
+        <div class="tot tot-red">
+            <div class="tot-num">{{ analisis.totales.n_h0 }}</div>
+            <div class="tot-label">Sin resolver</div>
         </div>
     </div>
 
-    {% set errores = validacion.alertas | selectattr('severidad', 'eq', 'error') | list %}
-    {% set warnings = validacion.alertas | selectattr('severidad', 'eq', 'warning') | list %}
-    {% set infos = validacion.alertas | selectattr('severidad', 'eq', 'info') | list %}
+    {% if analisis.totales.n_latas > 0 or analisis.totales.vdp > 0 %}
+    <div class="totals">
+        <div class="tot">
+            <div class="tot-num">{{ analisis.totales.n_latas }}</div>
+            <div class="tot-label">Latas abiertas ({{ analisis.totales.latas }}g)</div>
+        </div>
+        <div class="tot">
+            <div class="tot-num">{{ analisis.totales.vdp }}g</div>
+            <div class="tot-label">VDP</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabla de sabores -->
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Sabor</th><th>Raw</th><th>Final</th><th>Delta</th><th>Estado</th></tr>
+            </thead>
+            <tbody>
+                {% for s in analisis.sabores %}
+                <tr class="{{ 'row-neg' if s.final < 0 else ('row-h0' if s.status == 'H0' else ('row-corr' if s.status == 'CORREGIDO' else '')) }}">
+                    <td>{{ s.nombre }}</td>
+                    <td>{{ "{:,}".format(s.raw) }}</td>
+                    <td><strong>{{ "{:,}".format(s.final) }}</strong></td>
+                    <td>
+                        {% if s.delta and s.delta != 0 %}
+                        <span class="{{ 'delta-neg' if s.delta < 0 else 'delta-pos' }}">{{ "{:+,}".format(s.delta) }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if s.status == 'OK' %}<span class="badge badge-ok">OK</span>
+                        {% elif s.status == 'CORREGIDO' %}<span class="badge badge-corr">CORR</span>
+                        {% elif s.status == 'H0' %}<span class="badge badge-h0">H0</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if s.correccion %}
+                <tr><td colspan="5" style="font-size:0.7rem;color:#666;padding:2px 6px 6px 20px;">{{ s.correccion }}</td></tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Alertas -->
+    {% set errores = analisis.alertas | selectattr('severidad', 'eq', 'error') | list %}
+    {% set warnings = analisis.alertas | selectattr('severidad', 'eq', 'warning') | list %}
+    {% set infos = analisis.alertas | selectattr('severidad', 'eq', 'info') | list %}
 
     {% if errores %}
-    <div class="section">
-        <div class="section-h">Errores <span class="badge badge-err">{{ errores|length }}</span></div>
-        <div class="section-body">
+    <div class="sec open">
+        <div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Errores <span class="sec-badge sec-badge-err">{{ errores|length }}</span></div>
+        <div class="sec-b">
             {% for a in errores %}
-            <div class="alerta alerta-error">
-                <div class="alerta-icon">&#9888;</div>
-                <div class="alerta-content">
-                    {% if a.sabor %}<div class="alerta-sabor">{{ a.sabor }} <span class="alerta-codigo">{{ a.codigo }}</span></div>{% endif %}
-                    <div class="alerta-detalle">{{ a.detalle }}</div>
-                </div>
-            </div>
+            <div class="alerta al-error"><div class="al-icon">&#9888;</div><div class="al-text">{% if a.sabor %}<div class="al-sabor">{{ a.sabor }}</div>{% endif %}<div class="al-det">{{ a.detalle }}</div></div></div>
             {% endfor %}
         </div>
     </div>
     {% endif %}
 
     {% if warnings %}
-    <div class="section">
-        <div class="section-h">Advertencias <span class="badge badge-warn">{{ warnings|length }}</span></div>
-        <div class="section-body">
+    <div class="sec{{ ' open' if not errores else '' }}">
+        <div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Advertencias <span class="sec-badge sec-badge-warn">{{ warnings|length }}</span></div>
+        <div class="sec-b">
             {% for a in warnings %}
-            <div class="alerta alerta-warning">
-                <div class="alerta-icon">&#9888;</div>
-                <div class="alerta-content">
-                    {% if a.sabor %}<div class="alerta-sabor">{{ a.sabor }} <span class="alerta-codigo">{{ a.codigo }}</span></div>{% endif %}
-                    <div class="alerta-detalle">{{ a.detalle }}</div>
-                </div>
-            </div>
+            <div class="alerta al-warning"><div class="al-icon">&#9888;</div><div class="al-text">{% if a.sabor %}<div class="al-sabor">{{ a.sabor }}</div>{% endif %}<div class="al-det">{{ a.detalle }}</div></div></div>
             {% endfor %}
         </div>
     </div>
     {% endif %}
 
     {% if infos %}
-    <div class="section">
-        <div class="section-h">Info <span class="badge badge-ok">{{ infos|length }}</span></div>
-        <div class="section-body">
+    <div class="sec">
+        <div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Info <span class="sec-badge sec-badge-ok">{{ infos|length }}</span></div>
+        <div class="sec-b">
             {% for a in infos %}
-            <div class="alerta alerta-info">
-                <div class="alerta-icon">&#9432;</div>
-                <div class="alerta-content">
-                    {% if a.sabor %}<div class="alerta-sabor">{{ a.sabor }} <span class="alerta-codigo">{{ a.codigo }}</span></div>{% endif %}
-                    <div class="alerta-detalle">{{ a.detalle }}</div>
-                </div>
-            </div>
+            <div class="alerta al-info"><div class="al-icon">&#9432;</div><div class="al-text">{% if a.sabor %}<div class="al-sabor">{{ a.sabor }}</div>{% endif %}<div class="al-det">{{ a.detalle }}</div></div></div>
             {% endfor %}
         </div>
     </div>
     {% endif %}
 
-    {% if not validacion.alertas %}
-    <div class="section">
-        <div class="empty">Sin alertas. Todo en orden.</div>
-    </div>
+    {% if not analisis.tiene_analisis and not analisis.alertas %}
+    <div class="sec"><div class="empty">Sin datos suficientes para analisis. Cargar ambos turnos (DIA y NOCHE) o el turno anterior.</div></div>
     {% endif %}
 
     <div class="actions">
