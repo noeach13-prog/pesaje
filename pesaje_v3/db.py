@@ -425,6 +425,26 @@ def confirmar_turno(db: sqlite3.Connection, turno_id: int,
     }
 
 
+def borrar_turno(db: sqlite3.Connection, turno_id: int,
+                  pin_supervisor: str) -> dict:
+    """Borra un turno y todos sus datos. Requiere PIN de supervisor."""
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno:
+        return {'ok': False, 'error': 'Turno no encontrado'}
+
+    suc = db.execute(
+        "SELECT pin_supervisor FROM sucursales WHERE id = ?",
+        (turno['sucursal_id'],),
+    ).fetchone()
+    if not suc or suc['pin_supervisor'] != pin_supervisor.strip():
+        return {'ok': False, 'error': 'PIN de supervisor incorrecto'}
+
+    # CASCADE borra sabores_turno, vdp_turno, consumo_turno, notas_turno, log_actividad
+    db.execute("DELETE FROM turnos WHERE id = ?", (turno_id,))
+    db.commit()
+    return {'ok': True}
+
+
 def desbloquear_turno(db: sqlite3.Connection, turno_id: int,
                       pin_supervisor: str) -> dict:
     """Desbloquea un turno confirmado para editar. Requiere PIN de supervisor."""

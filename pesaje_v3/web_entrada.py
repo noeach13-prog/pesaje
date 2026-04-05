@@ -19,7 +19,7 @@ from .db import (
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
     registrar_inicio_carga, confirmar_turno, registrar_actividad,
-    desbloquear_turno, obtener_turno,
+    desbloquear_turno, borrar_turno, obtener_turno,
 )
 
 entrada_bp = Blueprint(
@@ -429,6 +429,31 @@ def revision(turno_id):
 
     return render_template('entrada/revision.html',
                            data=data, analisis=analisis)
+
+
+@entrada_bp.route('/entrada/api/borrar-turno', methods=['POST'])
+def api_borrar_turno():
+    """Borra turno completo con PIN de supervisor."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+
+    payload = request.get_json() or {}
+    turno_id = payload.get('turno_id')
+    pin = payload.get('pin_supervisor', '')
+
+    if not turno_id or not pin:
+        return jsonify({'ok': False, 'error': 'Faltan datos'}), 400
+
+    db = get_db()
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno or turno['sucursal_id'] != sid:
+        db.close()
+        return jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404
+
+    resultado = borrar_turno(db, turno_id, pin)
+    db.close()
+    return jsonify(resultado)
 
 
 @entrada_bp.route('/entrada/api/inicio-carga', methods=['POST'])
