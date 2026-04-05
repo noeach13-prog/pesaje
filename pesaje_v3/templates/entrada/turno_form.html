@@ -455,12 +455,86 @@ if (CONFIRMADO) {
     });
 }
 
+const _FIELD_NAMES = {
+    'abierta':'Abierta', 'celiaca':'Celiaca',
+    'cerrada_1':'Cerrada 1','cerrada_2':'Cerrada 2','cerrada_3':'Cerrada 3',
+    'cerrada_4':'Cerrada 4','cerrada_5':'Cerrada 5','cerrada_6':'Cerrada 6',
+    'entrante_1':'Entrante 1','entrante_2':'Entrante 2',
+};
+
 function toggle(fl, e) {
     if(e.target.tagName==='INPUT'||e.target.tagName==='BUTTON'||e.target.tagName==='SELECT') return;
-    if(active && active!==fl) active.classList.remove('active');
+
+    // Si estamos CERRANDO un sabor que tiene datos, comparar con turno anterior
+    if(active && active===fl && fl.classList.contains('active') && fl.classList.contains('done')) {
+        compararConAnterior(fl);
+    }
+
+    if(active && active!==fl) {
+        // Cerrando un sabor para abrir otro — comparar el que se cierra
+        if(active.classList.contains('done')) compararConAnterior(active);
+        active.classList.remove('active');
+    }
     fl.classList.toggle('active');
     active = fl.classList.contains('active') ? fl : null;
     if(active) { const inp=active.querySelector('.fl-body input'); if(inp)setTimeout(()=>inp.focus(),50); }
+}
+
+function compararConAnterior(fl) {
+    const nombre = fl.dataset.n;
+    const refData = REF[nombre];
+    if(!refData) return;
+
+    // Recoger todos los campos actuales y compararlos
+    const diffs = [];
+    fl.querySelectorAll('input[type=number]').forEach(inp => {
+        const field = inp.dataset.f;
+        const val = inp.value.trim();
+        if(!val || !field) return;
+        const n = parseInt(val);
+        if(isNaN(n)) return;
+
+        const prev = refData[field];
+        if(prev == null) {
+            // Campo nuevo que no existia antes
+            if(n > 0) diffs.push({field, n, prev: null, diff: n, tipo: 'NUEVO'});
+            return;
+        }
+        const diff = n - prev;
+        const pct = Math.abs(diff / prev * 100);
+        if(pct > 30 && Math.abs(diff) > 500) {
+            diffs.push({field, n, prev, diff, tipo: diff > 0 ? 'MAS' : 'MENOS'});
+        }
+    });
+
+    // Campos del turno anterior que desaparecieron
+    for(const field of Object.keys(_FIELD_NAMES)) {
+        if(refData[field] != null && refData[field] > 0) {
+            const inp = fl.querySelector('[data-f="'+field+'"]');
+            const val = inp ? inp.value.trim() : '';
+            if(!val || val === '0') {
+                diffs.push({field, n: 0, prev: refData[field], diff: -refData[field], tipo: 'DESAPARECIO'});
+            }
+        }
+    }
+
+    if(diffs.length === 0) return;
+
+    // Armar mensaje resumen
+    let msg = nombre + ': hay diferencias con el turno anterior:\n\n';
+    for(const d of diffs) {
+        const fn = _FIELD_NAMES[d.field] || d.field;
+        if(d.tipo === 'NUEVO') {
+            msg += '  + ' + fn + ': ' + d.n + 'g (NO estaba antes)\n';
+        } else if(d.tipo === 'DESAPARECIO') {
+            msg += '  - ' + fn + ': antes era ' + d.prev + 'g, ahora no esta\n';
+        } else {
+            msg += '  ' + fn + ': antes ' + d.prev + 'g, ahora ' + d.n + 'g (' + Math.abs(d.diff) + 'g de ' + d.tipo + ')\n';
+        }
+    }
+    msg += '\nEsta todo bien?';
+
+    showAlert('Resumen de cambios: ' + nombre, msg, 'compare', null);
 }
 
 function buscar(q) {
@@ -511,33 +585,6 @@ function v(inp) {
             showAlert('Peso no termina en 0 o 5',
                 n+'g termina en '+ultimo+'. La balanza pesa de a 5g. Quisiste poner '+sugerido5+'g?',
                 'warning', inp);
-            upd(inp); return;
-        }
-    }
-
-    // Comparacion con turno anterior
-    const refData=REF[nombre];
-    if(refData && field && refData[field]!=null){
-        const prev=refData[field];
-        const diff=n-prev;
-        const pct=Math.abs(diff/prev*100);
-        // Alerta si difiere >30% y >500g (cambio significativo)
-        if(pct>30 && Math.abs(diff)>500){
-            inp.classList.add('warn');
-            const fieldNames = {
-                'abierta': 'la abierta', 'celiaca': 'la celiaca',
-                'cerrada_1':'la cerrada 1','cerrada_2':'la cerrada 2','cerrada_3':'la cerrada 3',
-                'cerrada_4':'la cerrada 4','cerrada_5':'la cerrada 5','cerrada_6':'la cerrada 6',
-                'entrante_1':'el entrante 1','entrante_2':'el entrante 2',
-            };
-            const fn = fieldNames[field] || field;
-            const dir = diff>0 ? 'MAS' : 'MENOS';
-            showAlert('Diferencia con turno anterior',
-                nombre + ': Pusiste ' + n + 'g en ' + fn + '.\n\n' +
-                'En el turno anterior era ' + prev + 'g.\n' +
-                'Eso es ' + Math.abs(diff) + 'g de ' + dir + '.\n\n' +
-                'Esta bien o lo queres corregir?',
-                'compare',inp);
             upd(inp); return;
         }
     }
