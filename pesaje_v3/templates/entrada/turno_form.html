@@ -240,7 +240,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
                     <div class="chip">
                         <input type="number" inputmode="numeric" data-f="abierta" value="{{ s.abierta if s and s.abierta is not none else '' }}" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()">
                         <span class="unit">g</span>
-                        {% if r and r.abierta is not none %}<span class="ref">ant:{{ r.abierta }}</span>{% endif %}
+                        {% if r and r.abierta is not none %}<span class="ref">antes:{{ r.abierta }}</span>{% endif %}
                     </div>
                 </div>
             </div>
@@ -524,9 +524,19 @@ function v(inp) {
         // Alerta si difiere >30% y >500g (cambio significativo)
         if(pct>30 && Math.abs(diff)>500){
             inp.classList.add('warn');
-            const dir=diff>0?'subio':'bajo';
-            showAlert('Cambio vs turno anterior',
-                nombre+' '+field+': '+dir+' '+Math.abs(diff)+'g respecto al turno anterior ('+prev+'g -> '+n+'g). Verificar.',
+            const fieldNames = {
+                'abierta': 'la abierta', 'celiaca': 'la celiaca',
+                'cerrada_1':'la cerrada 1','cerrada_2':'la cerrada 2','cerrada_3':'la cerrada 3',
+                'cerrada_4':'la cerrada 4','cerrada_5':'la cerrada 5','cerrada_6':'la cerrada 6',
+                'entrante_1':'el entrante 1','entrante_2':'el entrante 2',
+            };
+            const fn = fieldNames[field] || field;
+            const dir = diff>0 ? 'MAS' : 'MENOS';
+            showAlert('Diferencia con turno anterior',
+                nombre + ': Pusiste ' + n + 'g en ' + fn + '.\n\n' +
+                'En el turno anterior era ' + prev + 'g.\n' +
+                'Eso es ' + Math.abs(diff) + 'g de ' + dir + '.\n\n' +
+                'Esta bien o lo queres corregir?',
                 'compare',inp);
             upd(inp); return;
         }
