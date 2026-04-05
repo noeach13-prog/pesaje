@@ -451,7 +451,7 @@ if (!CONFIRMADO) {
 // Si confirmado, deshabilitar todos los inputs
 if (CONFIRMADO) {
     document.querySelectorAll('input,button,select').forEach(el => {
-        if(!el.closest('.top') && !el.closest('.search') && el.id!=='q') el.disabled=true;
+        if(!el.closest('.top') && !el.closest('.search') && !el.closest('.confirmed-banner') && el.id!=='q') el.disabled=true;
     });
 }
 
