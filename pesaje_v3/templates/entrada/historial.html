@@ -42,7 +42,10 @@ a { color: #1565c0; text-decoration: none; font-weight: 600; }
                 <td>{{ t.fecha }}</td>
                 <td>{{ t.tipo_turno }}</td>
                 <td><span class="badge badge-{{ t.estado }}">{{ t.estado }}</span></td>
-                <td><a href="/entrada/turno/{{ t.id }}">Abrir</a></td>
+                <td>
+                    <a href="/entrada/turno/{{ t.id }}">Abrir</a>
+                    <a href="/entrada/revision/{{ t.id }}" style="margin-left:8px;color:#555;">Analisis</a>
+                </td>
             </tr>
             {% endfor %}
             {% if not turnos %}
