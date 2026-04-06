@@ -81,6 +81,24 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
 
         resultado['tiene_analisis'] = True
 
+        # Detectar INTRADUP no corregidos por el pipeline
+        # Chequea AMBOS turnos (DIA y NOCHE) porque el doble registro
+        # puede estar en el turno de referencia (DIA), no en el analizado.
+        intradup_por_sabor = {}
+        from .constantes_c3 import PFIT_TOL_INTRA
+        for turno_crudo in [datos_dia.turno_dia, datos_dia.turno_noche]:
+            for nombre, sab in turno_crudo.sabores.items():
+                if not sab.entrantes or not sab.cerradas:
+                    continue
+                dup_pesos = []
+                for e in sab.entrantes:
+                    for c in sab.cerradas:
+                        if abs(int(e) - int(c)) <= PFIT_TOL_INTRA:
+                            dup_pesos.append(int(e))
+                            break
+                if dup_pesos and nombre not in intradup_por_sabor:
+                    intradup_por_sabor[nombre] = sum(dup_pesos)
+
         # Ventas por sabor
         venta_total = 0
         latas_total = 0
@@ -104,10 +122,18 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
             proto = sc3.prototipo
             delta = proto.delta if proto else (c4_corr.delta if c4_corr else 0)
 
+            # Corrección web: INTRADUP detectado en nivel 3 pero no corregido por pipeline
+            web_corr = False
+            if not proto and not c4_corr and nombre in intradup_por_sabor:
+                dup_peso = intradup_por_sabor[nombre]
+                vf = sc.venta_raw - dup_peso
+                delta = -dup_peso
+                web_corr = True
+
             if res and res == ResolucionC3.ESCALAR_C4:
                 status = 'H0'
                 n_h0 += 1
-            elif proto or c4_corr:
+            elif proto or c4_corr or web_corr:
                 status = 'CORREGIDO'
                 n_corregidos += 1
             else:
@@ -129,6 +155,9 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
             elif c4_corr:
                 sabor_info['correccion'] = c4_corr.motivo[:80]
                 sabor_info['confianza'] = c4_corr.confianza
+            elif web_corr:
+                sabor_info['correccion'] = f'Doble registro: entrante duplica cerrada ({intradup_por_sabor[nombre]}g descontado)'
+                sabor_info['confianza'] = 0.70
 
             # Alerta si hay problema
             if vf < -200:
