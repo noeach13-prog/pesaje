@@ -195,39 +195,28 @@ def _armar_turno_unico(db, sucursal_id, fecha, modo, n_ctx):
 
 
 def _cargar_contexto(db, sucursal_id, fecha, modo, n_ctx, excluir_ids):
-    """Carga ±n_ctx turnos adyacentes como contexto para el pipeline."""
+    """Carga turnos adyacentes como contexto para el pipeline.
+    Ordena por cercanía a la fecha target. Los más cercanos primero."""
+    from datetime import date as date_cls
+
+    target = date_cls.fromisoformat(fecha)
+
     rows = db.execute(
         """SELECT id, fecha, tipo_turno FROM turnos
-           WHERE sucursal_id = ? ORDER BY fecha, tipo_turno""",
+           WHERE sucursal_id = ? AND id NOT IN ({})
+           ORDER BY fecha, tipo_turno""".format(
+            ','.join(str(i) for i in excluir_ids) if excluir_ids else '0'
+        ),
         (sucursal_id,),
     ).fetchall()
 
+    # Ordenar por cercanía a la fecha target
+    rows_sorted = sorted(rows, key=lambda r: abs((date_cls.fromisoformat(r['fecha']) - target).days))
+
     contexto = []
-    idx = 0
-    for row in rows:
-        if row['id'] in excluir_ids:
-            continue
-        tc = _turno_db_to_crudo(db, row['id'], modo, indice=idx)
+    for idx, row in enumerate(rows_sorted[:n_ctx * 2]):
+        tc = _turno_db_to_crudo(db, row['id'], modo, indice=idx + 2)  # indice > 1 para contexto
         if tc and tc.sabores:
             contexto.append(tc)
-            idx += 1
 
-    # Limitar a los más cercanos a la fecha target
-    # Ordenar por cercanía a fecha
-    from datetime import date
-    target = date.fromisoformat(fecha)
-    contexto.sort(key=lambda tc: abs((date.fromisoformat(
-        _fecha_de_nombre_hoja(tc.nombre_hoja, target)) - target).days))
-
-    return contexto[:n_ctx * 2]  # ±n_ctx = hasta 2*n_ctx turnos
-
-
-def _fecha_de_nombre_hoja(nombre_hoja: str, fallback) -> str:
-    """Intenta extraer fecha del nombre_hoja. Si falla, usa fallback."""
-    # nombre_hoja es "Jueves 3 (DIA)" o "Jueves 3"
-    import re
-    m = re.search(r'(\d+)', nombre_hoja)
-    if m:
-        day = int(m.group(1))
-        return fallback.replace(day=min(day, 28)).isoformat()
-    return fallback.isoformat()
+    return contexto
