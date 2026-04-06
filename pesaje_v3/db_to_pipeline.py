@@ -91,12 +91,27 @@ def armar_datos_dia(db: sqlite3.Connection, sucursal_id: int,
     suc = db.execute("SELECT * FROM sucursales WHERE id = ?", (sucursal_id,)).fetchone()
     if not suc:
         return None
-    modo = suc['modo']
 
-    if modo == 'DIA_NOCHE':
-        return _armar_dia_noche(db, sucursal_id, fecha, modo, turnos_contexto)
-    else:
-        return _armar_turno_unico(db, sucursal_id, fecha, modo, turnos_contexto)
+    # Buscar todos los turnos de esta fecha
+    turnos_fecha = db.execute(
+        "SELECT id, tipo_turno FROM turnos WHERE sucursal_id=? AND fecha=?",
+        (sucursal_id, fecha),
+    ).fetchall()
+    tipos = {t['tipo_turno'] for t in turnos_fecha}
+
+    # Estrategia flexible: probar en orden de preferencia
+    # 1. DIA + NOCHE del mismo dia (si existen ambos)
+    if 'DIA' in tipos and 'NOCHE' in tipos:
+        r = _armar_dia_noche(db, sucursal_id, fecha, 'DIA_NOCHE', turnos_contexto)
+        if r:
+            return r
+
+    # 2. Turno unico: dia anterior + dia actual (cualquier tipo)
+    r = _armar_turno_unico(db, sucursal_id, fecha, 'TURNO_UNICO', turnos_contexto)
+    if r:
+        return r
+
+    return None
 
 
 def _armar_dia_noche(db, sucursal_id, fecha, modo, n_ctx):
@@ -137,19 +152,22 @@ def _armar_dia_noche(db, sucursal_id, fecha, modo, n_ctx):
 
 
 def _armar_turno_unico(db, sucursal_id, fecha, modo, n_ctx):
-    """Arma DatosDia para modo TURNO_UNICO.
-    turno_dia = día anterior (referencia), turno_noche = día actual."""
-    # Turno actual
+    """Arma DatosDia comparando turno anterior vs turno actual.
+    turno_dia = ultimo turno antes de esta fecha (referencia).
+    turno_noche = turno mas reciente de esta fecha (actual).
+    Funciona para TURNO_UNICO, y tambien como fallback para DIA_NOCHE
+    cuando solo hay un turno del dia (compara con dia anterior)."""
+    # Turno actual: el mas reciente de esta fecha
     t_actual = db.execute(
-        "SELECT id FROM turnos WHERE sucursal_id=? AND fecha=?",
+        "SELECT id FROM turnos WHERE sucursal_id=? AND fecha=? ORDER BY tipo_turno DESC LIMIT 1",
         (sucursal_id, fecha),
     ).fetchone()
     if not t_actual:
         return None
 
-    # Turno anterior (referencia)
+    # Turno anterior: el mas reciente antes de esta fecha
     t_anterior = db.execute(
-        "SELECT id, fecha FROM turnos WHERE sucursal_id=? AND fecha<? ORDER BY fecha DESC LIMIT 1",
+        "SELECT id, fecha FROM turnos WHERE sucursal_id=? AND fecha<? ORDER BY fecha DESC, tipo_turno DESC LIMIT 1",
         (sucursal_id, fecha),
     ).fetchone()
     if not t_anterior:
