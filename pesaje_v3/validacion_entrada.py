@@ -49,10 +49,17 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
     # Armar DatosDia para pipeline
     datos_dia = armar_datos_dia(db, turno['sucursal_id'], turno['fecha'])
     if not datos_dia:
+        modo = suc['modo'] if suc else 'DIA_NOCHE'
+        tipo = turno['tipo_turno']
+        fecha = turno['fecha']
+        if modo == 'DIA_NOCHE':
+            falta = 'NOCHE' if tipo == 'DIA' else 'DIA'
+            msg = f'Para ver el analisis de ventas del {fecha}, falta cargar el turno {falta} de ese mismo dia.'
+        else:
+            msg = f'Para ver el analisis de ventas del {fecha}, falta cargar el turno del dia anterior.'
         resultado['alertas'].append({
             'nivel': 'info', 'severidad': 'info', 'sabor': None,
-            'codigo': 'SIN_PAR',
-            'detalle': 'Falta el turno par (DIA/NOCHE) o turno anterior para analisis completo.',
+            'codigo': 'SIN_PAR', 'detalle': msg,
         })
         return resultado
 
