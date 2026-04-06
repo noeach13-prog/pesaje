@@ -456,6 +456,24 @@ def api_borrar_turno():
     return jsonify(resultado)
 
 
+@entrada_bp.route('/entrada/api/debug-turnos')
+def api_debug_turnos():
+    """Debug: muestra datos crudos de todos los turnos."""
+    db = get_db()
+    turnos = db.execute('SELECT id, fecha, tipo_turno, estado FROM turnos ORDER BY fecha, tipo_turno').fetchall()
+    result = []
+    for t in turnos:
+        sabs = db.execute('SELECT nombre_norm, abierta, celiaca, cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6, entrante_1, entrante_2 FROM sabores_turno WHERE turno_id=? ORDER BY nombre_norm', (t['id'],)).fetchall()
+        sabores = []
+        for s in sabs:
+            cerr = [s[f'cerrada_{i}'] for i in range(1,7) if s[f'cerrada_{i}'] is not None]
+            ent = [s[f'entrante_{i}'] for i in range(1,3) if s[f'entrante_{i}'] is not None]
+            sabores.append({'nombre': s['nombre_norm'], 'ab': s['abierta'], 'cel': s['celiaca'], 'cerr': cerr, 'ent': ent})
+        result.append({'id': t['id'], 'fecha': t['fecha'], 'tipo': t['tipo_turno'], 'estado': t['estado'], 'sabores': sabores})
+    db.close()
+    return jsonify(result)
+
+
 @entrada_bp.route('/entrada/api/inicio-carga', methods=['POST'])
 def api_inicio_carga():
     """Registra timestamp del dispositivo cuando abre el form (solo la primera vez)."""
