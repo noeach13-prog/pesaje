@@ -1344,6 +1344,160 @@ def test_pf1_dia_noche_delta_es_offset():
 
 
 # ===================================================================
+# J) OMISION_BILATERAL_RESIDUAL — tests doctrinales
+#
+# Estatuto: RESIDUAL, no bilateral general. Corrige el residuo que
+# queda despues de C3/C4 cuando una cerrada de DIA desaparece en
+# NOCHE y reaparece en forward. No genera hipotesis nuevas; ajusta
+# correcciones/H0 existentes.
+#
+# Si manana un caso legitimo queda con residuo > cerrada pero G3
+# lo frena, eso marca el borde de esta version, no un fallo.
+# ===================================================================
+
+def _build_bilateral_datos(cerr_dia, cerr_noche, cerr_forward,
+                            ab_dia=3000, ab_noche=2000,
+                            ent_noche=None, ent_dia=None):
+    """Helper: construye DatosDia sintetico para tests bilaterales."""
+    from pesaje_v3.modelos import SaborCrudo, TurnoCrudo, DatosDia
+
+    d = TurnoCrudo(nombre_hoja='T_DIA', indice=0, sabores={
+        'STEST': SaborCrudo(nombre='STEST', nombre_norm='STEST',
+                            abierta=ab_dia, celiaca=None,
+                            cerradas=cerr_dia, entrantes=ent_dia or []),
+    })
+    n = TurnoCrudo(nombre_hoja='T_NOCHE', indice=1, sabores={
+        'STEST': SaborCrudo(nombre='STEST', nombre_norm='STEST',
+                            abierta=ab_noche, celiaca=None,
+                            cerradas=cerr_noche, entrantes=ent_noche or []),
+    })
+    fwd = TurnoCrudo(nombre_hoja='T_FWD', indice=2, sabores={
+        'STEST': SaborCrudo(nombre='STEST', nombre_norm='STEST',
+                            abierta=1500, celiaca=None,
+                            cerradas=cerr_forward, entrantes=[]),
+    })
+    return DatosDia(dia_label='test', turno_dia=d, turno_noche=n,
+                    contexto=[fwd], modo='DIA_NOCHE')
+
+
+def _run_pipeline(datos):
+    """Corre C2->C3->C4 y retorna venta final de STEST."""
+    from pesaje_v3.capa2_contrato import calcular_contabilidad
+    from pesaje_v3.capa3_motor import clasificar, canonicalizar_nombres, aplicar_canonicalizacion
+    from pesaje_v3.capa4_expediente import resolver_escalados
+
+    canon = canonicalizar_nombres(datos)
+    aplicar_canonicalizacion(datos, canon)
+    cont = calcular_contabilidad(datos)
+    c3 = clasificar(datos, cont)
+    c4 = resolver_escalados(datos, cont, c3)
+
+    sc = cont.sabores.get('STEST')
+    corr = next((c for c in c4.correcciones if c.nombre_norm == 'STEST'), None)
+    est = next((e for e in c4.estimaciones_h0 if e.nombre_norm == 'STEST'), None)
+
+    vf = corr.venta_corregida if corr else (est.venta_estimada if est else sc.venta_raw)
+    motivo = corr.motivo if corr else (est.motivo if est else '')
+    return vf, motivo, sc.venta_raw
+
+
+def test_bilateral_residual_positivo_cerrada_omitida_en_noche():
+    """Positivo 1: cerrada DIA desaparece, NOCHE tiene otra cerrada nueva + entrante.
+    Patron CHOCOLATE D27 Triunvirato: C4 resuelve parcialmente (GENEALOGIA/MISMATCH),
+    pero deja residuo alto porque una cerrada adicional fue omitida en NOCHE.
+    La bilateral actua sobre el residuo, no sobre el episodio crudo.
+    """
+    # Escenario: DIA tiene cerr [6665, 6460, 6460], NOCHE tiene cerr [6480, 6460]
+    # ent [6560]. C4 resuelve 6665->6560 como GENEALOGIA (delta=-105).
+    # Pero 6685 en forward no tiene pareja en NOCHE -> omision bilateral.
+    datos = _build_bilateral_datos(
+        cerr_dia=[6665, 6460, 6460],
+        cerr_noche=[6480, 6460],
+        cerr_forward=[6480, 6460, 6685, 6560],
+        ab_dia=3025, ab_noche=1920,
+        ent_noche=[6560],
+    )
+    vf, motivo, raw = _run_pipeline(datos)
+
+    # raw ~ 3025+6665+6460+6460 + 6560 - (1920+6480+6460+6560) = 7750
+    # GENEALOGIA: -105 -> 7645. Bilateral: -6685 -> 960
+    assert raw > 7000, f'raw deberia ser >7000, fue {raw}'
+    assert vf < 2000, f'bilateral deberia reducir a <2000, fue {vf}'
+    assert vf >= 0, f'bilateral no debe producir negativo, fue {vf}'
+
+
+def test_bilateral_residual_positivo_h0_con_residuo():
+    """Positivo 2: cerrada desaparece, C4 no resuelve, H0 con residuo alto.
+    Patron SAMBAYON D16 SM Feb: cerr unica desaparece, forward la tiene.
+    """
+    datos = _build_bilateral_datos(
+        cerr_dia=[6660],
+        cerr_noche=[],             # cerrada desaparecio completamente
+        cerr_forward=[6660],       # reaparece exacta
+        ab_dia=4000, ab_noche=3700,
+    )
+    vf, motivo, raw = _run_pipeline(datos)
+
+    # raw ~ 4000+6660 - 3700 = 6960. Con bilateral: 6960 - 6660 = 300.
+    assert raw > 6000, f'raw deberia ser alto, fue {raw}'
+    assert vf < 1500, f'bilateral deberia reducir a <1500, fue {vf}'
+    assert vf >= 0, f'no negativo, fue {vf}'
+
+
+def test_bilateral_residual_negativo_raw_menor_que_cerrada():
+    """Negativo: raw < cerrada desaparecida. La cerrada se abrio, no se omitio.
+    Patron BOSQUE D16 SM Feb: raw=765, cerr=6535. Bilateral NO aplica (G1 frena).
+    """
+    datos = _build_bilateral_datos(
+        cerr_dia=[6535],
+        cerr_noche=[],             # cerrada desaparecio
+        cerr_forward=[6535],       # reaparece exacta
+        ab_dia=3000, ab_noche=2235,  # raw ~ 3000+6535-2235 = 7300... no
+    )
+    # Necesito raw < cerrada. ab_dia bajo + cerrada = stock alto,
+    # pero ab_noche alto = poco vendido.
+    datos2 = _build_bilateral_datos(
+        cerr_dia=[6535],
+        cerr_noche=[],
+        cerr_forward=[6535],
+        ab_dia=1000, ab_noche=235,  # raw = 1000+6535-235 = 7300, no sirve
+    )
+    # El truco: para que raw < cerrada, la abierta tiene que subir mucho
+    # (apertura real: se abrio la cerrada y la abierta subio).
+    datos3 = _build_bilateral_datos(
+        cerr_dia=[6535],
+        cerr_noche=[],
+        cerr_forward=[6535],
+        ab_dia=1000, ab_noche=6300,  # raw = 1000+6535-6300 = 1235. < 6535 ok
+    )
+    vf, motivo, raw = _run_pipeline(datos3)
+
+    # raw = ~1235. Cerr = 6535. G1 falla: 1235 < 6535. Bilateral NO aplica.
+    assert raw < 6535, f'raw deberia ser menor que cerrada, fue {raw}'
+    assert 'OMISION_BILATERAL_RESIDUAL' not in motivo, \
+        f'bilateral NO deberia aplicar cuando raw < cerrada. motivo: {motivo[:80]}'
+
+
+def test_bilateral_residual_borde_cerrada_en_noche_con_mismatch():
+    """Borde: cerrada DIA tiene pareja en NOCHE dentro de 200g (MISMATCH_LEVE).
+    No es omision — es varianza de pesaje. Bilateral NO aplica (G2 frena).
+    Patron FLAN D9 Feb: cerr DIA 6675, NOCHE 6675-80=6595 (diff=80<=200).
+    """
+    datos = _build_bilateral_datos(
+        cerr_dia=[6675],
+        cerr_noche=[6595],         # mismatch leve (80g)
+        cerr_forward=[6675],       # reaparece
+        ab_dia=3000, ab_noche=2000,
+    )
+    vf, motivo, raw = _run_pipeline(datos)
+
+    # La cerrada 6675 matchea 6595 en NOCHE (diff=80 <= 200g).
+    # G2 no se cumple: la cerrada tiene pareja en NOCHE.
+    assert 'OMISION_BILATERAL_RESIDUAL' not in motivo, \
+        f'bilateral NO deberia aplicar con mismatch leve en NOCHE. motivo: {motivo[:80]}'
+
+
+# ===================================================================
 # MAIN
 # ===================================================================
 
