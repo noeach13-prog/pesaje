@@ -202,15 +202,15 @@ body {
                 <div class="detail-label">Ventas diarias (ultimos {{ p.ventas_hist|length }} dias con venta)</div>
                 <div class="detail-row">
                     {% for v in p.ventas_hist[-7:] %}
-                    <div class="detail-item" style="min-width:110px;"><span>Dia</span><strong>{{ "{:,}".format(v) }}g</strong></div>
+                    <div class="detail-item" style="min-width:110px;"><span>{{ v.fecha[5:] }}</span><strong>{{ "{:,}".format(v.venta) }}g</strong></div>
                     {% endfor %}
                 </div>
                 {% if p.ventas_hist|length > 1 %}
                 {% set show_ventas = p.ventas_hist[-7:] %}
                 <div class="hist-bar">
-                    {% set max_v = show_ventas|max if show_ventas|max > 0 else 1 %}
+                    {% set max_v = show_ventas|map(attribute='venta')|max if show_ventas|map(attribute='venta')|max > 0 else 1 %}
                     {% for v in show_ventas %}
-                    <div class="hist-bar-item" style="height:{{ (v / max_v * 34)|int + 4 }}px;width:{{ (100 / show_ventas|length)|int - 2 }}%;"></div>
+                    <div class="hist-bar-item" style="height:{{ (v.venta / max_v * 34)|int + 4 }}px;width:{{ (100 / show_ventas|length)|int - 2 }}%;"></div>
                     {% endfor %}
                 </div>
                 {% endif %}

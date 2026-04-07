@@ -213,7 +213,7 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                 sabor_info['correccion'] = proto.descripcion[:80]
                 sabor_info['confianza'] = proto.confianza
             elif c4_corr:
-                sabor_info['correccion'] = c4_corr.motivo[:80]
+                sabor_info['correccion'] = _resumen_correccion(c4_corr)
                 sabor_info['confianza'] = c4_corr.confianza
 
             # Senales C5 si se ejecuto analisis profundo
@@ -433,7 +433,7 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                     sabor_info['correccion'] = proto.descripcion[:80]
                     sabor_info['confianza'] = proto.confianza
                 elif c4_corr:
-                    sabor_info['correccion'] = c4_corr.motivo[:80]
+                    sabor_info['correccion'] = _resumen_correccion(c4_corr)
                     sabor_info['confianza'] = c4_corr.confianza
 
                 d = datos.turno_dia.sabores.get(nombre)
@@ -655,6 +655,40 @@ def validar_turno_completo(db: sqlite3.Connection, turno_id: int) -> Dict:
     return resultado
 
 
+def _resumen_correccion(c4_corr) -> str:
+    """Traduce motivo técnico C4 a resumen legible para el header."""
+    m = c4_corr.motivo or ''
+    if 'COMPOSICION' in m:
+        return 'Correccion multiple combinada'
+    if 'FORZADO_H0' in m:
+        return 'Estimacion forzada (revisar)'
+    if 'PHANTOM_DIA' in m:
+        return 'Cerrada fantasma eliminada (turno anterior)'
+    if 'PHANTOM_NOCHE' in m:
+        return 'Cerrada fantasma eliminada (turno actual)'
+    if 'OMISION_DIA' in m:
+        return 'Cerrada faltante recuperada (turno anterior)'
+    if 'OMISION_NOCHE' in m:
+        return 'Cerrada faltante recuperada (turno actual)'
+    if 'OMISION_BILATERAL' in m:
+        return 'Cerrada omitida detectada por turno siguiente'
+    if 'MISMATCH_LEVE' in m:
+        return 'Ajuste por varianza de pesaje'
+    if 'GENEALOGIA' in m:
+        return 'Entrante reclasificado como cerrada'
+    if 'ENTRANTE_MISMO_CAN' in m:
+        return 'Entrante duplicado descontado'
+    if 'ENTRANTE_DUP' in m:
+        return 'Entrante duplicado descontado'
+    if 'APERTURA_REAL' in m:
+        return 'Apertura de cerrada confirmada'
+    if 'CONTINUIDAD' in m:
+        return 'Varianza de pesaje ajustada'
+    if 'DUPLICADO_CERRADA' in m:
+        return 'Cerrada duplicada detectada'
+    return f'Correccion aplicada ({c4_corr.delta:+d}g)'
+
+
 def _explicar_caso(nombre, sc, d, n, proto, c4_corr, web_corr, dup_peso, vf, status):
     """
     Genera explicacion en espanol claro para verificacion humana.
@@ -795,9 +829,30 @@ def _explicar_caso(nombre, sc, d, n, proto, c4_corr, web_corr, dup_peso, vf, sta
     elif c4_corr:
         L.append('')
         L.append('QUE PASO:')
-        L.append(f'  Se detecto una combinacion de problemas que requirio analisis cruzado con otros turnos.')
-        if c4_corr.motivo:
-            L.append(f'  Detalle: {c4_corr.motivo}')
+        # Traducir motivo técnico a lenguaje claro
+        m = c4_corr.motivo or ''
+        if 'PHANTOM_DIA' in m:
+            L.append(f'  Una cerrada del turno anterior no deberia estar (es "fantasma"). Se elimino del calculo.')
+        elif 'PHANTOM_NOCHE' in m:
+            L.append(f'  Una cerrada del turno actual no deberia estar (es "fantasma"). Se elimino del calculo.')
+        elif 'OMISION_DIA' in m:
+            L.append(f'  Faltaba una cerrada en el turno anterior. Se agrego al calculo porque aparece en turnos cercanos.')
+        elif 'OMISION_NOCHE' in m:
+            L.append(f'  Faltaba una cerrada en el turno actual. Se agrego al calculo.')
+        elif 'MISMATCH_LEVE' in m:
+            L.append(f'  Una cerrada cambio levemente de peso entre turnos (varianza de pesaje). Se ajusto.')
+        elif 'GENEALOGIA' in m:
+            L.append(f'  Un entrante se convirtio en cerrada (o viceversa). Se ajusto el calculo.')
+        elif 'ENTRANTE_MISMO_CAN' in m:
+            L.append(f'  Un entrante resulto ser la misma lata que una cerrada (doble registro). Se desconto.')
+        elif 'APERTURA_REAL' in m:
+            L.append(f'  Se confirmo que una cerrada fue abierta durante el turno.')
+        elif 'CONTINUIDAD' in m:
+            L.append(f'  Una cerrada cambio de peso entre turnos pero es la misma lata fisica (varianza de pesaje).')
+        elif 'COMPOSICION' in m:
+            L.append(f'  Se detectaron multiples problemas combinados que se resolvieron en conjunto.')
+        else:
+            L.append(f'  Se detecto una anomalia que requirio analisis cruzado con turnos cercanos.')
         L.append('')
         L.append('QUE SE HIZO:')
         L.append(f'  Se analizo el historial de este sabor en turnos cercanos para encontrar la causa.')

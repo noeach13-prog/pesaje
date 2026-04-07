@@ -597,7 +597,7 @@ def _calcular_sugerencia_pedido(db, data):
         for i in range(1, len(fechas_ord)):
             v = cierre_por_dia[fechas_ord[i - 1]] - cierre_por_dia[fechas_ord[i]]
             if v > 0:
-                ventas_dia.append(v)
+                ventas_dia.append({'fecha': fechas_ord[i], 'venta': v})
         ventas_diarias_por_sabor[nn] = ventas_dia
 
     # Contar dias distintos en historial
@@ -617,8 +617,9 @@ def _calcular_sugerencia_pedido(db, data):
         entrantes = [s[f'entrante_{i}'] for i in range(1, 3) if s.get(f'entrante_{i}') is not None]
         stock_actual = ab + cel + sum(cerradas) + sum(entrantes)
 
-        ventas = ventas_diarias_por_sabor.get(nn, [])
-        N = len(ventas)
+        ventas_raw = ventas_diarias_por_sabor.get(nn, [])
+        N = len(ventas_raw)
+        ventas_vals = [v['venta'] for v in ventas_raw]
 
         base = {
             'nombre': nn,
@@ -627,7 +628,7 @@ def _calcular_sugerencia_pedido(db, data):
             'cerradas': cerradas,
             'entrantes': entrantes,
             'stock_actual': stock_actual,
-            'ventas_hist': ventas,
+            'ventas_hist': ventas_raw,  # [{fecha, venta}, ...]
             'n_dias_hist': n_dias_hist,
         }
 
@@ -644,8 +645,8 @@ def _calcular_sugerencia_pedido(db, data):
             pedidos.append(base)
             continue
 
-        venta_diaria = sum(ventas) / N
-        tendencia = (ventas[-1] - ventas[0]) / (N - 1) if N >= 2 else 0
+        venta_diaria = sum(ventas_vals) / N
+        tendencia = (ventas_vals[-1] - ventas_vals[0]) / (N - 1) if N >= 2 else 0
         venta_proyectada = max(0, venta_diaria + tendencia)
         stock_necesario = venta_proyectada * DIAS_PROYECCION
         deficit = stock_necesario - stock_actual
