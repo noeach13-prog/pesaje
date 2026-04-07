@@ -253,7 +253,84 @@ def _diagnostico_accionable(nombre: str, venta_final: int,
     if corr and r1:
         L.append(f'NOTA: Este sabor ya tiene una correccion aplicada (delta={corr.delta:+d}g). La senal C5 evalua el resultado DESPUES de la correccion.')
 
+    # Timeline: 4 turnos anteriores + DIA + NOCHE + 2 posteriores
+    timeline = _timeline_sabor(nombre, datos)
+    if timeline:
+        L.append('')
+        L.append('HISTORIAL:')
+        for entry in timeline:
+            L.append(f'  {entry}')
+
     return '\n'.join(L)
+
+
+def _timeline_sabor(nombre: str, datos: DatosDia) -> List[str]:
+    """Arma secuencia legible del sabor en turnos cercanos."""
+    entries = []
+
+    # Contexto antes (hasta 4, ordenados cronológicamente)
+    pre = sorted([t for t in datos.contexto if t.indice < datos.turno_dia.indice],
+                 key=lambda t: t.indice)
+    pre = pre[-4:]  # últimos 4
+
+    for tc in pre:
+        s = tc.sabores.get(nombre)
+        if s:
+            ab = s.abierta or 0
+            cerr = [int(c) for c in s.cerradas]
+            ent = [int(e) for e in s.entrantes]
+            parts = [f'ab={ab}']
+            if cerr:
+                parts.append(f'cerr={cerr}')
+            if ent:
+                parts.append(f'ent={ent}')
+            entries.append(f'{tc.nombre_hoja}: {", ".join(parts)}')
+
+    # Turno DIA (actual)
+    d = datos.turno_dia.sabores.get(nombre)
+    if d:
+        ab = d.abierta or 0
+        cerr = [int(c) for c in d.cerradas]
+        ent = [int(e) for e in d.entrantes]
+        parts = [f'ab={ab}']
+        if cerr:
+            parts.append(f'cerr={cerr}')
+        if ent:
+            parts.append(f'ent={ent}')
+        entries.append(f'>> {datos.turno_dia.nombre_hoja}: {", ".join(parts)}')
+
+    # Turno NOCHE (actual)
+    n = datos.turno_noche.sabores.get(nombre)
+    if n:
+        ab = n.abierta or 0
+        cerr = [int(c) for c in n.cerradas]
+        ent = [int(e) for e in n.entrantes]
+        parts = [f'ab={ab}']
+        if cerr:
+            parts.append(f'cerr={cerr}')
+        if ent:
+            parts.append(f'ent={ent}')
+        entries.append(f'>> {datos.turno_noche.nombre_hoja}: {", ".join(parts)}')
+
+    # Contexto después (hasta 2)
+    post = sorted([t for t in datos.contexto if t.indice > datos.turno_noche.indice],
+                  key=lambda t: t.indice)
+    post = post[:2]
+
+    for tc in post:
+        s = tc.sabores.get(nombre)
+        if s:
+            ab = s.abierta or 0
+            cerr = [int(c) for c in s.cerradas]
+            ent = [int(e) for e in s.entrantes]
+            parts = [f'ab={ab}']
+            if cerr:
+                parts.append(f'cerr={cerr}')
+            if ent:
+                parts.append(f'ent={ent}')
+            entries.append(f'{tc.nombre_hoja}: {", ".join(parts)}')
+
+    return entries
 
 
 # ===================================================================
