@@ -312,10 +312,10 @@ def _timeline_sabor(nombre: str, datos: DatosDia) -> List[str]:
             parts.append(f'ent={ent}')
         entries.append(f'>> {datos.turno_noche.nombre_hoja}: {", ".join(parts)}')
 
-    # Contexto después (hasta 2)
+    # Contexto después (hasta 4)
     post = sorted([t for t in datos.contexto if t.indice > datos.turno_noche.indice],
                   key=lambda t: t.indice)
-    post = post[:2]
+    post = post[:4]
 
     for tc in post:
         s = tc.sabores.get(nombre)
