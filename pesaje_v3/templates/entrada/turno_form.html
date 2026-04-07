@@ -602,6 +602,68 @@ function v(inp) {
         }
     }
 
+    // Cerradas: alertar si el peso cambio o si es nueva sin entrante
+    if(n > 0 && field && field.startsWith('cerrada_') && nombre) {
+        const refData = REF[nombre];
+        if(refData) {
+            const prev = refData[field];
+            if(prev != null && prev > 0) {
+                // Cerrada existia antes: alertar si cambio mucho
+                const diff = Math.abs(n - prev);
+                if(diff > 200) {
+                    inp.classList.add('warn');
+                    const signo = n > prev ? '+' : '';
+                    showAlert('Cerrada cambio de peso',
+                        nombre + ': la cerrada paso de ' + prev + 'g a ' + n + 'g (' + signo + (n - prev) + 'g).\n' +
+                        'En el turno anterior pesaba ' + prev + 'g.\n\n' +
+                        'Si es correcto (se abrio y repuso, o se cambio la lata), confirmar.\n' +
+                        'Si es un error de tipeo, corregir.',
+                        'warning', inp);
+                    upd(inp); return;
+                }
+            } else {
+                // Cerrada NO existia antes: verificar si paso por entrante
+                const TOL = 100;
+                let explicada = false;
+                // Buscar en entrantes del turno anterior
+                for(let i = 1; i <= 2; i++) {
+                    const ent = refData['entrante_' + i];
+                    if(ent != null && ent > 0 && Math.abs(n - ent) <= TOL) {
+                        explicada = true; break;
+                    }
+                }
+                // Buscar en entrantes del turno actual
+                if(!explicada) {
+                    const fl = inp.closest('.fl');
+                    if(fl) {
+                        fl.querySelectorAll('input[data-f^="entrante_"]').forEach(ei => {
+                            const ev = parseInt(ei.value);
+                            if(!isNaN(ev) && ev > 0 && Math.abs(n - ev) <= TOL) explicada = true;
+                        });
+                    }
+                }
+                // Buscar en cerradas del turno anterior (puede ser la misma lata en otro slot)
+                if(!explicada) {
+                    for(let i = 1; i <= 6; i++) {
+                        const cp = refData['cerrada_' + i];
+                        if(cp != null && cp > 0 && Math.abs(n - cp) <= TOL) {
+                            explicada = true; break;
+                        }
+                    }
+                }
+                if(!explicada) {
+                    inp.classList.add('warn');
+                    showAlert('Cerrada nueva sin entrante',
+                        nombre + ': esta cerrada de ' + n + 'g no estaba en el turno anterior y no figura como entrante.\n\n' +
+                        'Si es una lata que llego nueva, registrarla tambien como entrante.\n' +
+                        'Si ya estaba antes y no se anoto, confirmar.',
+                        'warning', inp);
+                    upd(inp); return;
+                }
+            }
+        }
+    }
+
     if(n>0)inp.classList.add('ok');
     upd(inp);
 }
