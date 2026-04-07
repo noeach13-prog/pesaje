@@ -46,138 +46,122 @@ def calcular_estadisticas(ventas_por_sabor: Dict[str, List[int]]) -> Dict[str, E
 
 
 # ===================================================================
-# R1: Desvio historico del sabor
+# SEÑALES UTILES PARA EL SUPERVISOR
+# Cada señal detecta algo que no se ve mirando un solo turno.
 # ===================================================================
 
-def _evaluar_r1(nombre: str, venta_final: int, stats: Dict[str, EstadisticaSabor],
-                tiene_apertura: bool) -> Optional[SenalResidual]:
-    est = stats.get(nombre)
-    if not est or est.n_periodos < 5 or est.std > 2000 or est.std == 0:
-        return None
-
-    z = (venta_final - est.media) / est.std
-
-    # Apertura confirmada con venta alta -> no marcar
-    if tiene_apertura and z > 0:
-        return None
-
-    abs_z = abs(z)
-    if abs_z <= 1.5:
-        return None
-    elif abs_z <= 1.8:
-        return SenalResidual('R1', 'R1_LEVE', f'z={z:.2f} (media={est.media:.0f}, std={est.std:.0f})', 0.3)
-    elif abs_z <= 2.5:
-        return SenalResidual('R1', 'R1_MODERADO', f'z={z:.2f} (media={est.media:.0f}, std={est.std:.0f})', 0.6)
-    else:
-        return SenalResidual('R1', 'R1_FUERTE', f'z={z:.2f} (media={est.media:.0f}, std={est.std:.0f})', 0.9)
-
-
-# ===================================================================
-# R2: Rareza estructural debil
-# ===================================================================
-
-def _evaluar_r2(nombre: str, datos: DatosDia, sc: SaborClasificado) -> Optional[SenalResidual]:
+def _evaluar_senales_sabor(nombre: str, datos: DatosDia, sc: SaborClasificado,
+                           venta_final: int, stats: Dict[str, EstadisticaSabor],
+                           correcciones: List[Correccion]) -> List[SenalResidual]:
+    """Evalúa todas las señales relevantes para un sabor."""
+    senales = []
     d = datos.turno_dia.sabores.get(nombre)
     n = datos.turno_noche.sabores.get(nombre)
     if not d or not n:
-        return None
+        return senales
 
-    sub_senales = []
+    pre = sorted([t for t in datos.contexto if t.indice < datos.turno_dia.indice],
+                 key=lambda t: t.indice)
 
-    # R2a: 2+ cerradas con diff 30-75g (zona ambigua)
-    for cd in d.cerradas:
-        for cn in n.cerradas:
-            diff = abs(cd - cn)
-            if 30 < diff <= 75:
-                sub_senales.append('R2a')
-                break
-        if 'R2a' in sub_senales:
-            break
-
-    # R2b: Ab no cambio (+-5g) en periodo con venta final >500g
+    # --- S1: Abierta estancada (copian peso en vez de pesar) ---
     ab_d = d.abierta or 0
-    ab_n = n.abierta or 0
-    vf = sc.venta_final_c3 or 0
-    if abs(ab_d - ab_n) <= 5 and vf > 500:
-        sub_senales.append('R2b')
+    if ab_d > 0 and len(pre) >= 2:
+        ab_iguales = 0
+        for tc in reversed(pre):
+            s = tc.sabores.get(nombre)
+            if s and s.abierta is not None:
+                if abs((s.abierta or 0) - ab_d) <= 25:
+                    ab_iguales += 1
+                else:
+                    break
+        if ab_iguales >= 2:
+            senales.append(SenalResidual('S1', 'ABIERTA_ESTANCADA',
+                f'La abierta tiene practicamente el mismo peso ({ab_d}g) en {ab_iguales + 1} turnos seguidos. Puede que no la esten pesando.', 0.8))
 
-    # R2c: Entrante sin genealogia (aparece solo en NOCHE, no en contexto)
-    for en_val in n.entrantes:
-        if not any(abs(en_val - ed) <= 50 for ed in d.entrantes):
-            # Entrante nuevo en NOCHE -- buscar en contexto
-            found = False
-            for ctx in datos.contexto:
-                s = ctx.sabores.get(nombre)
-                if s:
-                    if any(abs(en_val - c) <= 30 for c in s.cerradas + s.entrantes):
-                        found = True
-                        break
-            if not found:
-                sub_senales.append('R2c')
-                break
-
-    # R2d: Cerrada con 1 solo sighting preservada
-    from .capa3_motor import _count_sightings_cerr
+    # --- S2: Cerrada congelada (lata sin abrir hace muchos turnos) ---
     for cn in n.cerradas:
-        sightings = _count_sightings_cerr(cn, nombre, datos)
-        if sightings <= 1:
-            sub_senales.append('R2d')
+        cn_int = int(cn)
+        turnos_presente = 0
+        for tc in pre:
+            s = tc.sabores.get(nombre)
+            if s and any(abs(cn_int - int(c)) <= 50 for c in s.cerradas):
+                turnos_presente += 1
+        if turnos_presente >= 6:
+            senales.append(SenalResidual('S2', 'CERRADA_CONGELADA',
+                f'La cerrada de {cn_int}g lleva al menos {turnos_presente + 1} turnos sin abrirse. Verificar si esta trabada o congelada.', 0.6))
+            break  # una por sabor
+
+    # --- S3: Stock nuevo no documentado ---
+    cerr_n = [int(c) for c in n.cerradas]
+    cerr_d = [int(c) for c in d.cerradas]
+    ent_d = [int(e) for e in d.entrantes]
+    ent_n = [int(e) for e in n.entrantes]
+    for cn in cerr_n:
+        in_d = any(abs(cn - cd) <= 200 for cd in cerr_d)
+        in_ent = any(abs(cn - e) <= 100 for e in ent_d + ent_n)
+        if not in_d and not in_ent:
+            # Cerrada nueva sin origen
+            senales.append(SenalResidual('S3', 'STOCK_SIN_ORIGEN',
+                f'La cerrada de {cn}g aparecio en el turno actual sin estar antes ni figurar como entrante. Posible mercaderia no registrada.', 0.7))
             break
 
-    # R2e: Matching en borde (25-35g)
-    for cd in d.cerradas:
-        for cn in n.cerradas:
-            diff = abs(cd - cn)
-            if 25 <= diff <= 35:
-                sub_senales.append('R2e')
-                break
-        if 'R2e' in sub_senales:
-            break
+    # --- S4: Venta acumulada inconsistente (venta de hoy + stock final != stock inicial) ---
+    # Detecta cuando el stock total no cierra con lo que se vendio.
+    # Util para encontrar mermas, regalos o errores de conteo.
+    ab_n = n.abierta or 0
+    total_d = ab_d + sum(cerr_d) + sum(ent_d)
+    total_n = ab_n + sum(cerr_n) + sum(ent_n)
+    if total_d > 0 and total_n > total_d and not ent_n:
+        incremento = total_n - total_d
+        senales.append(SenalResidual('S4', 'STOCK_CRECE_SIN_ENTRANTE',
+            f'El stock total subio {incremento}g (de {total_d}g a {total_n}g) sin entrantes registrados. Llego mercaderia sin anotar.', 0.7))
 
-    sub_senales = list(set(sub_senales))
-    if len(sub_senales) >= 2:
-        return SenalResidual('R2', 'R2_FUERTE', f'sub-senales: {", ".join(sorted(sub_senales))}', 0.6)
-    elif len(sub_senales) == 1:
-        return SenalResidual('R2', f'R2_{sub_senales[0]}', sub_senales[0], 0.3)
-    return None
+    # --- S5: Abierta subio sin apertura documentada ---
+    rise = ab_n - ab_d
+    if rise > 2000 and len(cerr_d) > 0 and len(cerr_n) >= len(cerr_d):
+        # Abierta subio pero no desaparecio ninguna cerrada
+        senales.append(SenalResidual('S5', 'ABIERTA_SUBE_SIN_APERTURA',
+            f'La abierta subio {rise}g (de {ab_d}g a {ab_n}g) pero todas las cerradas siguen presentes. No hay apertura que lo explique.', 0.8))
+
+    return senales
 
 
-# ===================================================================
-# R3: Perfil de dia anomalo
-# ===================================================================
-
-def _evaluar_r3(ventas_finales: Dict[str, int],
-                stats: Dict[str, EstadisticaSabor],
-                media_dia: float, std_dia: float) -> List[SenalResidual]:
+def _evaluar_senales_dia(datos: DatosDia, ventas_finales: Dict[str, int],
+                          stats: Dict[str, EstadisticaSabor]) -> List[SenalResidual]:
+    """Señales a nivel dia (no por sabor)."""
     senales = []
 
-    # Calcular z-scores de todos los sabores
-    z_scores = {}
-    for nombre, vf in ventas_finales.items():
-        est = stats.get(nombre)
-        if est and est.n_periodos >= 5 and est.std > 0:
-            z_scores[nombre] = (vf - est.media) / est.std
+    # --- SD1: Muchos sabores con entrantes sin documentar ---
+    n_sin_origen = 0
+    for nombre in datos.turno_noche.sabores:
+        n_sab = datos.turno_noche.sabores[nombre]
+        d_sab = datos.turno_dia.sabores.get(nombre)
+        for cn in n_sab.cerradas:
+            cn_int = int(cn)
+            in_d = d_sab and any(abs(cn_int - int(c)) <= 200 for c in d_sab.cerradas)
+            in_ent = d_sab and any(abs(cn_int - int(e)) <= 100 for e in d_sab.entrantes + n_sab.entrantes)
+            if not in_d and not in_ent:
+                n_sin_origen += 1
+                break
+    if n_sin_origen >= 3:
+        senales.append(SenalResidual('SD1', 'RECEPCION_NO_REGISTRADA',
+            f'{n_sin_origen} sabores tienen cerradas nuevas sin entrante documentado. Posible recepcion de mercaderia sin registrar.', 0.7))
 
-    # R3a: >=2 sabores con desvios fuertes en direcciones opuestas
-    fuertes_pos = [n for n, z in z_scores.items() if z > 2.0]
-    fuertes_neg = [n for n, z in z_scores.items() if z < -2.0]
-    if len(fuertes_pos) >= 1 and len(fuertes_neg) >= 1:
-        senales.append(SenalResidual('R3', 'R3a',
-            f'{len(fuertes_pos)} fuertes+, {len(fuertes_neg)} fuertes-', 0.5))
-
-    # R3b: >=3 sabores simultaneamente >1.5 sigma
-    outliers = [n for n, z in z_scores.items() if abs(z) > 1.5]
-    if len(outliers) >= 3:
-        senales.append(SenalResidual('R3', 'R3b',
-            f'{len(outliers)} sabores >1.5 sigma', 0.4))
-
-    # R3c: Total ventas del dia difiere >2 sigma del promedio diario
-    total_dia = sum(ventas_finales.values())
-    if std_dia > 0:
-        z_dia = (total_dia - media_dia) / std_dia
-        if abs(z_dia) > 2.0:
-            senales.append(SenalResidual('R3', 'R3c',
-                f'total dia z={z_dia:.2f} ({total_dia}g vs media {media_dia:.0f}g)', 0.6))
+    # --- SD2: Muchas abiertas sin cambio (turno sin pesaje real) ---
+    n_estancadas = 0
+    for nombre in datos.turno_dia.sabores:
+        d_sab = datos.turno_dia.sabores[nombre]
+        n_sab = datos.turno_noche.sabores.get(nombre)
+        if not n_sab:
+            continue
+        ab_d = d_sab.abierta or 0
+        ab_n = n_sab.abierta or 0
+        if ab_d > 0 and abs(ab_d - ab_n) <= 10:
+            n_estancadas += 1
+    total_sab = len(datos.turno_dia.sabores)
+    if total_sab > 0 and n_estancadas >= 5 and n_estancadas / total_sab > 0.15:
+        senales.append(SenalResidual('SD2', 'PESAJE_DUDOSO',
+            f'{n_estancadas} de {total_sab} sabores tienen la abierta identica entre turnos. Puede que no se haya pesado realmente.', 0.8))
 
     return senales
 
@@ -203,55 +187,9 @@ def _diagnostico_accionable(nombre: str, venta_final: int,
     d = datos.turno_dia.sabores.get(nombre)
     n = datos.turno_noche.sabores.get(nombre)
 
-    # R1: desvío histórico
-    r1 = next((s for s in senales if s.tipo == 'R1'), None)
-    if r1 and est and est.std > 0:
-        z = (venta_final - est.media) / est.std
-        direccion = 'alta' if z > 0 else 'baja'
-
-        L.append(f'{nombre}: la venta de este turno ({venta_final}g) es {direccion} comparada con el promedio del mes ({est.media:.0f}g).')
-
-        if abs(z) > 2.0:
-            # Desvío fuerte — diagnosticar causa probable
-            if z > 2.0 and venta_final > 5000:
-                L.append(f'POSIBLE CAUSA: Una cerrada pudo no haberse registrado en el turno actual, inflando la venta.')
-                L.append(f'ACCION: Verificar con el empleado si todas las latas cerradas del sabor estan anotadas.')
-            elif z > 2.0:
-                L.append(f'POSIBLE CAUSA: Venta inusualmente alta. Puede ser un dia de mucha demanda o un error de pesaje en la abierta.')
-                L.append(f'ACCION: Comparar la abierta con los turnos anteriores y siguientes.')
-            elif z < -2.0 and venta_final < 0:
-                L.append(f'POSIBLE CAUSA: La venta negativa indica que aparecio mas stock del que habia. Probablemente falto registrar un entrante.')
-                L.append(f'ACCION: Preguntar al empleado si llego stock nuevo que no se anoto.')
-            elif z < -2.0:
-                L.append(f'POSIBLE CAUSA: Venta muy baja. Puede haber una cerrada anotada de mas o un error en la abierta.')
-                L.append(f'ACCION: Revisar si los pesos de las cerradas coinciden con los turnos cercanos.')
-        elif abs(z) > 1.5:
-            L.append(f'Desvio leve respecto al promedio. Probablemente normal, pero queda marcado por si se repite.')
-
-    # R2: rareza estructural
-    r2 = next((s for s in senales if s.tipo == 'R2'), None)
-    if r2:
-        sub = r2.detalle
-        if 'R2a' in sub and 'R2e' in sub:
-            L.append(f'OBSERVACION: Hay cerradas con diferencias de peso en zona ambigua (30-75g) y justo en el borde de tolerancia (25-35g).')
-            L.append(f'ACCION: Verificar que no se hayan intercambiado latas entre sabores o que no haya error de pesaje.')
-        elif 'R2a' in sub:
-            L.append(f'OBSERVACION: Hay cerradas con diferencia de 30-75g entre turnos. El sistema las considero como la misma lata, pero podrian ser latas distintas.')
-            L.append(f'ACCION: Comparar los pesos de cerradas con los turnos anteriores para confirmar identidad.')
-        elif 'R2b' in sub:
-            L.append(f'OBSERVACION: La abierta no cambio entre turnos pero la venta final es alta. Eso es raro.')
-            L.append(f'ACCION: Verificar si la abierta se peso correctamente en ambos turnos.')
-        elif 'R2d' in sub:
-            L.append(f'OBSERVACION: Hay una cerrada que solo aparece en este turno y no tiene historial en turnos cercanos.')
-            L.append(f'ACCION: Verificar si es una lata nueva que deberia figurar como entrante.')
-        elif 'R2e' in sub:
-            L.append(f'OBSERVACION: Hay cerradas con diferencia justo en el borde de tolerancia (25-35g). El matching podria ser incorrecto.')
-            L.append(f'ACCION: Revisar si esas cerradas son la misma lata o latas distintas.')
-
-    # Corrección existente + señal = contexto adicional
-    corr = next((c for c in correcciones if c.nombre_norm == nombre), None)
-    if corr and r1:
-        L.append(f'NOTA: Este sabor ya tiene una correccion aplicada (delta={corr.delta:+d}g). La senal C5 evalua el resultado DESPUES de la correccion.')
+    # Generar explicaciones por cada señal detectada
+    for s in senales:
+        L.append(f'  {s.detalle}')
 
     # Timeline: 4 turnos anteriores + DIA + NOCHE + 2 posteriores
     timeline = _timeline_sabor(nombre, datos)
@@ -381,34 +319,17 @@ def segunda_pasada(
         else:
             ventas_finales[nombre] = sc.contable.venta_raw
 
-    # R3 a nivel dia
-    senales_r3 = _evaluar_r3(ventas_finales, stats, media_dia, std_dia)
-    resultado.senales_dia = senales_r3
+    # Señales a nivel dia
+    senales_dia = _evaluar_senales_dia(datos, ventas_finales, stats)
+    resultado.senales_dia = senales_dia
 
-    # Evaluar TODOS los sabores (no solo LIMPIO).
-    # R1 (desvío histórico) es útil para CORREGIDOS y ENGINE también:
-    # una venta corregida que sigue siendo outlier merece revisión.
-    # R2 (rareza estructural) sigue siendo más relevante para LIMPIO.
+    # Evaluar TODOS los sabores con señales útiles para el supervisor
     for nombre, sc in clasificacion.sabores.items():
         if sc.status in (StatusC3.SOLO_DIA, StatusC3.SOLO_NOCHE):
             continue
-        senales = []
         vf = ventas_finales.get(nombre, 0)
 
-        # R1
-        tiene_apertura = sc.status == StatusC3.ENGINE
-        r1 = _evaluar_r1(nombre, vf, stats, tiene_apertura)
-        if r1:
-            senales.append(r1)
-
-        # R2
-        r2 = _evaluar_r2(nombre, datos, sc)
-        if r2:
-            senales.append(r2)
-
-        # R3 aplica a nivel dia, afecta a todos los limpios
-        for r3 in senales_r3:
-            senales.append(r3)
+        senales = _evaluar_senales_sabor(nombre, datos, sc, vf, stats, correcciones)
 
         # Clasificar
         tipos_distintos = set(s.tipo for s in senales if s.peso >= 0.3)

@@ -325,61 +325,34 @@ HISTORIAL:
     <div class="c5-banner">
         <div class="c5-title">Analisis profundo</div>
 
+        {# Alertas a nivel dia #}
         {% if analisis.c5_senales_dia %}
+        {% for s in analisis.c5_senales_dia %}
         <div style="background:#fff8ed;border:1px solid rgba(180,106,31,0.18);border-radius:18px;padding:14px 16px;margin-bottom:12px;">
-            <div style="font-weight:900;font-size:0.88rem;color:var(--warning);margin-bottom:6px;">Dia atipico</div>
-            {% for s in analisis.c5_senales_dia %}
-            <div style="font-size:0.84rem;color:var(--muted);line-height:1.5;">
-                {% if s.subtipo == 'R3a' %}Hay sabores con ventas inusualmente altas y bajas al mismo tiempo. Puede indicar un error cruzado entre faltantes y sobrantes.
-                {% elif s.subtipo == 'R3b' %}Varios sabores tienen ventas fuera de lo normal para este mes. Conviene revisar si hubo evento especial o un error sistemático de carga.
-                {% elif s.subtipo == 'R3c' %}El total de ventas del día se aleja mucho del promedio mensual. {{ s.detalle }}
-                {% else %}{{ s.detalle }}
-                {% endif %}
-            </div>
-            {% endfor %}
+            <div style="font-weight:900;font-size:0.88rem;color:var(--warning);margin-bottom:6px;">{{ s.subtipo }}</div>
+            <div style="font-size:0.84rem;color:var(--muted);line-height:1.5;">{{ s.detalle }}</div>
         </div>
+        {% endfor %}
         {% endif %}
 
-        {% set ns_c5 = namespace(count=0) %}
+        {# Alertas por sabor #}
+        {% if analisis.c5_senales %}
+        <div class="c5-subtitle">{{ analisis.c5_senales|length }} sabores con observaciones:</div>
         {% for nombre, senales in analisis.c5_senales.items() %}
-            {% set has_r1_r2 = false %}
-            {% for s in senales %}
-                {% if s.tipo in ['R1', 'R2'] %}{% set has_r1_r2 = true %}{% endif %}
-            {% endfor %}
-            {% if has_r1_r2 %}{% set ns_c5.count = ns_c5.count + 1 %}{% endif %}
-        {% endfor %}
-
-        {% if ns_c5.count > 0 %}
-        <div class="c5-subtitle">{{ ns_c5.count }} sabores con observaciones:</div>
-        {% for nombre, senales in analisis.c5_senales.items() %}
-        {% set has_relevant = [] %}
-        {% for s in senales %}{% if s.tipo in ['R1', 'R2'] %}{% set _ = has_relevant.append(s) %}{% endif %}{% endfor %}
-        {% if has_relevant %}
         <div class="c5-row" style="padding:8px 0;">
             <strong>{{ nombre }}</strong>
-            {% if analisis.c5_explicaciones and nombre in analisis.c5_explicaciones %}
-            <pre style="font-family:inherit;font-size:0.8rem;color:var(--ink);padding:8px 12px;margin:6px 0 0;white-space:pre-wrap;line-height:1.55;background:rgba(255,255,255,0.62);border-radius:14px;">{{ analisis.c5_explicaciones[nombre] }}</pre>
-            {% else %}
-            {% for s in has_relevant %}
-            <div style="font-size:0.8rem;color:var(--muted);padding-left:8px;margin-top:4px;line-height:1.5;">
-                {% if 'R1_FUERTE' in s.subtipo %}La venta de este sabor está muy fuera del rango habitual del mes. Vale la pena revisar la carga.
-                {% elif 'R1_MODERADO' in s.subtipo %}La venta es más alta o baja de lo usual para este sabor. No implica error seguro, pero sí revisión.
-                {% elif 'R1_LEVE' in s.subtipo %}Hay un desvío leve respecto del promedio mensual. Probablemente normal, aunque queda marcado.
-                {% elif 'R2_FUERTE' in s.subtipo %}Se combinan varias rarezas estructurales en este sabor. Conviene revisar pesos.
-                {% elif 'R2e' in s.subtipo %}Hay cerradas con diferencia de 25-35g, justo en el borde de la tolerancia del sistema.
-                {% else %}{{ s.detalle }}
-                {% endif %}
+            {% for s in senales %}
+            <div style="font-size:0.84rem;color:var(--ink);padding:6px 12px;margin:4px 0;line-height:1.55;background:rgba(255,255,255,0.62);border-radius:14px;border-left:3px solid var(--accent);">
+                {{ s.detalle }}
             </div>
             {% endfor %}
-            {% endif %}
         </div>
-        {% endif %}
         {% endfor %}
         {% elif not analisis.c5_senales_dia %}
         <div class="c5-subtitle" style="color:var(--success);">No se encontraron patrones sospechosos. Los resultados se leen como confiables.</div>
         {% endif %}
 
-        <div class="c5-note">Nota: el análisis profundo compara cada sabor contra su promedio del mes y busca patrones estructurales inusuales. No modifica ventas.</div>
+        <div class="c5-note">Nota: el analisis profundo busca patrones que no se ven mirando un solo turno (abiertas estancadas, latas congeladas, stock no documentado). No modifica ventas.</div>
     </div>
     {% else %}
     <div style="margin:14px 0;">
