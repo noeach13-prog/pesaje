@@ -76,9 +76,9 @@ tr.row-neg { background: #fce4ec; }
 </style>
 </head>
 <body>
-<div class="header">
-    <h1>{{ data.sucursal.nombre }}</h1>
-    <div class="sub">Analisis: {{ data.nombre_hoja }}{% if data.turno.estado == 'confirmado' %} — Confirmado{% endif %}</div>
+<div class="header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">Analisis: {{ data.nombre_hoja }}{% if data.turno.estado == 'confirmado' %} — Confirmado{% endif %}</div></div>
+    <a href="/entrada/seleccion" style="color:#fff;opacity:0.8;font-size:0.75rem;text-decoration:none;">Inicio</a>
 </div>
 
 <div class="container">
@@ -211,7 +211,6 @@ tr.row-neg { background: #fce4ec; }
         <a href="/entrada/planilla/{{ data.turno.id }}" class="btn" style="background:#1e3a5f;color:#fff;">Planilla</a>
         <a href="/entrada/pedido/{{ data.turno.id }}" class="btn" style="background:#e65100;color:#fff;">Pedido</a>
         <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Turno</a>
-        <a href="/entrada/seleccion" class="btn btn-back">Inicio</a>
     </div>
 </div>
 </body>

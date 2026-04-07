@@ -42,9 +42,9 @@ tr:hover { background: #f8f9fa; }
 </style>
 </head>
 <body>
-<div class="header">
-    <h1>{{ data.sucursal.nombre }}</h1>
-    <div class="sub">Planilla: {{ data.nombre_hoja }}{% if data_ant %} vs {{ data_ant.nombre_hoja }}{% endif %}</div>
+<div class="header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">Planilla: {{ data.nombre_hoja }}{% if data_ant %} vs {{ data_ant.nombre_hoja }}{% endif %}</div></div>
+    <a href="/entrada/seleccion" style="color:#fff;opacity:0.8;font-size:0.75rem;text-decoration:none;">Inicio</a>
 </div>
 <div class="container">
     <div class="meta">
@@ -136,7 +136,6 @@ tr:hover { background: #f8f9fa; }
     <div class="actions">
         <a href="/entrada/exportar-turno/{{ data.turno.id }}" class="btn btn-dl">Descargar Excel</a>
         <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Turno</a>
-        <a href="/entrada/seleccion" class="btn btn-back">Inicio</a>
     </div>
 </div>
 </body>
