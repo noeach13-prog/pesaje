@@ -671,8 +671,10 @@ def test_bilateral_sambayon_d28_resuelto_por_composicion():
         'SAMBAYON D28 no fue resuelto — deberia resolverse por composicion'
     assert 'COMPOSICION' in samb_corr.motivo, \
         f'SAMBAYON D28 resuelto por {samb_corr.motivo[:40]}, esperaba COMPOSICION'
-    assert 'GENEALOGIA_ENT_CERR' in samb_corr.motivo, \
-        f'SAMBAYON D28 debe incluir GENEALOGIA en composicion'
+    # CONTINUIDAD_MISMATCH_LEVE reemplaza GENEALOGIA cuando 6450↔6575 (125g)
+    # son la misma lata con varianza de pesaje + conteo 2→1
+    assert 'CONTINUIDAD_MISMATCH_LEVE' in samb_corr.motivo or 'GENEALOGIA_ENT_CERR' in samb_corr.motivo, \
+        f'SAMBAYON D28 debe incluir CONTINUIDAD o GENEALOGIA en composicion'
     assert 'PHANTOM_DIA' in samb_corr.motivo, \
         f'SAMBAYON D28 debe incluir PHANTOM_DIA en composicion'
     assert samb_corr.venta_corregida == 555, \

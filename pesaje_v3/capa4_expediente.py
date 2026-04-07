@@ -514,6 +514,65 @@ def _paso3_hipotesis(sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3,
             sightings=sightings,
         ))
 
+    # --- 3b-bis: Continuidad fisica con varianza de pesaje ---
+    # Doctrina: cuando una cerrada DIA "desaparece" y una cerrada NOCHE "aparece"
+    # con mismatch_leve (≤200g), y el conteo baja, la hipotesis mas probable es
+    # que sea la MISMA LATA pesada con varianza. Esta hipotesis tiene privilegio
+    # sobre OMISION_DIA basada en sightings historicos, porque la evidencia
+    # intra-periodo (continuidad fisica) es mas fuerte que la biografia remota.
+    # Sin esta regla, sightings altos de Marzo contaminan lecturas de Febrero.
+    if p2.desaparecen and p2.aparecen and sc.n_cerr_a > sc.n_cerr_b:
+        restantes_desaparecen = list(p2.desaparecen)
+        restantes_aparecen_mismatch = list(p2.aparecen)
+
+        for peso_d, sight_d in restantes_desaparecen:
+            mejor_match = None
+            mejor_diff = 201
+            mejor_idx = -1
+            for i, (peso_n, sight_n) in enumerate(restantes_aparecen_mismatch):
+                diff = abs(peso_d - peso_n)
+                if 30 < diff <= 200 and diff < mejor_diff:
+                    mejor_match = (peso_n, sight_n)
+                    mejor_diff = diff
+                    mejor_idx = i
+
+            if mejor_match is not None:
+                peso_n, sight_n = mejor_match
+                # Hipotesis: misma lata con varianza de pesaje
+                # delta_stock = diferencia de peso (la lata "cambio" de peso)
+                # No agrega ni quita latas; solo ajusta el peso
+                hips.append(Hipotesis(
+                    tipo='CONTINUIDAD_MISMATCH_LEVE',
+                    peso=peso_d,
+                    accion=f'Cerr DIA {int(peso_d)} = cerr NOCHE {int(peso_n)} (misma lata, varianza {int(mejor_diff)}g). '
+                           f'Conteo {sc.n_cerr_a}->{sc.n_cerr_b} confirma continuidad.',
+                    delta_stock=peso_n - peso_d,  # ajuste por varianza
+                    delta_latas=0,
+                    sightings=max(sight_d, sight_n),  # la mejor biografia de las dos
+                ))
+                restantes_aparecen_mismatch.pop(mejor_idx)
+
+        # Veto: si CONTINUIDAD explica una cerrada NOCHE, eliminar la OMISION_DIA
+        # correspondiente. La continuidad local tiene privilegio sobre la lectura
+        # de "lata independiente que faltaba en DIA".
+        pesos_continuidad = {h.peso for h in hips if h.tipo == 'CONTINUIDAD_MISMATCH_LEVE'}
+        # Encontrar que peso NOCHE corresponde a cada peso DIA de continuidad
+        pesos_noche_explicados = set()
+        for h in hips:
+            if h.tipo == 'CONTINUIDAD_MISMATCH_LEVE':
+                # La accion tiene el peso NOCHE: "Cerr DIA X = cerr NOCHE Y"
+                import re
+                m = re.search(r'NOCHE (\d+)', h.accion)
+                if m:
+                    pesos_noche_explicados.add(int(m.group(1)))
+        if pesos_noche_explicados:
+            # Eliminar OMISION_DIA y PHANTOM_NOCHE para cerradas ya explicadas
+            # por continuidad. No son omisiones ni phantoms: son la misma lata.
+            hips = [h for h in hips if not (
+                (h.tipo == 'OMISION_DIA' and int(h.peso) in pesos_noche_explicados) or
+                (h.tipo == 'PHANTOM_NOCHE' and int(h.peso) in pesos_noche_explicados)
+            )]
+
     # --- 3c: Entrantes que PERSISTEN con apertura ---
     if p1.clasificacion in ('APERTURA_SOPORTADA', 'APERTURA_PLAUSIBLE_NO_CONFIRMADA'):
         for ea, eb, diff in p3.persisten:
@@ -706,6 +765,11 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
             else:
                 h.planos_neutros.append('P1')
 
+        elif h.tipo == 'CONTINUIDAD_MISMATCH_LEVE':
+            # Continuidad intra-periodo: la evidencia local (misma lata con varianza)
+            # es inherentemente a favor. No depende de P1 (apertura) ni de sightings.
+            h.planos_favor.append('P1_CONTINUIDAD_LOCAL')
+
         elif h.tipo == 'MISMATCH_LEVE':
             h.planos_neutros.append('P1')
 
@@ -746,6 +810,11 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
                 h.planos_favor.append('P2')
             else:
                 h.planos_neutros.append('P2')
+
+        elif h.tipo == 'CONTINUIDAD_MISMATCH_LEVE':
+            # P2: continuidad local no depende de sightings historicos.
+            # La evidencia es el mismatch intra-periodo + conteo descendente.
+            h.planos_favor.append('P2_CONTEO_DESC')
 
         elif h.tipo == 'MISMATCH_LEVE':
             h.planos_favor.append('P2')  # solo P2

@@ -240,3 +240,139 @@ def _cargar_contexto(db, sucursal_id, fecha, modo, n_ctx, excluir_ids):
             contexto.append(tc)
 
     return contexto
+
+
+# ═══════════════════════════════════════════════════════════════
+# Carga batch: todos los días de un mes (replica cargar_todos_los_dias)
+# ═══════════════════════════════════════════════════════════════
+
+def cargar_todos_los_dias_db(db: sqlite3.Connection, sucursal_id: int,
+                              mes: str) -> List[DatosDia]:
+    """Replica cargar_todos_los_dias del parser pero leyendo de la DB.
+
+    Retorna List[DatosDia] con contexto por POSICIÓN en la lista plana
+    (±3 turnos), idéntico al parser. Esto garantiza paridad con el
+    pipeline del reporte Excel.
+
+    Args:
+        db: conexión SQLite
+        sucursal_id: id de la sucursal
+        mes: formato 'YYYY-MM' (ej: '2026-02')
+    """
+    # 1. Obtener todos los turnos del mes, ordenados como hojas del workbook
+    rows = db.execute(
+        """SELECT id, fecha, tipo_turno FROM turnos
+           WHERE sucursal_id=? AND fecha LIKE ?
+           ORDER BY fecha, tipo_turno""",
+        (sucursal_id, f"{mes}%"),
+    ).fetchall()
+    if not rows:
+        return []
+
+    # 2. Detectar modo por tipos presentes
+    tipos = {r['tipo_turno'] for r in rows}
+    modo = 'DIA_NOCHE' if ('DIA' in tipos and 'NOCHE' in tipos) else 'TURNO_UNICO'
+
+    # 3. Convertir todos a TurnoCrudo con índice posicional (como el workbook)
+    turnos_info = []
+    for i, row in enumerate(rows):
+        tc = _turno_db_to_crudo(db, row['id'], modo, indice=i)
+        if tc:
+            turnos_info.append((i, dict(row), tc))
+
+    if not turnos_info:
+        return []
+
+    # 4. Agrupar en DatosDia según modo
+    if modo == 'DIA_NOCHE':
+        return _todos_dia_noche_db(turnos_info, len(rows))
+    else:
+        return _todos_turno_unico_db(turnos_info, len(rows))
+
+
+def _todos_dia_noche_db(turnos_info, total):
+    """Modo DIA/NOCHE: agrupar por fecha, buscar par DIA+NOCHE.
+
+    Contexto = ±3 por posición en la lista plana (replica parser
+    _todos_los_dias_dia_noche, capa1_parser.py:307-341).
+    """
+    from datetime import date as date_cls
+
+    # Agrupar por fecha
+    dias_dict = {}
+    for idx, row, tc in turnos_info:
+        fecha = row['fecha']
+        if fecha not in dias_dict:
+            dias_dict[fecha] = {'turnos': [], 'indices': [], 'rows': []}
+        dias_dict[fecha]['turnos'].append(tc)
+        dias_dict[fecha]['indices'].append(idx)
+        dias_dict[fecha]['rows'].append(row)
+
+    # Mapa posición → TurnoCrudo para contexto rápido
+    all_turnos = {idx: tc for idx, _, tc in turnos_info}
+
+    resultado = []
+    for fecha, info in dias_dict.items():
+        dia_turno = noche_turno = None
+        for tc, row in zip(info['turnos'], info['rows']):
+            if row['tipo_turno'] == 'DIA':
+                dia_turno = tc
+            elif row['tipo_turno'] == 'NOCHE':
+                noche_turno = tc
+
+        if not dia_turno or not noche_turno:
+            continue
+
+        # Contexto: ±3 por posición en lista plana (como parser)
+        idx_min = max(0, min(info['indices']) - 3)
+        idx_max = min(total - 1, max(info['indices']) + 3)
+        contexto = [all_turnos[i] for i in range(idx_min, idx_max + 1)
+                    if i in all_turnos and i not in info['indices']]
+
+        dia_label = str(date_cls.fromisoformat(fecha).day)
+        resultado.append(DatosDia(
+            dia_label=dia_label,
+            turno_dia=dia_turno,
+            turno_noche=noche_turno,
+            contexto=contexto,
+            modo='DIA_NOCHE',
+        ))
+
+    return resultado
+
+
+def _todos_turno_unico_db(turnos_info, total):
+    """Modo turno unico: pares consecutivos (A=referencia, B=venta).
+
+    Contexto = ±3 por posición en la lista plana (replica parser
+    _todos_los_dias_turno_unico, capa1_parser.py:344-373).
+    """
+    from datetime import date as date_cls
+
+    # Filtrar turnos sin sabores (equivalente a es_vacio en parser)
+    validos = [(idx, row, tc) for idx, row, tc in turnos_info if tc.sabores]
+    all_turnos = {idx: tc for idx, _, tc in turnos_info}
+
+    resultado = []
+    for j in range(len(validos) - 1):
+        idx_a, row_a, turno_a = validos[j]
+        idx_b, row_b, turno_b = validos[j + 1]
+
+        # Venta pertenece al día B
+        dia_label = str(date_cls.fromisoformat(row_b['fecha']).day)
+
+        # Contexto: ±3 por posición
+        idx_min = max(0, idx_a - 3)
+        idx_max = min(total - 1, idx_b + 3)
+        contexto = [all_turnos[i] for i in range(idx_min, idx_max + 1)
+                    if i in all_turnos and i != idx_a and i != idx_b]
+
+        resultado.append(DatosDia(
+            dia_label=dia_label,
+            turno_dia=turno_a,
+            turno_noche=turno_b,
+            contexto=contexto,
+            modo='TURNO_UNICO',
+        ))
+
+    return resultado

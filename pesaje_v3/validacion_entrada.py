@@ -46,7 +46,37 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
     alertas_turno = _validar_nivel3_turno(db, turno_id, turno, suc)
     resultado['alertas'].extend(alertas_turno)
 
-    # Armar DatosDia para pipeline
+    # ── Intentar pipeline batch (analizar_mes) para paridad con reporte ──
+    from datetime import date as date_cls
+    fecha = turno['fecha']
+    mes = fecha[:7]  # 'YYYY-MM'
+    dia_label = str(date_cls.fromisoformat(fecha).day)
+
+    # Contar turnos del mes para decidir si vale la pena batch
+    n_turnos_mes = db.execute(
+        "SELECT COUNT(*) as n FROM turnos WHERE sucursal_id=? AND fecha LIKE ?",
+        (turno['sucursal_id'], f"{mes}%"),
+    ).fetchone()['n']
+
+    if n_turnos_mes >= 4:  # Al menos 2 días de datos → batch vale la pena
+        try:
+            res_mes = analizar_mes(db, turno['sucursal_id'], mes)
+            if dia_label in res_mes and res_mes[dia_label].get('tiene_analisis'):
+                res_dia = res_mes[dia_label]
+                # Combinar alertas de nivel 3 con las del pipeline batch
+                res_dia['alertas'] = resultado['alertas'] + res_dia.get('alertas', [])
+                res_dia['n_errores'] = sum(1 for a in res_dia['alertas'] if a['severidad'] == 'error')
+                res_dia['n_warnings'] = sum(1 for a in res_dia['alertas'] if a['severidad'] == 'warning')
+
+                # C5 profundo si se pidió
+                if profundo and turno['estado'] == 'confirmado':
+                    res_dia = _agregar_c5_profundo(db, turno, res_dia)
+
+                return res_dia
+        except Exception:
+            pass  # Fallback al pipeline individual
+
+    # ── Fallback: pipeline individual (armar_datos_dia) ──
     datos_dia = armar_datos_dia(db, turno['sucursal_id'], turno['fecha'])
     if not datos_dia:
         tipo = turno['tipo_turno']
@@ -206,6 +236,191 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
     # Conteo de alertas
     resultado['n_errores'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'error')
     resultado['n_warnings'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'warning')
+
+    return resultado
+
+
+def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
+    """Corre el pipeline completo sobre TODOS los turnos del mes.
+
+    Replica EXACTAMENTE web.py:_procesar() pero leyendo de la DB.
+    Retorna dict {dia_label: resultado_analisis} donde cada resultado
+    tiene la misma estructura que analizar_turno().
+
+    Args:
+        db: conexión SQLite
+        sucursal_id: id de la sucursal
+        mes: formato 'YYYY-MM' (ej: '2026-02')
+    """
+    from .db_to_pipeline import cargar_todos_los_dias_db
+    from .capa2_contrato import calcular_contabilidad
+    from .capa3_motor import clasificar, canonicalizar_nombres, aplicar_canonicalizacion
+    from .capa4_expediente import resolver_escalados
+    from .modelos import ResolucionC3
+
+    dias = cargar_todos_los_dias_db(db, sucursal_id, mes)
+    if not dias:
+        return {}
+
+    resultados = {}
+    for datos in sorted(dias, key=lambda d: int(d.dia_label) if d.dia_label.isdigit() else 0):
+        try:
+            canon = canonicalizar_nombres(datos)
+            aplicar_canonicalizacion(datos, canon)
+            cont = calcular_contabilidad(datos)
+            c3 = clasificar(datos, cont)
+            c4 = resolver_escalados(datos, cont, c3)
+
+            # Armar resultado con misma estructura que analizar_turno
+            resultado = {
+                'ok': True,
+                'alertas': [],
+                'sabores': [],
+                'totales': {},
+                'tiene_analisis': True,
+                'profundo': False,
+                'c5_senales': {},
+            }
+
+            venta_total = 0
+            latas_total = 0
+            n_corregidos = 0
+            n_h0 = 0
+
+            for nombre in sorted(c3.sabores.keys()):
+                sc3 = c3.sabores[nombre]
+                sc = sc3.contable
+                if sc.solo_dia or sc.solo_noche:
+                    continue
+
+                res = sc3.resolution_status
+                vf = sc3.venta_final_c3 if sc3.venta_final_c3 is not None else sc.venta_raw
+
+                c4_corr = next((c for c in c4.correcciones if c.nombre_norm == nombre), None)
+                if c4_corr:
+                    vf = c4_corr.venta_corregida
+
+                proto = sc3.prototipo
+                delta = proto.delta if proto else (c4_corr.delta if c4_corr else 0)
+
+                if res and res == ResolucionC3.ESCALAR_C4:
+                    status = 'H0'
+                    n_h0 += 1
+                elif proto or c4_corr:
+                    status = 'CORREGIDO'
+                    n_corregidos += 1
+                else:
+                    status = 'OK'
+
+                sabor_info = {
+                    'nombre': nombre,
+                    'raw': sc.venta_raw,
+                    'final': vf,
+                    'delta': delta,
+                    'status': status,
+                    'n_latas': sc.n_latas,
+                    'ajuste_latas': sc.ajuste_latas,
+                }
+
+                if proto:
+                    sabor_info['correccion'] = proto.descripcion[:80]
+                    sabor_info['confianza'] = proto.confianza
+                elif c4_corr:
+                    sabor_info['correccion'] = c4_corr.motivo[:80]
+                    sabor_info['confianza'] = c4_corr.confianza
+
+                d = datos.turno_dia.sabores.get(nombre)
+                n = datos.turno_noche.sabores.get(nombre)
+                if status != 'OK':
+                    sabor_info['explicacion'] = _explicar_caso(
+                        nombre, sc, d, n, proto, c4_corr, False,
+                        0, vf, status,
+                    )
+
+                if vf < -200:
+                    resultado['alertas'].append({
+                        'nivel': 'analisis', 'severidad': 'error', 'sabor': nombre,
+                        'codigo': 'VENTA_NEG',
+                        'detalle': f'{nombre}: la venta da {vf}g (negativa). Revisar si faltan cerradas o si la abierta esta mal.',
+                    })
+                elif status == 'H0':
+                    resultado['alertas'].append({
+                        'nivel': 'analisis', 'severidad': 'warning', 'sabor': nombre,
+                        'codigo': 'H0',
+                        'detalle': sabor_info.get('explicacion', f'{nombre}: no se pudo corregir automaticamente.'),
+                    })
+
+                venta_total += vf
+                latas_total += sc.ajuste_latas
+                resultado['sabores'].append(sabor_info)
+
+            resultado['totales'] = {
+                'venta': venta_total,
+                'latas': latas_total,
+                'n_latas': latas_total // 280 if latas_total else 0,
+                'vdp': cont.vdp_total,
+                'neto': venta_total - latas_total - cont.vdp_total,
+                'n_sabores': len(resultado['sabores']),
+                'n_corregidos': n_corregidos,
+                'n_h0': n_h0,
+            }
+
+            resultado['n_errores'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'error')
+            resultado['n_warnings'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'warning')
+
+            resultados[datos.dia_label] = resultado
+
+        except Exception as e:
+            resultados[datos.dia_label] = {
+                'ok': False,
+                'error': f'Error en pipeline D{datos.dia_label}: {str(e)[:120]}',
+                'alertas': [],
+                'sabores': [],
+                'totales': {},
+                'tiene_analisis': False,
+            }
+
+    return resultados
+
+
+def _agregar_c5_profundo(db, turno, resultado):
+    """Agrega señales C5 a un resultado ya calculado."""
+    try:
+        from .capa5_residual import segunda_pasada
+        datos_dia = armar_datos_dia(db, turno['sucursal_id'], turno['fecha'])
+        if not datos_dia:
+            return resultado
+
+        from .capa2_contrato import calcular_contabilidad
+        from .capa3_motor import clasificar, canonicalizar_nombres, aplicar_canonicalizacion
+        from .capa4_expediente import resolver_escalados
+
+        canon = canonicalizar_nombres(datos_dia)
+        aplicar_canonicalizacion(datos_dia, canon)
+        cont = calcular_contabilidad(datos_dia)
+        c3 = clasificar(datos_dia, cont)
+        c4 = resolver_escalados(datos_dia, cont, c3)
+        c5 = segunda_pasada(datos_dia, c3, c4.correcciones, stats={})
+
+        c5_senales = {}
+        if hasattr(c5, 'sabores'):
+            for nn, c5_sab in c5.sabores.items():
+                if c5_sab.senales:
+                    c5_senales[nn] = [
+                        {'tipo': s.tipo, 'subtipo': s.subtipo, 'detalle': s.detalle}
+                        for s in c5_sab.senales
+                    ]
+
+        resultado['profundo'] = True
+        resultado['c5_senales'] = c5_senales
+        for sab in resultado.get('sabores', []):
+            if sab['nombre'] in c5_senales:
+                sab['c5_senales'] = c5_senales[sab['nombre']]
+    except Exception as e:
+        resultado['alertas'].append({
+            'nivel': 'analisis', 'severidad': 'info', 'sabor': None,
+            'codigo': 'C5_ERROR', 'detalle': f'Error en C5: {str(e)[:80]}',
+        })
 
     return resultado
 

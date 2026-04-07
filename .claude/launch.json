@@ -4,8 +4,8 @@
     {
       "name": "Pesaje Web Runner",
       "runtimeExecutable": "C:/Users/EliteBook/AppData/Local/Programs/Python/Python312/python.exe",
-      "runtimeArgs": ["web_runner.py"],
-      "port": 5000
+      "runtimeArgs": ["-m", "pesaje_v3.web"],
+      "port": 5001
     },
     {
       "name": "Pesaje v3",
