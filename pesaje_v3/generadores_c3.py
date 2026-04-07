@@ -1022,6 +1022,20 @@ def _generar_pfit_individuales(nombre: str, sc: SaborContable,
             ]
             elevado_por_masivo = True
 
+        elif abs(ea - cerrada_match) == 0:
+            # Match EXACTO (diff=0): evidencia directa suficiente sin soporte temporal.
+            # Un entrante con el mismo peso exacto que una cerrada del mismo turno
+            # es doble registro con altísima probabilidad.
+            conf = PFIT_CONF_MEDIA
+            fuente = FuenteEvidencia(
+                TipoFuente.MATCHING,
+                f'ent {ea} = cerr {cerrada_match} EXACTO (diff=0); evidencia directa de doble registro',
+            )
+            evidencias = [
+                f'ent DIA {ea} = cerr DIA {cerrada_match} (diff=0, match perfecto)',
+                'evidencia directa: peso identico sin soporte temporal necesario',
+            ]
+
         else:
             continue  # DÉBIL sin masivo → descartar
 
