@@ -320,10 +320,29 @@ def historial():
         mes = meses[0]['mes']
 
     turnos = listar_turnos(db, sucursal_id=sid, mes=mes) if mes else []
+
+    # Resumen de analisis por turno (para vista de supervisor)
+    # Solo si hay query param ?resumen=1 (evita carga pesada por defecto)
+    resumenes = {}
+    if request.args.get('resumen') and turnos:
+        from .validacion_entrada import analizar_turno
+        for t in turnos:
+            try:
+                r = analizar_turno(db, t['id'])
+                if r.get('tiene_analisis'):
+                    resumenes[t['id']] = {
+                        'venta': r['totales']['venta'],
+                        'corr': r['totales']['n_corregidos'],
+                        'h0': r['totales']['n_h0'],
+                        'n_sab': r['totales']['n_sabores'],
+                    }
+            except:
+                pass
+
     db.close()
     return render_template('entrada/historial.html',
                            turnos=turnos, sucursal_nombre=nombre,
-                           mes=mes, meses=meses)
+                           mes=mes, meses=meses, resumenes=resumenes)
 
 
 # ─── APIs: VDP, Consumos, Notas, Agregar sabor ──────────────────────
