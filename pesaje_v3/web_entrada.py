@@ -424,6 +424,42 @@ def planilla(turno_id):
     return render_template('entrada/planilla.html', data=data)
 
 
+@entrada_bp.route('/entrada/exportar-turno/<int:turno_id>')
+def exportar_turno_route(turno_id):
+    """Descarga Excel de un turno individual."""
+    from flask import send_file
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return redirect(url_for('entrada.index'))
+    db = get_db()
+    turno = db.execute("SELECT * FROM turnos WHERE id=?", (turno_id,)).fetchone()
+    if not turno or turno['sucursal_id'] != sid:
+        db.close()
+        return redirect(url_for('entrada.seleccion'))
+    from .excel_generador import exportar_turno
+    path = exportar_turno(db, turno_id)
+    db.close()
+    return send_file(path, as_attachment=True)
+
+
+@entrada_bp.route('/entrada/exportar-mes/<int:anio>/<int:mes>')
+def exportar_mes_route(anio, mes):
+    """Descarga Excel del mes completo de la sucursal activa."""
+    from flask import send_file
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return redirect(url_for('entrada.index'))
+    db = get_db()
+    from .excel_generador import exportar_mes
+    try:
+        path = exportar_mes(db, sid, anio, mes)
+    except ValueError as e:
+        db.close()
+        return str(e), 404
+    db.close()
+    return send_file(path, as_attachment=True)
+
+
 @entrada_bp.route('/entrada/pedido/<int:turno_id>')
 def pedido(turno_id):
     """Sugerencia de pedido por sabor basada en historial confirmado."""

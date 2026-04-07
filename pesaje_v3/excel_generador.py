@@ -62,6 +62,28 @@ def exportar_mes(db: sqlite3.Connection, sucursal_id: int, anio: int, mes: int) 
     return path
 
 
+def exportar_turno(db: sqlite3.Connection, turno_id: int) -> str:
+    """Genera Excel de un solo turno. Retorna path del archivo temporal."""
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno:
+        raise ValueError(f"Turno {turno_id} no encontrado")
+
+    suc = db.execute("SELECT * FROM sucursales WHERE id = ?", (turno['sucursal_id'],)).fetchone()
+    modo = suc['modo']
+    nombre_hoja = derivar_nombre_hoja(turno['fecha'], turno['tipo_turno'], modo)[:31]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = nombre_hoja
+    _escribir_hoja(db, ws, turno_id)
+
+    nombre_suc = suc['nombre'].replace(' ', '_')
+    nombre_archivo = f"Planilla_{nombre_suc}_{turno['fecha']}_{turno['tipo_turno']}.xlsx"
+    path = os.path.join(tempfile.gettempdir(), nombre_archivo)
+    wb.save(path)
+    return path
+
+
 def _escribir_hoja(db: sqlite3.Connection, ws, turno_id: int):
     """Escribe una hoja con el formato que parser.py espera."""
     # Header
