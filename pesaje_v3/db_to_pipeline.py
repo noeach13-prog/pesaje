@@ -307,13 +307,30 @@ def cargar_todos_los_dias_db(db: sqlite3.Connection, sucursal_id: int,
     from datetime import date as date_cls
     from collections import defaultdict
 
-    # 1. Obtener todos los turnos del mes, ordenados como hojas del workbook
-    rows = db.execute(
+    # 1. Obtener todos los turnos del mes + últimos 6 del mes anterior (cross-mes)
+    # Los turnos del mes anterior sirven como contexto backward para los
+    # primeros días del mes, y como turno_dia para el primer par TURNO_UNICO.
+    rows_mes = db.execute(
         """SELECT id, fecha, tipo_turno FROM turnos
            WHERE sucursal_id=? AND fecha LIKE ?
            ORDER BY fecha, tipo_turno""",
         (sucursal_id, f"{mes}%"),
     ).fetchall()
+    if not rows_mes:
+        return []
+
+    # Turnos del mes anterior (últimos 6, suficientes para contexto ±3)
+    primera_fecha = rows_mes[0]['fecha']
+    rows_prev = db.execute(
+        """SELECT id, fecha, tipo_turno FROM turnos
+           WHERE sucursal_id=? AND fecha < ?
+           ORDER BY fecha DESC, tipo_turno DESC LIMIT 6""",
+        (sucursal_id, primera_fecha),
+    ).fetchall()
+    rows_prev = list(reversed(rows_prev))  # cronológico
+
+    rows = rows_prev + list(rows_mes)
+    n_prev = len(rows_prev)  # offset para saber qué turnos son del mes actual
     if not rows:
         return []
 
@@ -336,16 +353,20 @@ def cargar_todos_los_dias_db(db: sqlite3.Connection, sucursal_id: int,
     all_turnos = {idx: tc for idx, _, tc in turnos_info}
     total = len(rows)
 
-    # 4. Agrupar por fecha
+    # 4. Agrupar por fecha (solo turnos del mes actual generan DatosDia;
+    #    turnos previos participan solo como contexto en la lista plana)
     dias_dict = defaultdict(list)
     for idx, row, tc in turnos_info:
         dias_dict[row['fecha']].append((idx, row, tc))
 
     resultado = []
     fechas_usadas = set()
+    fechas_mes = {row['fecha'] for row in rows_mes}  # solo fechas del mes pedido
 
     # 5a. Procesar pares DIA_NOCHE y UNICO_NOCHE
     for fecha in sorted(dias_dict.keys()):
+        if fecha not in fechas_mes:
+            continue  # turno del mes anterior, solo contexto
         entries = dias_dict[fecha]
         tipos_dia = {row['tipo_turno'] for _, row, _ in entries}
 
@@ -382,6 +403,8 @@ def cargar_todos_los_dias_db(db: sqlite3.Connection, sucursal_id: int,
             fechas_usadas.add(fecha)
 
     # 5b. Procesar turnos sueltos como TURNO_UNICO (pares consecutivos)
+    # Incluye turnos del mes anterior como posible turno_dia (referencia).
+    # Solo genera DatosDia cuando turno_b es del mes actual.
     sueltos = []
     for fecha in sorted(dias_dict.keys()):
         if fecha in fechas_usadas:
@@ -393,6 +416,10 @@ def cargar_todos_los_dias_db(db: sqlite3.Connection, sucursal_id: int,
     for j in range(len(sueltos) - 1):
         idx_a, row_a, turno_a = sueltos[j]
         idx_b, row_b, turno_b = sueltos[j + 1]
+
+        # Solo generar DatosDia si turno_b es del mes pedido
+        if row_b['fecha'] not in fechas_mes:
+            continue
 
         dia_label = str(date_cls.fromisoformat(row_b['fecha']).day)
 
