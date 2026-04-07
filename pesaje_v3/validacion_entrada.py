@@ -170,6 +170,11 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
             else:
                 status = 'OK'
 
+            # Venta negativa es fisicamente imposible.
+            # Si el pipeline no pudo resolver, mostrar 0 (datos insuficientes).
+            if vf < 0:
+                vf = 0
+
             sabor_info = {
                 'nombre': nombre,
                 'raw': sc.venta_raw,
@@ -352,6 +357,9 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                     n_corregidos += 1
                 else:
                     status = 'OK'
+
+                if vf < 0:
+                    vf = 0
 
                 sabor_info = {
                     'nombre': nombre,
