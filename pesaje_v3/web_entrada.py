@@ -412,16 +412,32 @@ def api_desbloquear():
 
 @entrada_bp.route('/entrada/planilla/<int:turno_id>')
 def planilla(turno_id):
-    """Vista planilla: datos crudos tipo Excel, sin análisis."""
+    """Vista planilla: datos crudos tipo Excel con comparativa del dia anterior."""
     sid, _ = _sucursal_activa()
     if not sid:
         return redirect(url_for('entrada.index'))
     db = get_db()
     data = obtener_turno(db, turno_id)
-    db.close()
     if not data or data['turno']['sucursal_id'] != sid:
+        db.close()
         return redirect(url_for('entrada.seleccion'))
-    return render_template('entrada/planilla.html', data=data)
+
+    # Turno anterior para comparativa
+    t_ant = db.execute(
+        "SELECT id FROM turnos WHERE sucursal_id=? AND fecha<? ORDER BY fecha DESC, tipo_turno DESC LIMIT 1",
+        (sid, data['turno']['fecha']),
+    ).fetchone()
+    data_ant = obtener_turno(db, t_ant['id']) if t_ant else None
+    db.close()
+
+    # Indexar anterior por nombre_norm para comparar
+    ant_por_sabor = {}
+    if data_ant:
+        for s in data_ant['sabores']:
+            ant_por_sabor[s['nombre_norm']] = s
+
+    return render_template('entrada/planilla.html', data=data,
+                           data_ant=data_ant, ant=ant_por_sabor)
 
 
 @entrada_bp.route('/entrada/exportar-turno/<int:turno_id>')
