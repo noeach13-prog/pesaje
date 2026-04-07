@@ -17,7 +17,7 @@ from .db_to_pipeline import armar_datos_dia
 from .db import get_db
 
 
-def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
+def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False) -> Dict:
     """
     Corre el pipeline completo sobre un turno y retorna:
     - alertas de validación (niveles 3-5)
@@ -79,7 +79,43 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
         c3 = clasificar(datos_dia, cont)
         c4 = resolver_escalados(datos_dia, cont, c3)
 
+        # C5: segunda pasada — solo si el supervisor lo pide explicitamente
+        c5_cambios = []
+        if profundo and turno['estado'] == 'confirmado':
+            from .capa5_residual import segunda_pasada
+            c5 = segunda_pasada(datos_dia, c3, c4.correcciones, stats={})
+            # Detectar que cambio entre C4 y C5
+            c4_por_nombre = {c.nombre_norm: c for c in c4.correcciones}
+            c5_por_nombre = {c.nombre_norm: c for c in c5} if isinstance(c5, list) else {}
+            for nn, c5c in c5_por_nombre.items():
+                c4c = c4_por_nombre.get(nn)
+                if c4c and c4c.venta_corregida != c5c.venta_corregida:
+                    c5_cambios.append({
+                        'nombre': nn,
+                        'c4_venta': c4c.venta_corregida,
+                        'c5_venta': c5c.venta_corregida,
+                        'delta': c5c.venta_corregida - c4c.venta_corregida,
+                        'motivo': getattr(c5c, 'motivo', '')[:80],
+                    })
+                elif not c4c:
+                    c5_cambios.append({
+                        'nombre': nn,
+                        'c4_venta': None,
+                        'c5_venta': c5c.venta_corregida,
+                        'delta': c5c.delta,
+                        'motivo': getattr(c5c, 'motivo', '')[:80],
+                    })
+            # Usar correcciones C5 como fuente si hay
+            if c5_por_nombre:
+                c4_correcciones_final = c5 if isinstance(c5, list) else c4.correcciones
+            else:
+                c4_correcciones_final = c4.correcciones
+        else:
+            c4_correcciones_final = c4.correcciones
+
         resultado['tiene_analisis'] = True
+        resultado['profundo'] = profundo and turno['estado'] == 'confirmado'
+        resultado['c5_cambios'] = c5_cambios
 
         # Ventas por sabor
         venta_total = 0
@@ -97,7 +133,7 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
             vf = sc3.venta_final_c3 if sc3.venta_final_c3 is not None else sc.venta_raw
 
             # Corrección de C4
-            c4_corr = next((c for c in c4.correcciones if c.nombre_norm == nombre), None)
+            c4_corr = next((c for c in c4_correcciones_final if c.nombre_norm == nombre), None)
             if c4_corr:
                 vf = c4_corr.venta_corregida
 

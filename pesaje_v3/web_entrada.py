@@ -667,7 +667,8 @@ def revision(turno_id):
         return redirect(url_for('entrada.seleccion'))
 
     from .validacion_entrada import analizar_turno
-    analisis = analizar_turno(db, turno_id)
+    profundo = request.args.get('profundo') == '1'
+    analisis = analizar_turno(db, turno_id, profundo=profundo)
     db.close()
 
     return render_template('entrada/revision.html',

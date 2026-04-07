@@ -68,6 +68,15 @@ tr.row-neg { background: #fce4ec; }
 .exp-detail { display: none; font-size: 0.72rem; color: #444; padding: 6px 20px 10px; margin: 0; white-space: pre-wrap; font-family: inherit; line-height: 1.5; background: #f8f9fa; border-top: 1px solid #eee; }
 .exp-box.open .exp-detail { display: block; }
 
+/* C5 analisis profundo */
+.btn-c5 { display: block; text-align: center; padding: 10px; background: #fff; border: 2px dashed #1565c0; color: #1565c0; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.85rem; }
+.c5-banner { background: #f3e5f5; border: 1px solid #ce93d8; border-radius: 8px; padding: 12px; margin: 8px 0; }
+.c5-title { font-weight: 700; font-size: 0.9rem; color: #6a1b9a; margin-bottom: 4px; }
+.c5-subtitle { font-size: 0.8rem; color: #555; margin-bottom: 6px; }
+.c5-row { font-size: 0.8rem; padding: 4px 0; border-bottom: 1px solid #e1bee7; }
+.c5-row:last-of-type { border-bottom: none; }
+.c5-note { font-size: 0.7rem; color: #888; margin-top: 8px; font-style: italic; }
+
 .actions { display: flex; gap: 8px; margin: 12px 0; }
 .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
 .btn-back { background: #f5f5f5; color: #333; }
@@ -205,6 +214,34 @@ tr.row-neg { background: #fce4ec; }
 
     {% if not analisis.tiene_analisis and not analisis.alertas %}
     <div class="sec"><div class="empty">Sin datos suficientes para analisis. Cargar ambos turnos (DIA y NOCHE) o el turno anterior.</div></div>
+    {% endif %}
+
+    {# C5: Analisis profundo #}
+    {% if analisis.tiene_analisis and data.turno.estado == 'confirmado' %}
+    {% if analisis.profundo %}
+    <div class="c5-banner">
+        <div class="c5-title">Analisis profundo (C5) ejecutado</div>
+        {% if analisis.c5_cambios %}
+        <div class="c5-subtitle">{{ analisis.c5_cambios|length }} sabores con cambios respecto al analisis base:</div>
+        {% for c in analisis.c5_cambios %}
+        <div class="c5-row">
+            <strong>{{ c.nombre }}</strong>:
+            base={{ "{:,}".format(c.c4_venta) if c.c4_venta is not none else 'sin correccion' }}g
+            → profundo={{ "{:,}".format(c.c5_venta) }}g
+            ({{ "{:+,}".format(c.delta) }}g)
+            {% if c.motivo %}<br><span style="font-size:0.7rem;color:#555;">{{ c.motivo }}</span>{% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="c5-subtitle">C5 no encontro mejoras. El resultado base es el mejor disponible.</div>
+        {% endif %}
+        <div class="c5-note">Nota: El analisis profundo es local (este turno + vecinos). Puede diferir del reporte mensual si hay patrones que cruzan dias no visibles aqui.</div>
+    </div>
+    {% else %}
+    <div style="margin:8px 0;">
+        <a href="/entrada/revision/{{ data.turno.id }}?profundo=1" class="btn-c5">Ejecutar analisis profundo (C5)</a>
+    </div>
+    {% endif %}
     {% endif %}
 
     <div class="actions">
