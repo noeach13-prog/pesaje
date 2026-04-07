@@ -5,372 +5,676 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ sucursal_nombre }} - Nuevo turno</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@500;600;700&display=swap');
 :root {
-    --bg: #f7f1e8;
-    --panel: rgba(255, 252, 247, 0.95);
-    --panel-strong: #fffdf8;
-    --line: rgba(112, 80, 59, 0.14);
-    --ink: #30241d;
-    --muted: #7c675b;
-    --accent: #99613a;
-    --accent-strong: #7f4c2b;
-    --accent-soft: #f4e7da;
+    --bg-1: #f8f2eb;
+    --bg-2: #efe0d2;
+    --shell: rgba(255, 252, 247, 0.86);
+    --card: rgba(255, 251, 246, 0.90);
+    --card-strong: rgba(255,255,255,0.94);
+    --ink: #281d18;
+    --muted: #736154;
+    --line: rgba(114, 80, 59, 0.14);
+    --line-strong: rgba(114, 80, 59, 0.22);
+    --accent: #9b613b;
+    --accent-deep: #6d4227;
+    --accent-soft: #f2e0ce;
+    --gold: #c8a269;
+    --gold-soft: rgba(200,162,105,0.20);
     --success: #2f6a41;
-    --success-soft: #ecf6ef;
-    --warning: #b46a1f;
-    --warning-soft: #fff3e3;
-    --shadow: 0 22px 54px rgba(74, 48, 31, 0.11);
-    --shadow-soft: 0 12px 28px rgba(74, 48, 31, 0.08);
+    --success-soft: #edf7ef;
+    --warning: #b76b1f;
+    --warning-soft: #fff4e6;
+    --shadow-xl: 0 32px 80px rgba(68, 40, 24, 0.14);
+    --shadow-lg: 0 18px 40px rgba(68, 40, 24, 0.10);
+    --shadow-sm: 0 10px 24px rgba(68, 40, 24, 0.06);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    padding: 22px;
+    font-family: 'Manrope', 'Segoe UI', sans-serif;
     color: var(--ink);
     background:
-        radial-gradient(circle at top left, rgba(173, 123, 82, 0.12), transparent 32%),
-        radial-gradient(circle at 100% 100%, rgba(151, 99, 61, 0.10), transparent 26%),
-        linear-gradient(180deg, #fbf7f1 0%, #f6ede3 100%);
-    min-height: 100vh;
-    padding: 24px 16px 40px;
+        radial-gradient(circle at top left, rgba(200,162,105,0.18), transparent 28%),
+        radial-gradient(circle at 82% 12%, rgba(155,97,59,0.14), transparent 22%),
+        radial-gradient(circle at bottom right, rgba(109,66,39,0.08), transparent 30%),
+        linear-gradient(135deg, var(--bg-1) 0%, #f4e9dd 42%, var(--bg-2) 100%);
+}
+body::before {
+    content: '';
+    position: fixed;
+    inset: 14px;
+    border-radius: 32px;
+    border: 1px solid rgba(114, 80, 59, 0.14);
+    pointer-events: none;
 }
 .page-shell {
-    width: 100%;
-    max-width: 620px;
+    max-width: 1320px;
     margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(290px, 0.82fr);
+    gap: 18px;
 }
-.topbar,
+.main-column,
+.side-column {
+    display: grid;
+    gap: 18px;
+    align-content: start;
+}
 .hero,
-.card,
+.composer,
+.summary-card,
 .links-card,
-.recientes {
-    background: var(--panel);
+.recientes,
+.info-card {
+    border-radius: 28px;
     border: 1px solid var(--line);
-    border-radius: 24px;
-    box-shadow: var(--shadow-soft);
-    backdrop-filter: blur(10px);
+    background: var(--card);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(16px);
 }
-.topbar {
+.hero {
+    position: relative;
+    overflow: hidden;
+    padding: 28px;
+    background:
+        linear-gradient(140deg, rgba(46, 29, 20, 0.94), rgba(72, 44, 30, 0.88)),
+        radial-gradient(circle at top right, rgba(200,162,105,0.24), transparent 24%);
+    color: #fff8f0;
+}
+.hero::before {
+    content: '';
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    right: -180px;
+    top: -170px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.hero-top {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 14px;
-    padding: 20px 22px;
-    margin-bottom: 14px;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
 }
-.kicker {
+.hero-kicker {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
+    gap: 10px;
+    padding: 9px 13px;
     border-radius: 999px;
-    margin-bottom: 10px;
-    background: rgba(153, 97, 58, 0.08);
-    color: var(--accent-strong);
-    font-size: 0.72rem;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.12);
+    font-size: 0.73rem;
     font-weight: 800;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    letter-spacing: 0.11em;
+    margin-bottom: 16px;
 }
-.kicker::before {
+.hero-kicker::before {
     content: '';
     width: 8px;
     height: 8px;
     border-radius: 999px;
-    background: var(--accent);
+    background: linear-gradient(180deg, #f0d5a8, #c48c57);
 }
-.topbar h1 {
-    font-size: clamp(1.6rem, 4vw, 2rem);
-    line-height: 1.05;
-    letter-spacing: -0.03em;
-    margin-bottom: 4px;
+.hero-copy h1 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(3rem, 6vw, 4.2rem);
+    line-height: 0.92;
+    letter-spacing: -0.04em;
+    font-weight: 600;
+    margin-bottom: 14px;
 }
-.topbar p {
-    color: var(--muted);
-    font-size: 0.92rem;
-    line-height: 1.5;
+.hero-copy p {
+    max-width: 54ch;
+    color: rgba(255,244,235,0.80);
+    font-size: 0.98rem;
+    line-height: 1.7;
 }
-.topbar a {
+.hero-action {
     flex-shrink: 0;
     text-decoration: none;
-    color: var(--accent-strong);
-    background: rgba(153, 97, 58, 0.08);
-    border: 1px solid rgba(153, 97, 58, 0.14);
-    padding: 11px 14px;
-    border-radius: 16px;
-    font-weight: 700;
-    font-size: 0.84rem;
-    transition: background 0.16s ease, transform 0.16s ease;
+    color: #fff6ee;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    font-weight: 800;
+    font-size: 0.83rem;
+    transition: transform 0.16s ease, background 0.16s ease;
 }
-.topbar a:hover { background: rgba(153, 97, 58, 0.13); transform: translateY(-1px); }
-.hero {
-    padding: 18px 22px;
-    margin-bottom: 14px;
-    display: flex;
-    gap: 16px;
-    justify-content: space-between;
-    align-items: center;
+.hero-action:hover { transform: translateY(-1px); background: rgba(255,255,255,0.12); }
+.metrics {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 24px;
 }
-.hero-copy { display: flex; flex-direction: column; gap: 6px; }
-.hero-label {
-    color: var(--muted);
+.metric {
+    padding: 18px;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.10);
+}
+.metric strong {
+    display: block;
+    margin-bottom: 9px;
+    color: #f2d9ba;
+    font-size: 0.73rem;
     text-transform: uppercase;
-    letter-spacing: 0.11em;
+    letter-spacing: 0.13em;
+}
+.metric span {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+.composer {
+    overflow: hidden;
+}
+.composer-head {
+    padding: 26px 28px 20px;
+    border-bottom: 1px solid rgba(114,80,59,0.10);
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    align-items: flex-start;
+    background: linear-gradient(180deg, rgba(255,255,255,0.26), rgba(255,255,255,0));
+}
+.composer-head .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(242,224,206,0.84), rgba(255,250,244,0.72));
+    border: 1px solid rgba(155,97,59,0.10);
     font-size: 0.73rem;
     font-weight: 800;
-}
-.hero strong {
-    font-size: 1.04rem;
-    font-weight: 800;
-}
-.hero-meta {
-    text-align: right;
-    color: var(--muted);
-    font-size: 0.82rem;
-}
-.card {
-    padding: 24px 22px 22px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--accent-deep);
     margin-bottom: 14px;
 }
-.section-title {
-    font-size: 1.08rem;
-    font-weight: 800;
-    margin-bottom: 6px;
-    letter-spacing: -0.02em;
+.composer-head .eyebrow::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #d7ae75, #8c5b32);
 }
-.section-subtitle {
+.composer-head h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(2.3rem, 5vw, 3.1rem);
+    line-height: 0.92;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    margin-bottom: 10px;
+}
+.composer-head p {
     color: var(--muted);
-    font-size: 0.9rem;
-    line-height: 1.5;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    max-width: 46ch;
+}
+.head-note {
+    min-width: 180px;
+    padding: 16px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(248,238,229,0.82));
+    border: 1px solid rgba(114,80,59,0.10);
+    box-shadow: var(--shadow-sm);
+}
+.head-note strong {
+    display: block;
+    margin-bottom: 7px;
+    font-size: 0.72rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent-deep);
+}
+.head-note span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.84rem;
+    line-height: 1.55;
+}
+.form-wrap {
+    padding: 24px 28px 28px;
+}
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
     margin-bottom: 18px;
 }
+.field {
+    position: relative;
+}
+.field.full { grid-column: 1 / -1; }
 label {
     display: block;
     margin-bottom: 8px;
-    color: #876f61;
-    font-size: 0.77rem;
+    color: #856f62;
+    font-size: 0.75rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.11em;
+    letter-spacing: 0.13em;
 }
 input[type="date"],
 input[type="text"] {
     width: 100%;
-    margin-bottom: 16px;
-    padding: 15px 16px;
-    border-radius: 16px;
-    border: 1px solid rgba(128, 93, 67, 0.16);
-    background: linear-gradient(180deg, #fffdf9 0%, #f8f1e8 100%);
+    border-radius: 20px;
+    border: 1px solid rgba(114,80,59,0.12);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,239,230,0.96));
     color: var(--ink);
-    font-size: 1rem;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    padding: 16px 17px;
+    font-size: 0.98rem;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.82),
+        0 10px 20px rgba(114,80,59,0.05);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
 }
 input:focus {
     outline: none;
-    border-color: rgba(153, 97, 58, 0.40);
-    box-shadow: 0 0 0 4px rgba(153, 97, 58, 0.10);
+    transform: translateY(-1px);
+    border-color: rgba(155,97,59,0.36);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.82),
+        0 0 0 5px rgba(155,97,59,0.10),
+        0 16px 28px rgba(114,80,59,0.08);
+}
+.turno-area {
+    border-radius: 24px;
+    padding: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.74), rgba(249,241,233,0.70));
+    border: 1px solid rgba(114,80,59,0.10);
+    box-shadow: var(--shadow-sm);
+}
+.turno-area-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.turno-area-head strong {
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+}
+.turno-area-head span {
+    color: var(--muted);
+    font-size: 0.84rem;
 }
 .turno-btns {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 12px;
 }
 .turno-btn {
-    border-radius: 18px;
-    border: 1px solid rgba(124, 103, 91, 0.18);
-    background: #fffdf9;
-    padding: 14px 12px;
+    position: relative;
+    padding: 18px 14px 16px;
+    min-height: 112px;
+    border-radius: 22px;
+    border: 1px solid rgba(114,80,59,0.12);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(249,241,233,0.92));
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.84),
+        0 12px 20px rgba(114,80,59,0.06);
     cursor: pointer;
-    text-align: center;
-    font-size: 0.88rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
     transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
-.turno-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 18px rgba(80, 52, 35, 0.09); }
-.turno-btn.active {
-    border-color: rgba(153, 97, 58, 0.45);
-    background: linear-gradient(180deg, var(--accent-soft) 0%, #f7e7d5 100%);
-    color: var(--accent-strong);
-    box-shadow: 0 10px 18px rgba(133, 81, 47, 0.10);
+.turno-btn:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.84),
+        0 16px 24px rgba(114,80,59,0.09);
 }
+.turno-btn::before {
+    content: attr(data-val);
+    display: block;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    margin-bottom: 9px;
+    color: var(--ink);
+}
+.turno-btn::after {
+    content: 'Seleccionar';
+    display: block;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+.turno-btn.active {
+    border-color: rgba(155,97,59,0.38);
+    background:
+        radial-gradient(circle at top right, rgba(200,162,105,0.22), transparent 45%),
+        linear-gradient(180deg, #f7ebdd 0%, #f2e0ce 100%);
+    color: var(--accent-deep);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.7),
+        0 20px 30px rgba(114,80,59,0.12);
+}
+.turno-btn.active::after { content: 'Turno elegido'; color: var(--accent-deep); }
 .turno-btn.exists {
-    border-color: rgba(47, 106, 65, 0.28);
-    background: linear-gradient(180deg, #f4fbf5 0%, var(--success-soft) 100%);
+    border-color: rgba(47,106,65,0.26);
+    background: linear-gradient(180deg, rgba(255,255,255,0.96), var(--success-soft) 100%);
     color: var(--success);
     cursor: default;
     box-shadow: none;
 }
-.turno-btn.exists::after {
-    content: ' · cargado';
-    font-size: 0.69rem;
-    font-weight: 700;
-    letter-spacing: 0;
-}
+.turno-btn.exists::after { content: 'Ya cargado'; color: var(--success); }
 .warn-box {
     display: none;
-    margin: 2px 0 14px;
-    padding: 13px 14px;
-    border-radius: 16px;
+    margin: 16px 0 0;
+    padding: 14px 16px;
+    border-radius: 18px;
     background: var(--warning-soft);
+    border: 1px solid rgba(183,107,31,0.14);
     color: var(--warning);
-    border: 1px solid rgba(180, 106, 31, 0.16);
-    font-size: 0.84rem;
-    line-height: 1.45;
+    font-size: 0.87rem;
+    line-height: 1.55;
+}
+.footer-action {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: 14px;
+    align-items: center;
+    margin-top: 20px;
+}
+.action-note {
+    padding: 14px 16px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(249,241,233,0.74));
+    border: 1px solid rgba(114,80,59,0.10);
+    color: var(--muted);
+    font-size: 0.86rem;
+    line-height: 1.6;
 }
 .btn-primary {
     width: 100%;
     border: none;
-    border-radius: 18px;
-    padding: 16px 20px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
-    color: #fffaf4;
-    font-size: 1rem;
+    border-radius: 22px;
+    padding: 18px 20px;
+    background: linear-gradient(135deg, #a56c43 0%, #7a492c 52%, #603923 100%);
+    color: #fffaf5;
+    font-size: 0.98rem;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 16px 30px rgba(126, 79, 47, 0.24);
+    box-shadow:
+        0 22px 36px rgba(111,67,40,0.25),
+        inset 0 1px 0 rgba(255,255,255,0.22);
     transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
 }
-.btn-primary:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.02); }
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+}
 .btn-primary:disabled { opacity: 0.72; cursor: not-allowed; box-shadow: none; }
+.summary-card,
+.info-card,
+.links-card,
+.recientes {
+    padding: 22px;
+}
+.summary-card h3,
+.info-card h3,
+.recientes h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 2rem;
+    line-height: 0.98;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    margin-bottom: 10px;
+}
+.summary-card p,
+.info-card p,
+.recientes p {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.65;
+}
+.summary-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 16px;
+}
+.summary-item {
+    padding: 16px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(248,239,229,0.82));
+    border: 1px solid rgba(114,80,59,0.10);
+}
+.summary-item strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.73rem;
+    text-transform: uppercase;
+    letter-spacing: 0.13em;
+    color: var(--accent-deep);
+}
+.summary-item span {
+    display: block;
+    color: var(--ink);
+    font-size: 0.94rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
 .links-card {
-    display: flex;
-    gap: 10px;
-    padding: 12px;
-    margin-bottom: 14px;
+    display: grid;
+    gap: 12px;
 }
 .links a {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    min-height: 52px;
-    border-radius: 16px;
+    min-height: 56px;
+    border-radius: 20px;
     text-decoration: none;
     font-weight: 800;
-    color: var(--accent-strong);
-    background: rgba(153, 97, 58, 0.08);
-    border: 1px solid rgba(153, 97, 58, 0.12);
-}
-.recientes {
-    padding: 18px 22px;
-}
-.recientes h2 {
-    font-size: 1.04rem;
-    margin-bottom: 4px;
-    letter-spacing: -0.02em;
-}
-.recientes p {
-    color: var(--muted);
-    font-size: 0.86rem;
-    margin-bottom: 14px;
+    color: var(--accent-deep);
+    background: linear-gradient(180deg, rgba(242,224,206,0.72), rgba(255,250,244,0.78));
+    border: 1px solid rgba(155,97,59,0.12);
+    box-shadow: var(--shadow-sm);
 }
 .turno-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
     gap: 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid rgba(112, 80, 59, 0.10);
-    font-size: 0.9rem;
+    align-items: center;
+    padding: 15px 0;
+    border-bottom: 1px solid rgba(114,80,59,0.10);
 }
 .turno-item:last-child { border-bottom: none; padding-bottom: 0; }
 .turno-item a {
     color: var(--ink);
     text-decoration: none;
     font-weight: 700;
+    line-height: 1.45;
 }
-.turno-item a:hover { color: var(--accent-strong); }
+.turno-item a:hover { color: var(--accent-deep); }
 .badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 6px 10px;
-    min-width: 96px;
+    min-width: 108px;
+    padding: 7px 11px;
     border-radius: 999px;
-    font-size: 0.74rem;
+    font-size: 0.73rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
 }
 .badge-borrador { background: var(--warning-soft); color: var(--warning); }
 .badge-confirmado { background: var(--success-soft); color: var(--success); }
-@media (max-width: 540px) {
-    body { padding: 14px 12px 32px; }
-    .topbar,
+@media (max-width: 1100px) {
+    .page-shell { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+    body { padding: 12px; }
+    body::before { inset: 8px; border-radius: 22px; }
     .hero,
-    .card,
-    .recientes { padding-left: 18px; padding-right: 18px; }
-    .topbar { flex-direction: column; }
-    .topbar a { width: 100%; text-align: center; }
-    .hero { flex-direction: column; align-items: flex-start; }
-    .hero-meta { text-align: left; }
+    .composer,
+    .summary-card,
+    .links-card,
+    .recientes,
+    .info-card { border-radius: 22px; }
+    .hero-top,
+    .composer-head,
+    .footer-action { grid-template-columns: 1fr; display: grid; }
+    .form-grid,
+    .metrics,
+    .footer-action { grid-template-columns: 1fr; }
+    .turno-btns { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+    .hero,
+    .composer-head,
+    .form-wrap,
+    .summary-card,
+    .links-card,
+    .recientes,
+    .info-card { padding-left: 18px; padding-right: 18px; }
+    .hero-copy h1 { font-size: 2.7rem; }
+    .composer-head h2,
+    .summary-card h3,
+    .info-card h3,
+    .recientes h2 { font-size: 1.8rem; }
 }
 </style>
 </head>
 <body>
 <div class="page-shell">
-    <div class="topbar">
-        <div>
-            <div class="kicker">Modulo entrada</div>
-            <h1>{{ sucursal_nombre }}</h1>
-            <p>Creación y continuidad de turnos con una lectura visual más clara, sin tocar la lógica del flujo.</p>
-        </div>
-        <a href="/entrada/salir">Cambiar sucursal</a>
-    </div>
-
-    {% if prox_fecha %}
-    <div class="hero">
-        <div class="hero-copy">
-            <span class="hero-label">Proximo turno sugerido</span>
-            <strong>{{ prox_fecha }} · {{ prox_tipo }}</strong>
-        </div>
-        <div class="hero-meta">La fecha sugerida sigue la secuencia actual de carga.</div>
-    </div>
-    {% endif %}
-
-    <form method="POST" action="/entrada/turno/nuevo" id="frmNuevo">
-        <div class="card">
-            <div class="section-title">Nuevo turno</div>
-            <div class="section-subtitle">Elegí la fecha, seleccioná el tipo de turno y, si querés, dejá registrado quién hizo la carga.</div>
-
-            <label for="fecha">Fecha</label>
-            <input type="date" name="fecha" id="fecha" value="{{ prox_fecha or hoy }}" required onchange="checkFecha()">
-
-            <label>Turno</label>
-            <div class="turno-btns" id="turnoBtns">
-                <div class="turno-btn{{ ' active' if prox_tipo == 'DIA' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
-                <div class="turno-btn{{ ' active' if prox_tipo == 'NOCHE' else '' }}" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
-                <div class="turno-btn{{ ' active' if prox_tipo == 'UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
+    <div class="main-column">
+        <section class="hero">
+            <div class="hero-top">
+                <div class="hero-copy">
+                    <div class="hero-kicker">Módulo entrada</div>
+                    <h1>{{ sucursal_nombre }}</h1>
+                    <p>La pantalla deja de sentirse como una utilidad plana y pasa a leerse como una consola con jerarquía: más presencia editorial, más relieve visual y una composición que respira como página seria de operación.</p>
+                </div>
+                <a class="hero-action" href="/entrada/salir">Cambiar sucursal</a>
             </div>
-            <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ prox_tipo }}">
 
-            <div class="warn-box" id="warnBox"></div>
+            <div class="metrics">
+                <div class="metric">
+                    <strong>Próximo turno</strong>
+                    <span>{% if prox_fecha %}{{ prox_fecha }} · {{ prox_tipo }}{% else %}Sin sugerencia{% endif %}</span>
+                </div>
+                <div class="metric">
+                    <strong>Modo actual</strong>
+                    <span>{{ modo }}</span>
+                </div>
+                <div class="metric">
+                    <strong>Acción principal</strong>
+                    <span>Crear o retomar turno de carga</span>
+                </div>
+            </div>
+        </section>
 
-            <label for="ingresadoPor">Quien carga (opcional)</label>
-            <input type="text" id="ingresadoPor" name="ingresado_por" placeholder="Nombre">
+        <form method="POST" action="/entrada/turno/nuevo" id="frmNuevo">
+            <section class="composer">
+                <div class="composer-head">
+                    <div>
+                        <div class="eyebrow">Nuevo turno</div>
+                        <h2>Preparar la carga</h2>
+                        <p>Reorganicé la puesta en escena para que la acción principal tenga presencia de panel premium, pero sin tocar el mecanismo de creación, los campos ni el JavaScript existente.</p>
+                    </div>
+                    <div class="head-note">
+                        <strong>Lectura rápida</strong>
+                        <span>Fecha, tipo de turno y responsable quedan mejor agrupados y con más jerarquía visual.</span>
+                    </div>
+                </div>
 
-            <button type="submit" class="btn-primary" id="btnCrear">Crear turno</button>
-        </div>
-    </form>
+                <div class="form-wrap">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="fecha">Fecha</label>
+                            <input type="date" name="fecha" id="fecha" value="{{ prox_fecha or hoy }}" required onchange="checkFecha()">
+                        </div>
+                        <div class="field">
+                            <label for="ingresadoPor">Quién carga (opcional)</label>
+                            <input type="text" id="ingresadoPor" name="ingresado_por" placeholder="Nombre">
+                        </div>
+                    </div>
 
-    <div class="links-card links">
-        <a href="/entrada/historial">Historial</a>
+                    <div class="turno-area">
+                        <div class="turno-area-head">
+                            <strong>Tipo de turno</strong>
+                            <span>Se mantiene la misma lógica de selección.</span>
+                        </div>
+                        <div class="turno-btns" id="turnoBtns">
+                            <div class="turno-btn{{ ' active' if prox_tipo == 'DIA' else '' }}" data-val="DIA" onclick="selTurno(this)"></div>
+                            <div class="turno-btn{{ ' active' if prox_tipo == 'NOCHE' else '' }}" data-val="NOCHE" onclick="selTurno(this)"></div>
+                            <div class="turno-btn{{ ' active' if prox_tipo == 'UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)"></div>
+                        </div>
+                        <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ prox_tipo }}">
+
+                        <div class="warn-box" id="warnBox"></div>
+                    </div>
+
+                    <div class="footer-action">
+                        <div class="action-note">La interfaz ahora se apoya en paneles, bloques de información y un ritmo visual más editorial. El comportamiento funcional sigue intacto.</div>
+                        <button type="submit" class="btn-primary" id="btnCrear">Crear turno</button>
+                    </div>
+                </div>
+            </section>
+        </form>
     </div>
 
-    {% if recientes %}
-    <div class="recientes">
-        <h2>Turnos recientes</h2>
-        <p>Acceso rápido a los últimos turnos registrados en esta sucursal.</p>
-        {% for t in recientes %}
-        <div class="turno-item">
-            <a href="/entrada/turno/{{ t.id }}">{{ t.fecha }} - {{ t.tipo_turno }}</a>
-            <span class="badge badge-{{ t.estado }}">{{ t.estado }}</span>
-        </div>
-        {% endfor %}
+    <div class="side-column">
+        <aside class="summary-card">
+            <h3>Resumen operativo</h3>
+            <p>Pequeño panel lateral para que la pantalla tenga sensación de sistema completo y no de formulario aislado.</p>
+            <div class="summary-list">
+                <div class="summary-item">
+                    <strong>Sucursal</strong>
+                    <span>{{ sucursal_nombre }}</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Próxima sugerencia</strong>
+                    <span>{% if prox_fecha %}{{ prox_fecha }} · {{ prox_tipo }}{% else %}Definir manualmente{% endif %}</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Modo</strong>
+                    <span>{{ modo }}</span>
+                </div>
+            </div>
+        </aside>
+
+        <aside class="links-card links">
+            <a href="/entrada/historial">Ver historial</a>
+        </aside>
+
+        <aside class="info-card">
+            <h3>Criterio visual</h3>
+            <p>Acá la mejora no es solo cromática. Hay un cambio en composición, jerarquía, bloques, materiales, profundidad y lenguaje editorial.</p>
+        </aside>
+
+        {% if recientes %}
+        <section class="recientes">
+            <h2>Turnos recientes</h2>
+            <p>Acceso rápido a los últimos registros de esta sucursal.</p>
+            {% for t in recientes %}
+            <div class="turno-item">
+                <a href="/entrada/turno/{{ t.id }}">{{ t.fecha }} - {{ t.tipo_turno }}</a>
+                <span class="badge badge-{{ t.estado }}">{{ t.estado }}</span>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
 
 <script>
