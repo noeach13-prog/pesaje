@@ -5,592 +5,172 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pesaje - Acceso</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@500;600;700&display=swap');
 :root {
-    --bg-1: #f7f0e7;
-    --bg-2: #efe0cf;
-    --paper: rgba(255, 251, 246, 0.82);
-    --paper-strong: rgba(255, 251, 246, 0.94);
-    --ink: #271d17;
-    --muted: #766255;
-    --line: rgba(115, 82, 61, 0.16);
-    --line-strong: rgba(102, 70, 49, 0.28);
-    --accent: #9f633d;
-    --accent-deep: #6f4328;
-    --accent-soft: #f2e2d0;
-    --gold: #c6a36d;
-    --gold-soft: rgba(198, 163, 109, 0.20);
-    --danger-bg: #fff1ed;
-    --danger-text: #8d3a33;
-    --shadow-xl: 0 36px 80px rgba(65, 38, 22, 0.16);
-    --shadow-lg: 0 18px 40px rgba(65, 38, 22, 0.12);
+    --bg: #f5f0ea;
+    --card: #fff;
+    --ink: #2c2117;
+    --muted: #8a7868;
+    --accent: #8b5e34;
+    --accent-hover: #6d4828;
+    --line: #e4ddd5;
+    --focus: rgba(139,94,52,0.15);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    min-height: 100vh;
-    padding: 22px;
-    font-family: 'Manrope', 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: var(--bg);
     color: var(--ink);
-    background:
-        radial-gradient(circle at top left, rgba(198,163,109,0.20), transparent 30%),
-        radial-gradient(circle at 85% 15%, rgba(159,99,61,0.14), transparent 24%),
-        radial-gradient(circle at bottom right, rgba(111,67,40,0.10), transparent 32%),
-        linear-gradient(135deg, var(--bg-1) 0%, #f3e7da 42%, var(--bg-2) 100%);
-}
-body::before {
-    content: '';
-    position: fixed;
-    inset: 14px;
-    border-radius: 34px;
-    border: 1px solid rgba(115, 82, 61, 0.14);
-    pointer-events: none;
-}
-body::after {
-    content: '';
-    position: fixed;
-    inset: 28px;
-    border-radius: 28px;
-    border: 1px solid rgba(255,255,255,0.35);
-    pointer-events: none;
-}
-.layout {
-    max-width: 1180px;
-    margin: 0 auto;
-    min-height: calc(100vh - 44px);
-    display: grid;
-    grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
-    background: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04));
-    border: 1px solid rgba(255,255,255,0.28);
-    border-radius: 34px;
-    overflow: hidden;
-    box-shadow: var(--shadow-xl);
-    backdrop-filter: blur(16px);
-}
-.brand-panel {
-    position: relative;
-    padding: 42px 46px 38px;
-    background:
-        linear-gradient(160deg, rgba(46, 29, 20, 0.92), rgba(66, 40, 28, 0.88)),
-        radial-gradient(circle at top left, rgba(198,163,109,0.24), transparent 26%),
-        radial-gradient(circle at bottom right, rgba(255,255,255,0.05), transparent 28%);
-    color: #fff8f0;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-.brand-panel::before,
-.brand-panel::after {
-    content: '';
-    position: absolute;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,0.08);
-    pointer-events: none;
-}
-.brand-panel::before {
-    width: 340px;
-    height: 340px;
-    right: -140px;
-    top: -72px;
-}
-.brand-panel::after {
-    width: 250px;
-    height: 250px;
-    left: -110px;
-    bottom: -80px;
-}
-.brand-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 20px;
-}
-.brand-mark {
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    border-radius: 999px;
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.12);
-    font-size: 0.76rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-}
-.brand-mark::before {
-    content: '';
-    width: 9px;
-    height: 9px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, #efd1a3, #ba8c59);
-    box-shadow: 0 0 0 6px rgba(239,209,163,0.12);
-}
-.brand-status {
-    font-size: 0.75rem;
-    color: rgba(255,244,235,0.76);
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    padding-top: 4px;
-}
-.hero-copy {
-    max-width: 500px;
-    padding-block: 22px 10px;
-}
-.hero-copy h1 {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(3.3rem, 7vw, 4.9rem);
-    line-height: 0.92;
-    letter-spacing: -0.04em;
-    font-weight: 600;
-    margin-bottom: 18px;
-}
-.hero-copy p {
-    max-width: 46ch;
-    font-size: 1.02rem;
-    line-height: 1.75;
-    color: rgba(255,244,235,0.80);
-}
-.feature-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 34px;
-}
-.feature-card {
-    padding: 18px 18px 16px;
-    border-radius: 22px;
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.10);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-}
-.feature-card strong {
-    display: block;
-    font-size: 0.80rem;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #f0d6b5;
-    margin-bottom: 8px;
-}
-.feature-card span {
-    display: block;
-    font-size: 0.92rem;
-    line-height: 1.55;
-    color: rgba(255,246,239,0.84);
-}
-.brand-bottom {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    margin-top: 32px;
-}
-.brand-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: 16px;
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.10);
-    color: rgba(255,245,237,0.84);
-    font-size: 0.78rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-weight: 700;
-}
-.brand-chip::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: #efd1a3;
-}
-.form-panel {
-    position: relative;
-    padding: 28px;
-    background:
-        linear-gradient(180deg, rgba(255,252,247,0.88), rgba(255,248,242,0.82)),
-        linear-gradient(135deg, rgba(255,255,255,0.5), rgba(255,255,255,0));
-}
-.form-shell {
-    height: 100%;
+    min-height: 100vh;
     display: flex;
     align-items: center;
+    justify-content: center;
+    padding: 20px;
 }
-.form-card {
-    width: 100%;
-    max-width: 470px;
-    margin: 0 auto;
-    background: var(--paper);
-    border: 1px solid rgba(255,255,255,0.38);
-    border-radius: 30px;
-    box-shadow: var(--shadow-lg);
-    padding: 28px;
-    backdrop-filter: blur(14px);
-    position: relative;
-    overflow: hidden;
-}
-.form-card::before {
-    content: '';
-    position: absolute;
-    inset: 16px;
-    border-radius: 22px;
-    border: 1px solid rgba(115, 82, 61, 0.08);
-    pointer-events: none;
-}
-.form-top {
-    position: relative;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 18px;
-    padding-bottom: 18px;
-    margin-bottom: 20px;
-}
-.form-top::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 1px;
-    background: linear-gradient(90deg, rgba(159,99,61,0), rgba(159,99,61,0.28), rgba(159,99,61,0));
-}
-.form-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, rgba(242,226,208,0.88), rgba(255,250,244,0.78));
-    border: 1px solid rgba(159,99,61,0.12);
-    font-size: 0.74rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--accent-deep);
-    margin-bottom: 14px;
-}
-.form-eyebrow::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 999px;
-    background: linear-gradient(180deg, #d4ac73, #8d5b32);
-}
-.form-top h2 {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: clamp(2.2rem, 6vw, 3rem);
-    line-height: 0.95;
-    font-weight: 600;
-    letter-spacing: -0.04em;
-    margin-bottom: 10px;
-}
-.form-top p {
-    color: var(--muted);
-    font-size: 0.95rem;
-    line-height: 1.65;
-    max-width: 30ch;
-}
-.form-badge {
-    flex-shrink: 0;
-    padding: 14px 14px 12px;
-    min-width: 120px;
+.card {
+    background: var(--card);
     border-radius: 20px;
-    text-align: right;
-    background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(248,238,228,0.86));
-    border: 1px solid rgba(115,82,61,0.12);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    width: 100%;
+    max-width: 400px;
+    overflow: hidden;
 }
-.form-badge strong {
-    display: block;
-    font-size: 0.76rem;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--accent-deep);
-    margin-bottom: 8px;
+.card-top {
+    background: var(--ink);
+    padding: 28px 28px 22px;
+    color: #fff;
 }
-.form-badge span {
-    display: block;
-    color: var(--muted);
-    font-size: 0.84rem;
-    line-height: 1.5;
+.card-top h1 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 4px;
 }
-.helper {
-    padding: 14px 16px;
-    margin-bottom: 18px;
-    border-radius: 18px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(249,241,232,0.72));
-    border: 1px solid rgba(115,82,61,0.10);
-    color: var(--muted);
-    font-size: 0.88rem;
-    line-height: 1.65;
+.card-top p {
+    font-size: 0.82rem;
+    opacity: 0.6;
+}
+.card-body {
+    padding: 24px 28px 20px;
 }
 .error-msg {
-    background: var(--danger-bg);
-    border: 1px solid rgba(173,73,59,0.16);
-    color: var(--danger-text);
-    padding: 14px 15px;
-    border-radius: 18px;
-    font-size: 0.88rem;
-    line-height: 1.55;
-    margin-bottom: 18px;
-}
-.form-grid {
-    display: grid;
-    gap: 16px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    margin-bottom: 16px;
 }
 .field {
-    position: relative;
+    margin-bottom: 16px;
 }
 .field label {
     display: block;
-    margin-bottom: 8px;
-    font-size: 0.76rem;
-    font-weight: 800;
+    font-size: 0.72rem;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: #836d61;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 6px;
 }
 .field select,
-.field input[type="password"],
-.field input[type="text"] {
+.field input {
     width: 100%;
-    border-radius: 20px;
-    border: 1px solid rgba(115,82,61,0.12);
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(247,239,230,0.96));
-    padding: 17px 18px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--line);
+    border-radius: 12px;
+    font-size: 15px;
     color: var(--ink);
-    font-size: 1rem;
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.85),
-        0 10px 22px rgba(115,82,61,0.05);
-    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+    background: #faf8f5;
+    transition: border-color 0.2s, box-shadow 0.2s;
     -webkit-appearance: none;
 }
 .field select:focus,
 .field input:focus {
     outline: none;
-    transform: translateY(-1px);
-    border-color: rgba(159,99,61,0.36);
-    box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.85),
-        0 0 0 5px rgba(159,99,61,0.10),
-        0 16px 28px rgba(115,82,61,0.08);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus);
 }
 .field select {
     cursor: pointer;
-    padding-right: 52px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' fill='none' viewBox='0 0 16 16'%3E%3Cpath d='M4 6.5L8 10.5L12 6.5' stroke='%23766355' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238a7868' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 18px center;
+    background-position: right 14px center;
+    padding-right: 36px;
 }
-.pin-field {
+.pin-input {
+    text-align: center;
+    letter-spacing: 0.4em;
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-family: 'Consolas', monospace;
+}
+.pin-input::placeholder {
+    letter-spacing: 0.25em;
+    color: #ccc;
+}
+.btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
     margin-top: 4px;
 }
-.pin-field input {
+.btn:hover { background: var(--accent-hover); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.card-foot {
+    padding: 12px 28px;
+    background: #faf8f5;
+    border-top: 1px solid var(--line);
     text-align: center;
-    letter-spacing: 0.46em;
-    font-size: 1.55rem;
-    font-weight: 800;
-    font-family: 'SF Mono', 'Consolas', monospace;
-    padding-inline: 26px;
-}
-.pin-field .pin-caption {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 10px;
+    font-size: 0.68rem;
     color: var(--muted);
-    font-size: 0.77rem;
-}
-.actions {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-top: 6px;
-}
-.btn-enter {
-    width: 100%;
-    border: none;
-    border-radius: 22px;
-    padding: 18px 20px;
-    cursor: pointer;
-    color: #fffaf5;
-    background:
-        linear-gradient(135deg, #a56c43 0%, #7a492c 52%, #603923 100%);
-    box-shadow:
-        0 22px 36px rgba(111,67,40,0.28),
-        inset 0 1px 0 rgba(255,255,255,0.22);
-    font-size: 1rem;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
-}
-.btn-enter:hover {
-    transform: translateY(-1px);
-    filter: saturate(1.02) brightness(1.02);
-    box-shadow:
-        0 24px 40px rgba(111,67,40,0.30),
-        inset 0 1px 0 rgba(255,255,255,0.22);
-}
-.btn-enter:active { transform: translateY(1px); }
-.btn-enter:disabled { opacity: 0.74; cursor: not-allowed; box-shadow: none; }
-.meta-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-}
-.meta-card {
-    border-radius: 18px;
-    padding: 14px 15px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,239,229,0.82));
-    border: 1px solid rgba(115,82,61,0.10);
-}
-.meta-card strong {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 0.72rem;
-    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--accent-deep);
-}
-.meta-card span {
-    color: var(--muted);
-    font-size: 0.84rem;
-    line-height: 1.55;
-}
-@media (max-width: 980px) {
-    .layout { grid-template-columns: 1fr; }
-    .brand-panel { min-height: 430px; }
-    .form-panel { padding: 24px; }
-}
-@media (max-width: 620px) {
-    body { padding: 12px; }
-    body::before { inset: 8px; border-radius: 22px; }
-    body::after { inset: 16px; border-radius: 18px; }
-    .layout { min-height: auto; border-radius: 26px; }
-    .brand-panel,
-    .form-panel { padding: 22px 18px; }
-    .hero-copy h1 { font-size: 2.85rem; }
-    .feature-grid,
-    .meta-row { grid-template-columns: 1fr; }
-    .form-card { padding: 22px 18px; border-radius: 24px; }
-    .form-top { flex-direction: column; }
-    .form-badge { width: 100%; text-align: left; }
-    .pin-field input { letter-spacing: 0.30em; font-size: 1.32rem; }
+    letter-spacing: 0.06em;
 }
 </style>
 </head>
 <body>
-<main class="layout">
-    <section class="brand-panel">
-        <div>
-            <div class="brand-top">
-                <div class="brand-mark">Pesaje v3</div>
-                <div class="brand-status">Uso interno · acceso controlado</div>
+<div class="card">
+    <div class="card-top">
+        <h1>Sistema de Pesaje</h1>
+        <p>Control de stock y carga de sucursales</p>
+    </div>
+    <div class="card-body">
+        {% if error %}
+        <div class="error-msg">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="/entrada/login" id="f">
+            <div class="field">
+                <label>Sucursal</label>
+                <select name="sucursal_id" required>
+                    <option value="">Seleccionar...</option>
+                    {% for s in sucursales %}
+                    <option value="{{ s.id }}">{{ s.nombre }}</option>
+                    {% endfor %}
+                </select>
             </div>
-
-            <div class="hero-copy">
-                <h1>Control con presencia de marca.</h1>
-                <p>La lógica sigue siendo operativa y sobria, pero la entrada deja de sentirse como un formulario aislado: ahora se presenta como un sistema con peso visual, jerarquía y una identidad más cercana a una plataforma institucional que a una pantalla improvisada.</p>
+            <div class="field">
+                <label>Codigo de acceso</label>
+                <input type="password" name="pin" class="pin-input" maxlength="6"
+                       inputmode="numeric" pattern="[0-9]*"
+                       placeholder="------" required autocomplete="off">
             </div>
-
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <strong>Continuidad</strong>
-                    <span>Acceso a carga, control y seguimiento sin alterar flujos ni permisos ya existentes.</span>
-                </div>
-                <div class="feature-card">
-                    <strong>Lectura clara</strong>
-                    <span>La interfaz ordena mejor la acción principal y reduce la sensación de herramienta de transición.</span>
-                </div>
-                <div class="feature-card">
-                    <strong>Lenguaje visual</strong>
-                    <span>Capas, materiales suaves y tipografía editorial para una presencia más premium.</span>
-                </div>
-                <div class="feature-card">
-                    <strong>Uso real</strong>
-                    <span>Todo sigue orientado a operar rápido desde sucursal, sin teatralidad de landing pública.</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="brand-bottom">
-            <span class="brand-chip">Interfaz institucional</span>
-            <span class="brand-chip">Entrada de sucursales</span>
-            <span class="brand-chip">Control operativo</span>
-        </div>
-    </section>
-
-    <section class="form-panel">
-        <div class="form-shell">
-            <div class="form-card">
-                <div class="form-top">
-                    <div>
-                        <div class="form-eyebrow">Acceso de sucursal</div>
-                        <h2>Ingresar</h2>
-                        <p>Seleccioná la sucursal e ingresá el código correspondiente para continuar con la carga de turnos.</p>
-                    </div>
-                    <div class="form-badge">
-                        <strong>Modulo</strong>
-                        <span>Entrada, pesaje y seguimiento de turnos.</span>
-                    </div>
-                </div>
-
-                <div class="helper">No cambié la lógica del acceso. La intervención está en la experiencia visual: composición, jerarquía, materiales, tipografía y sensación general de plataforma más premium.</div>
-
-                {% if error %}
-                <div class="error-msg">{{ error }}</div>
-                {% endif %}
-
-                <form method="POST" action="/entrada/login" id="loginForm">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label for="sucursal">Sucursal</label>
-                            <select name="sucursal_id" id="sucursal" required>
-                                <option value="">Seleccionar sucursal...</option>
-                                {% for s in sucursales %}
-                                <option value="{{ s.id }}">{{ s.nombre }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <div class="field pin-field">
-                            <label for="pin">Código de acceso</label>
-                            <input type="password" name="pin" id="pin" maxlength="6"
-                                   inputmode="numeric" pattern="[0-9]*"
-                                   placeholder="------" required autocomplete="off">
-                            <div class="pin-caption">
-                                <span>Ingreso numérico</span>
-                                <span>Hasta 6 dígitos</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="actions">
-                        <button type="submit" class="btn-enter" id="btnEntrar">Ingresar al sistema</button>
-                        <div class="meta-row">
-                            <div class="meta-card">
-                                <strong>Acceso</strong>
-                                <span>Restringido al personal autorizado por sucursal.</span>
-                            </div>
-                            <div class="meta-card">
-                                <strong>Diseño</strong>
-                                <span>Más presencia visual, misma base funcional.</span>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </section>
-</main>
-
+            <button type="submit" class="btn" id="btn">Ingresar</button>
+        </form>
+    </div>
+    <div class="card-foot">Acceso restringido a personal autorizado</div>
+</div>
 <script>
-document.getElementById('loginForm').addEventListener('submit', function() {
-    var btn = document.getElementById('btnEntrar');
-    btn.disabled = true;
-    btn.textContent = 'Ingresando...';
+document.getElementById('f').addEventListener('submit', function() {
+    var b = document.getElementById('btn');
+    b.disabled = true;
+    b.textContent = 'Ingresando...';
 });
 </script>
 </body>
