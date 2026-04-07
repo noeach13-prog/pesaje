@@ -5,92 +5,364 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ sucursal_nombre }} - Nuevo turno</title>
 <style>
+:root {
+    --bg: #f7f1e8;
+    --panel: rgba(255, 252, 247, 0.95);
+    --panel-strong: #fffdf8;
+    --line: rgba(112, 80, 59, 0.14);
+    --ink: #30241d;
+    --muted: #7c675b;
+    --accent: #99613a;
+    --accent-strong: #7f4c2b;
+    --accent-soft: #f4e7da;
+    --success: #2f6a41;
+    --success-soft: #ecf6ef;
+    --warning: #b46a1f;
+    --warning-soft: #fff3e3;
+    --shadow: 0 22px 54px rgba(74, 48, 31, 0.11);
+    --shadow-soft: 0 12px 28px rgba(74, 48, 31, 0.08);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
-.container { max-width: 480px; margin: 0 auto; padding: 16px; }
-.topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.topbar h1 { font-size: 1.2rem; }
-.topbar a { color: #666; font-size: 0.8rem; text-decoration: none; }
-.card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 6px; color: #555; }
-input[type="date"], input[type="text"] {
-    width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px;
-    font-size: 16px; margin-bottom: 12px; background: #fff;
+body {
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top left, rgba(173, 123, 82, 0.12), transparent 32%),
+        radial-gradient(circle at 100% 100%, rgba(151, 99, 61, 0.10), transparent 26%),
+        linear-gradient(180deg, #fbf7f1 0%, #f6ede3 100%);
+    min-height: 100vh;
+    padding: 24px 16px 40px;
 }
-.turno-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+.page-shell {
+    width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
+}
+.topbar,
+.hero,
+.card,
+.links-card,
+.recientes {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(10px);
+}
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+}
+.kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+    background: rgba(153, 97, 58, 0.08);
+    color: var(--accent-strong);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+}
+.kicker::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--accent);
+}
+.topbar h1 {
+    font-size: clamp(1.6rem, 4vw, 2rem);
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+}
+.topbar p {
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+.topbar a {
+    flex-shrink: 0;
+    text-decoration: none;
+    color: var(--accent-strong);
+    background: rgba(153, 97, 58, 0.08);
+    border: 1px solid rgba(153, 97, 58, 0.14);
+    padding: 11px 14px;
+    border-radius: 16px;
+    font-weight: 700;
+    font-size: 0.84rem;
+    transition: background 0.16s ease, transform 0.16s ease;
+}
+.topbar a:hover { background: rgba(153, 97, 58, 0.13); transform: translateY(-1px); }
+.hero {
+    padding: 18px 22px;
+    margin-bottom: 14px;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+    align-items: center;
+}
+.hero-copy { display: flex; flex-direction: column; gap: 6px; }
+.hero-label {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+    font-size: 0.73rem;
+    font-weight: 800;
+}
+.hero strong {
+    font-size: 1.04rem;
+    font-weight: 800;
+}
+.hero-meta {
+    text-align: right;
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+.card {
+    padding: 24px 22px 22px;
+    margin-bottom: 14px;
+}
+.section-title {
+    font-size: 1.08rem;
+    font-weight: 800;
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+}
+.section-subtitle {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin-bottom: 18px;
+}
+label {
+    display: block;
+    margin-bottom: 8px;
+    color: #876f61;
+    font-size: 0.77rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+}
+input[type="date"],
+input[type="text"] {
+    width: 100%;
+    margin-bottom: 16px;
+    padding: 15px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(128, 93, 67, 0.16);
+    background: linear-gradient(180deg, #fffdf9 0%, #f8f1e8 100%);
+    color: var(--ink);
+    font-size: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+input:focus {
+    outline: none;
+    border-color: rgba(153, 97, 58, 0.40);
+    box-shadow: 0 0 0 4px rgba(153, 97, 58, 0.10);
+}
+.turno-btns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+}
 .turno-btn {
-    flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 6px;
-    background: #fff; font-size: 0.9rem; font-weight: 600; cursor: pointer;
-    text-align: center; transition: all 0.15s;
+    border-radius: 18px;
+    border: 1px solid rgba(124, 103, 91, 0.18);
+    background: #fffdf9;
+    padding: 14px 12px;
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.88rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
-.turno-btn.active { border-color: #1565c0; background: #e3f2fd; color: #1565c0; }
-.turno-btn.exists { border-color: #2e7d32; background: #e8f5e9; color: #2e7d32; cursor: default; }
-.turno-btn.exists::after { content: ' (cargado)'; font-size: 0.65rem; font-weight: 400; }
+.turno-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 18px rgba(80, 52, 35, 0.09); }
+.turno-btn.active {
+    border-color: rgba(153, 97, 58, 0.45);
+    background: linear-gradient(180deg, var(--accent-soft) 0%, #f7e7d5 100%);
+    color: var(--accent-strong);
+    box-shadow: 0 10px 18px rgba(133, 81, 47, 0.10);
+}
+.turno-btn.exists {
+    border-color: rgba(47, 106, 65, 0.28);
+    background: linear-gradient(180deg, #f4fbf5 0%, var(--success-soft) 100%);
+    color: var(--success);
+    cursor: default;
+    box-shadow: none;
+}
+.turno-btn.exists::after {
+    content: ' · cargado';
+    font-size: 0.69rem;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+.warn-box {
+    display: none;
+    margin: 2px 0 14px;
+    padding: 13px 14px;
+    border-radius: 16px;
+    background: var(--warning-soft);
+    color: var(--warning);
+    border: 1px solid rgba(180, 106, 31, 0.16);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
 .btn-primary {
-    width: 100%; padding: 14px; background: #1565c0; color: #fff; border: none;
-    border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer;
+    width: 100%;
+    border: none;
+    border-radius: 18px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    color: #fffaf4;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 16px 30px rgba(126, 79, 47, 0.24);
+    transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
 }
-.btn-primary:disabled { background: #ccc; }
-.btn-primary:hover:not(:disabled) { background: #0d47a1; }
-.hint { font-size: 0.75rem; color: #888; margin-bottom: 8px; }
-.hint-next { background: #e3f2fd; color: #1565c0; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; margin-bottom: 12px; font-weight: 500; }
-.warn-box { background: #fff3e0; color: #e65100; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; margin-bottom: 12px; display: none; }
-.recientes { margin-top: 20px; }
-.recientes h2 { font-size: 1rem; margin-bottom: 8px; }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.02); }
+.btn-primary:disabled { opacity: 0.72; cursor: not-allowed; box-shadow: none; }
+.links-card {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 14px;
+}
+.links a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 52px;
+    border-radius: 16px;
+    text-decoration: none;
+    font-weight: 800;
+    color: var(--accent-strong);
+    background: rgba(153, 97, 58, 0.08);
+    border: 1px solid rgba(153, 97, 58, 0.12);
+}
+.recientes {
+    padding: 18px 22px;
+}
+.recientes h2 {
+    font-size: 1.04rem;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+}
+.recientes p {
+    color: var(--muted);
+    font-size: 0.86rem;
+    margin-bottom: 14px;
+}
 .turno-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 0; border-bottom: 1px solid #eee; font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(112, 80, 59, 0.10);
+    font-size: 0.9rem;
 }
-.turno-item a { color: #1565c0; text-decoration: none; font-weight: 600; }
-.badge { padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; }
-.badge-borrador { background: #fff3e0; color: #e65100; }
-.badge-confirmado { background: #e8f5e9; color: #2e7d32; }
-.links { display: flex; gap: 16px; margin-top: 16px; font-size: 0.85rem; }
-.links a { color: #1565c0; text-decoration: none; }
+.turno-item:last-child { border-bottom: none; padding-bottom: 0; }
+.turno-item a {
+    color: var(--ink);
+    text-decoration: none;
+    font-weight: 700;
+}
+.turno-item a:hover { color: var(--accent-strong); }
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    min-width: 96px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.badge-borrador { background: var(--warning-soft); color: var(--warning); }
+.badge-confirmado { background: var(--success-soft); color: var(--success); }
+@media (max-width: 540px) {
+    body { padding: 14px 12px 32px; }
+    .topbar,
+    .hero,
+    .card,
+    .recientes { padding-left: 18px; padding-right: 18px; }
+    .topbar { flex-direction: column; }
+    .topbar a { width: 100%; text-align: center; }
+    .hero { flex-direction: column; align-items: flex-start; }
+    .hero-meta { text-align: left; }
+}
 </style>
 </head>
 <body>
-<div class="container">
+<div class="page-shell">
     <div class="topbar">
-        <h1>{{ sucursal_nombre }}</h1>
+        <div>
+            <div class="kicker">Modulo entrada</div>
+            <h1>{{ sucursal_nombre }}</h1>
+            <p>Creación y continuidad de turnos con una lectura visual más clara, sin tocar la lógica del flujo.</p>
+        </div>
         <a href="/entrada/salir">Cambiar sucursal</a>
     </div>
 
     {% if prox_fecha %}
-    <div class="hint-next">
-        Proximo turno: <strong>{{ prox_fecha }}</strong> - {{ prox_tipo }}
+    <div class="hero">
+        <div class="hero-copy">
+            <span class="hero-label">Proximo turno sugerido</span>
+            <strong>{{ prox_fecha }} · {{ prox_tipo }}</strong>
+        </div>
+        <div class="hero-meta">La fecha sugerida sigue la secuencia actual de carga.</div>
     </div>
     {% endif %}
 
     <form method="POST" action="/entrada/turno/nuevo" id="frmNuevo">
-    <div class="card">
-        <label>Fecha</label>
-        <input type="date" name="fecha" id="fecha" value="{{ prox_fecha or hoy }}" required onchange="checkFecha()">
+        <div class="card">
+            <div class="section-title">Nuevo turno</div>
+            <div class="section-subtitle">Elegí la fecha, seleccioná el tipo de turno y, si querés, dejá registrado quién hizo la carga.</div>
 
-        <label>Turno</label>
-        <div class="turno-btns" id="turnoBtns">
-            <div class="turno-btn{{ ' active' if prox_tipo == 'DIA' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
-            <div class="turno-btn{{ ' active' if prox_tipo == 'NOCHE' else '' }}" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
-            <div class="turno-btn{{ ' active' if prox_tipo == 'UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
+            <label for="fecha">Fecha</label>
+            <input type="date" name="fecha" id="fecha" value="{{ prox_fecha or hoy }}" required onchange="checkFecha()">
+
+            <label>Turno</label>
+            <div class="turno-btns" id="turnoBtns">
+                <div class="turno-btn{{ ' active' if prox_tipo == 'DIA' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
+                <div class="turno-btn{{ ' active' if prox_tipo == 'NOCHE' else '' }}" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
+                <div class="turno-btn{{ ' active' if prox_tipo == 'UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
+            </div>
+            <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ prox_tipo }}">
+
+            <div class="warn-box" id="warnBox"></div>
+
+            <label for="ingresadoPor">Quien carga (opcional)</label>
+            <input type="text" id="ingresadoPor" name="ingresado_por" placeholder="Nombre">
+
+            <button type="submit" class="btn-primary" id="btnCrear">Crear turno</button>
         </div>
-        <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ prox_tipo }}">
-
-        <div class="warn-box" id="warnBox"></div>
-
-        <label>Quien carga (opcional)</label>
-        <input type="text" name="ingresado_por" placeholder="Nombre">
-    </div>
-
-    <button type="submit" class="btn-primary" id="btnCrear">Crear turno</button>
     </form>
 
-    <div class="links">
+    <div class="links-card links">
         <a href="/entrada/historial">Historial</a>
     </div>
 
     {% if recientes %}
     <div class="recientes">
         <h2>Turnos recientes</h2>
+        <p>Acceso rápido a los últimos turnos registrados en esta sucursal.</p>
         {% for t in recientes %}
         <div class="turno-item">
             <a href="/entrada/turno/{{ t.id }}">{{ t.fecha }} - {{ t.tipo_turno }}</a>

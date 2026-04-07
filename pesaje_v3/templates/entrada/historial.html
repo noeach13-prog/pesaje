@@ -5,62 +5,183 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ sucursal_nombre }} - Historial</title>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
-.header { background: #1e3a5f; color: #fff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
-.header h1 { font-size: 1.1rem; }
-.header a { color: #fff; opacity: 0.8; font-size: 0.75rem; text-decoration: none; }
-.container { max-width: 600px; margin: 0 auto; padding: 8px; }
-
-/* Tabs por mes */
-.tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 0; -webkit-overflow-scrolling: touch; }
-.tab {
-    padding: 8px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
-    text-decoration: none; white-space: nowrap; border: 1px solid #ddd; background: #fff; color: #555;
+:root {
+    --bg: #f7f1e8;
+    --panel: rgba(255, 252, 247, 0.95);
+    --line: rgba(112, 80, 59, 0.14);
+    --ink: #30241d;
+    --muted: #7c675b;
+    --accent: #99613a;
+    --accent-strong: #7f4c2b;
+    --accent-soft: #f4e7da;
+    --success: #2f6a41;
+    --success-soft: #ecf6ef;
+    --warning: #b46a1f;
+    --warning-soft: #fff3e3;
+    --danger: #8f3b38;
+    --danger-soft: #fff0ee;
+    --shadow: 0 20px 54px rgba(74, 48, 31, 0.10);
 }
-.tab.active { background: #1565c0; color: #fff; border-color: #1565c0; }
-.tab .tab-count { font-size: 0.65rem; font-weight: 400; opacity: 0.7; }
-
-/* Resumen del mes */
-.mes-info { display: flex; gap: 12px; padding: 8px 12px; background: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 0.8rem; }
-.mes-stat { }
-.mes-stat span { color: #888; font-size: 0.7rem; }
-.mes-stat strong { }
-
-/* Tabla */
-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
-th { background: #1e3a5f; color: #fff; padding: 8px; text-align: left; font-size: 0.75rem; }
-td { padding: 8px; border-bottom: 1px solid #f0f0f0; font-size: 0.82rem; }
-tr:hover { background: #f8f9fa; }
-a { color: #1565c0; text-decoration: none; font-weight: 600; }
-.badge { padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
-.badge-borrador { background: #fff3e0; color: #e65100; }
-.badge-confirmado { background: #e8f5e9; color: #2e7d32; }
-
-.actions { display: flex; gap: 8px; margin: 10px 0; }
-.btn { padding: 10px 16px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; }
-.btn-dl { background: #2e7d32; color: #fff; }
-.empty { text-align: center; padding: 20px; color: #999; font-size: 0.85rem; }
-.row-h0 { background: #fff3e0; }
-.btn-resumen { display: block; text-align: center; padding: 10px; background: #1565c0; color: #fff; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.85rem; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top left, rgba(173, 123, 82, 0.12), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(151, 99, 61, 0.10), transparent 26%),
+        linear-gradient(180deg, #fbf7f1 0%, #f6ede3 100%);
+    min-height: 100vh;
+    padding: 24px 16px 36px;
+}
+.page-shell { width: 100%; max-width: 960px; margin: 0 auto; }
+.header,
+.panel,
+.table-card,
+.export-card { background: var(--panel); border: 1px solid var(--line); border-radius: 24px; box-shadow: var(--shadow); }
+.header {
+    padding: 20px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+.eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+    background: rgba(153, 97, 58, 0.08);
+    color: var(--accent-strong);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.11em;
+}
+.eyebrow::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: var(--accent); }
+.header h1 { font-size: clamp(1.5rem, 3vw, 1.9rem); line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 4px; }
+.header p { color: var(--muted); font-size: 0.9rem; }
+.header a {
+    text-decoration: none; color: var(--accent-strong); background: rgba(153, 97, 58, 0.08);
+    border: 1px solid rgba(153, 97, 58, 0.12); padding: 11px 14px; border-radius: 16px; font-weight: 800; font-size: 0.84rem;
+}
+.panel { padding: 16px 18px; margin-bottom: 14px; }
+.tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.tabs::-webkit-scrollbar { height: 6px; }
+.tabs::-webkit-scrollbar-thumb { background: rgba(112, 80, 59, 0.16); border-radius: 999px; }
+.tab {
+    flex-shrink: 0;
+    padding: 11px 14px;
+    border-radius: 16px;
+    text-decoration: none;
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: var(--muted);
+    border: 1px solid rgba(112, 80, 59, 0.12);
+    background: rgba(255,255,255,0.7);
+}
+.tab.active { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%); color: #fffaf4; border-color: transparent; }
+.tab .tab-count { opacity: 0.72; font-size: 0.75rem; font-weight: 700; }
+.mes-info {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px;
+}
+.mes-stat {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 16px 18px;
+}
+.mes-stat span { display: block; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.10em; font-weight: 800; margin-bottom: 8px; }
+.mes-stat strong { font-size: 1.35rem; letter-spacing: -0.03em; }
+.mes-stat.warn strong { color: var(--warning); }
+.btn-resumen {
+    display: inline-flex; align-items: center; justify-content: center; width: 100%;
+    padding: 14px 18px; border-radius: 18px; text-decoration: none; font-weight: 800; color: #fffaf4;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    box-shadow: 0 16px 30px rgba(126, 79, 47, 0.24);
+}
+.table-card { overflow: hidden; }
+.table-head {
+    padding: 18px 22px 0;
+}
+.table-title { font-size: 1.05rem; font-weight: 800; margin-bottom: 4px; }
+.table-copy { color: var(--muted); font-size: 0.86rem; margin-bottom: 16px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 660px; }
+th {
+    background: #3a281f;
+    color: #fff8f1;
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(112, 80, 59, 0.10);
+    font-size: 0.88rem;
+    vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover { background: rgba(252, 246, 238, 0.72); }
+.row-h0 { background: #fff8f3; }
+a { color: var(--accent-strong); text-decoration: none; font-weight: 800; }
+.badge {
+    display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border-radius: 999px;
+    font-size: 0.73rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.badge-borrador { background: var(--warning-soft); color: var(--warning); }
+.badge-confirmado { background: var(--success-soft); color: var(--success); }
+.empty { text-align: center; padding: 26px !important; color: var(--muted); font-size: 0.9rem; }
+.export-card { padding: 18px 20px; margin-top: 14px; }
+.export-title { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 800; margin-bottom: 14px; }
+.export-grid { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.export-grid label { color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+.export-grid input {
+    width: 72px; padding: 12px 10px; border-radius: 14px; border: 1px solid rgba(128, 93, 67, 0.16);
+    background: linear-gradient(180deg, #fffdf9 0%, #f8f1e8 100%); font-size: 0.92rem;
+}
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; min-width: 180px;
+    padding: 14px 18px; border-radius: 18px; text-decoration: none; font-size: 0.9rem; font-weight: 800;
+}
+.btn-dl { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%); color: #fffaf4; }
+.btn-secondary { background: rgba(153, 97, 58, 0.08); border: 1px solid rgba(153, 97, 58, 0.12); color: var(--accent-strong); }
+@media (max-width: 720px) {
+    body { padding: 14px 12px 28px; }
+    .header { flex-direction: column; }
+    .header a { width: 100%; text-align: center; }
+    .mes-info { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
-<div class="header">
-    <h1>{{ sucursal_nombre }} - Historial</h1>
-    <a href="/entrada/seleccion">Inicio</a>
-</div>
-<div class="container">
+<div class="page-shell">
+    <div class="header">
+        <div>
+            <div class="eyebrow">Historial</div>
+            <h1>{{ sucursal_nombre }}</h1>
+            <p>Seguimiento mensual, análisis consolidados y exportación de reportes por rango.</p>
+        </div>
+        <a href="/entrada/seleccion">Inicio</a>
+    </div>
 
     {% if meses %}
-    <div class="tabs">
-        {% set meses_nombres = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'} %}
-        {% for m in meses %}
-        {% set m_label = meses_nombres.get(m.mes[5:7], m.mes[5:7]) + ' ' + m.mes[:4] %}
-        <a href="/entrada/historial?mes={{ m.mes }}" class="tab{{ ' active' if m.mes == mes else '' }}">
-            {{ m_label }} <span class="tab-count">({{ m.n }})</span>
-        </a>
-        {% endfor %}
+    <div class="panel">
+        <div class="tabs">
+            {% set meses_nombres = {'01':'Enero','02':'Febrero','03':'Marzo','04':'Abril','05':'Mayo','06':'Junio','07':'Julio','08':'Agosto','09':'Septiembre','10':'Octubre','11':'Noviembre','12':'Diciembre'} %}
+            {% for m in meses %}
+            {% set m_label = meses_nombres.get(m.mes[5:7], m.mes[5:7]) + ' ' + m.mes[:4] %}
+            <a href="/entrada/historial?mes={{ m.mes }}" class="tab{{ ' active' if m.mes == mes else '' }}">
+                {{ m_label }} <span class="tab-count">({{ m.n }})</span>
+            </a>
+            {% endfor %}
+        </div>
     </div>
     {% endif %}
 
@@ -69,67 +190,77 @@ a { color: #1565c0; text-decoration: none; font-weight: 600; }
     {% for m in meses %}{% if m.mes == mes %}{% set mes_data = m %}{% endif %}{% endfor %}
     {% if mes_data %}
     <div class="mes-info">
-        <div class="mes-stat"><span>Turnos:</span> <strong>{{ mes_data.n }}</strong></div>
-        <div class="mes-stat"><span>Confirmados:</span> <strong>{{ mes_data.conf }}</strong></div>
+        <div class="mes-stat"><span>Turnos</span><strong>{{ mes_data.n }}</strong></div>
+        <div class="mes-stat"><span>Confirmados</span><strong>{{ mes_data.conf }}</strong></div>
         {% if mes_data.borr > 0 %}
-        <div class="mes-stat"><span>Borradores:</span> <strong style="color:#e65100;">{{ mes_data.borr }}</strong></div>
+        <div class="mes-stat warn"><span>Borradores</span><strong>{{ mes_data.borr }}</strong></div>
+        {% else %}
+        <div class="mes-stat"><span>Borradores</span><strong>0</strong></div>
         {% endif %}
     </div>
     {% endif %}
     {% endif %}
 
     {% if mes and turnos and not resumenes %}
-    <div style="margin-bottom:8px;">
+    <div style="margin-bottom:14px;">
         <a href="/entrada/historial?mes={{ mes }}&resumen=1" class="btn-resumen">Analizar todos los turnos del mes</a>
     </div>
     {% endif %}
 
-    <table>
-        <thead>
-            <tr>
-                <th>Fecha</th><th>Turno</th><th>Estado</th>
-                {% if resumenes %}<th>Venta</th><th>Corr</th><th>H0</th>{% endif %}
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for t in turnos %}
-            {% set res = resumenes.get(t.id) %}
-            <tr class="{{ 'row-h0' if res and res.h0 > 0 else '' }}">
-                <td>{{ t.fecha }}</td>
-                <td>{{ t.tipo_turno }}</td>
-                <td><span class="badge badge-{{ t.estado }}">{{ t.estado }}</span></td>
-                {% if resumenes %}
-                <td style="text-align:right;font-variant-numeric:tabular-nums;">{% if res %}{{ "{:,}".format(res.venta) }}g{% else %}-{% endif %}</td>
-                <td style="text-align:center;">{% if res and res.corr %}<span style="color:#1565c0;font-weight:600;">{{ res.corr }}</span>{% elif res %}0{% else %}-{% endif %}</td>
-                <td style="text-align:center;">{% if res and res.h0 %}<span style="color:#c62828;font-weight:700;">{{ res.h0 }}</span>{% elif res %}0{% else %}-{% endif %}</td>
-                {% endif %}
-                <td>
-                    <a href="/entrada/turno/{{ t.id }}">Abrir</a>
-                    <a href="/entrada/revision/{{ t.id }}" style="margin-left:6px;color:#555;">Analisis</a>
-                </td>
-            </tr>
-            {% endfor %}
-            {% if not turnos %}
-            <tr><td colspan="{{ 7 if resumenes else 4 }}" class="empty">
-                {% if mes %}No hay turnos en este mes{% else %}No hay turnos cargados{% endif %}
-            </td></tr>
-            {% endif %}
-        </tbody>
-    </table>
+    <div class="table-card">
+        <div class="table-head">
+            <div class="table-title">Turnos cargados</div>
+            <div class="table-copy">Vista consolidada de estados y, cuando corresponde, métricas del análisis mensual.</div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th><th>Turno</th><th>Estado</th>
+                        {% if resumenes %}<th>Venta</th><th>Corr</th><th>H0</th>{% endif %}
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in turnos %}
+                    {% set res = resumenes.get(t.id) %}
+                    <tr class="{{ 'row-h0' if res and res.h0 > 0 else '' }}">
+                        <td>{{ t.fecha }}</td>
+                        <td>{{ t.tipo_turno }}</td>
+                        <td><span class="badge badge-{{ t.estado }}">{{ t.estado }}</span></td>
+                        {% if resumenes %}
+                        <td style="text-align:right;font-variant-numeric:tabular-nums;">{% if res %}{{ "{:,}".format(res.venta) }}g{% else %}-{% endif %}</td>
+                        <td style="text-align:center;">{% if res and res.corr %}<span style="color:var(--accent-strong);font-weight:800;">{{ res.corr }}</span>{% elif res %}0{% else %}-{% endif %}</td>
+                        <td style="text-align:center;">{% if res and res.h0 %}<span style="color:var(--danger);font-weight:900;">{{ res.h0 }}</span>{% elif res %}0{% else %}-{% endif %}</td>
+                        {% endif %}
+                        <td>
+                            <a href="/entrada/turno/{{ t.id }}">Abrir</a>
+                            <a href="/entrada/revision/{{ t.id }}" style="margin-left:10px;color:var(--muted);">Analisis</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% if not turnos %}
+                    <tr><td colspan="{{ 7 if resumenes else 4 }}" class="empty">
+                        {% if mes %}No hay turnos en este mes{% else %}No hay turnos cargados{% endif %}
+                    </td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     {% if mes and turnos %}
-    <div style="background:#fff;border-radius:8px;padding:12px;margin-top:8px;">
-        <div style="font-size:0.75rem;color:#888;text-transform:uppercase;font-weight:600;margin-bottom:6px;">Exportar reporte</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <label style="font-size:0.8rem;">Desde dia:</label>
-            <input type="number" id="dia-desde" value="1" min="1" max="31" style="width:50px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">
-            <label style="font-size:0.8rem;">Hasta dia:</label>
-            <input type="number" id="dia-hasta" value="31" min="1" max="31" style="width:50px;padding:4px 6px;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">
+    <div class="export-card">
+        <div class="export-title">Exportar reporte</div>
+        <div class="export-grid">
+            <label for="dia-desde">Desde dia:</label>
+            <input type="number" id="dia-desde" value="1" min="1" max="31">
+            <label for="dia-hasta">Hasta dia:</label>
+            <input type="number" id="dia-hasta" value="31" min="1" max="31">
         </div>
-        <div class="actions" style="margin-top:8px;">
+        <div class="actions">
             <a id="btn-reporte" href="#" class="btn btn-dl" onclick="descargarReporte(event,'reporte')">Descargar reporte</a>
-            <a id="btn-planilla" href="#" class="btn" style="background:#f5f5f5;color:#333;" onclick="descargarReporte(event,'planilla')">Descargar planilla</a>
+            <a id="btn-planilla" href="#" class="btn btn-secondary" onclick="descargarReporte(event,'planilla')">Descargar planilla</a>
         </div>
     </div>
     <script>

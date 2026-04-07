@@ -5,64 +5,146 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ data.sucursal.nombre }} - Sugerencia de pedido</title>
 <style>
+:root {
+    --bg: #f7f1e8;
+    --panel: rgba(255, 252, 247, 0.95);
+    --line: rgba(112, 80, 59, 0.14);
+    --ink: #30241d;
+    --muted: #7c675b;
+    --accent: #99613a;
+    --accent-strong: #7f4c2b;
+    --accent-soft: #f4e7da;
+    --danger: #8f3b38;
+    --danger-soft: #fff0ee;
+    --warning: #b46a1f;
+    --warning-soft: #fff3e3;
+    --success: #2f6a41;
+    --success-soft: #ecf6ef;
+    --info: #415b74;
+    --info-soft: #edf3f8;
+    --shadow: 0 20px 54px rgba(74, 48, 31, 0.10);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
-.header { background: #1e3a5f; color: #fff; padding: 12px 16px; }
-.header h1 { font-size: 1rem; } .header .sub { font-size: 0.75rem; opacity: 0.8; }
-.container { max-width: 700px; margin: 0 auto; padding: 8px; }
-.meta { background: #fff; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 0.8rem; color: #555; }
-
-.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
-.sum-card { background: #fff; border-radius: 8px; padding: 10px; text-align: center; }
-.sum-num { font-size: 1.3rem; font-weight: 700; }
-.sum-label { font-size: 0.65rem; color: #888; text-transform: uppercase; }
-.sum-urgente .sum-num { color: #c62828; }
-.sum-pedir .sum-num { color: #e65100; }
-.sum-ok .sum-num { color: #2e7d32; }
-
-/* Sabor cards */
-.sabor-card { background: #fff; border-radius: 8px; margin-bottom: 6px; overflow: hidden; border-left: 4px solid #e0e0e0; }
-.sabor-card.sug-urgente { border-left-color: #c62828; }
-.sabor-card.sug-pedir { border-left-color: #e65100; }
-.sabor-card.sug-justo { border-left-color: #f9a825; }
-.sabor-card.sug-ok { border-left-color: #2e7d32; }
-
-.sabor-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; }
-.sabor-name { font-weight: 700; font-size: 0.9rem; }
-.sabor-sug { font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
-.sug-urgente-badge { background: #fce4ec; color: #c62828; }
-.sug-pedir-badge { background: #fff3e0; color: #e65100; }
-.sug-justo-badge { background: #fff8e1; color: #f9a825; }
-.sug-ok-badge { background: #e8f5e9; color: #2e7d32; }
-.sug-sin-badge { background: #f5f5f5; color: #999; }
-
-.sabor-detail { padding: 0 12px 10px; font-size: 0.8rem; }
-.detail-section { margin-bottom: 6px; }
-.detail-label { font-size: 0.65rem; color: #999; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; }
-.detail-row { display: flex; gap: 12px; flex-wrap: wrap; }
-.detail-item { }
-.detail-item span { color: #888; font-size: 0.7rem; }
-.detail-item strong { font-size: 0.85rem; }
-
-.hist-bar { display: flex; gap: 3px; align-items: flex-end; height: 30px; margin-top: 4px; }
-.hist-bar-item { background: #1565c0; border-radius: 2px 2px 0 0; min-width: 12px; opacity: 0.7; }
-.hist-bar-item:last-child { opacity: 1; }
-
-.actions { display: flex; gap: 8px; margin: 12px 0; }
-.btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
-.btn-back { background: #f5f5f5; color: #333; }
-.btn-primary { background: #1565c0; color: #fff; }
+body {
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top left, rgba(173, 123, 82, 0.12), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(151, 99, 61, 0.10), transparent 26%),
+        linear-gradient(180deg, #fbf7f1 0%, #f6ede3 100%);
+    min-height: 100vh;
+    padding: 24px 16px 36px;
+}
+.page-shell { width: 100%; max-width: 980px; margin: 0 auto; }
+.header,
+.meta,
+.sum-card,
+.sabor-card,
+.actions-shell {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+}
+.header {
+    padding: 20px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+.eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+    margin-bottom: 10px; background: rgba(153, 97, 58, 0.08); color: var(--accent-strong);
+    font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.11em;
+}
+.eyebrow::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: var(--accent); }
+.header h1 { font-size: clamp(1.5rem, 3vw, 1.9rem); line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 4px; }
+.header .sub { color: var(--muted); font-size: 0.92rem; }
+.header a {
+    text-decoration: none; color: var(--accent-strong); background: rgba(153, 97, 58, 0.08);
+    border: 1px solid rgba(153, 97, 58, 0.12); padding: 11px 14px; border-radius: 16px; font-weight: 800; font-size: 0.84rem;
+}
+.meta { padding: 18px 20px; margin-bottom: 14px; color: var(--muted); font-size: 0.92rem; }
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.sum-card { padding: 18px; }
+.sum-label { color: var(--muted); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 10px; }
+.sum-num { font-size: clamp(1.7rem, 4vw, 2rem); font-weight: 900; letter-spacing: -0.04em; }
+.sum-urgente .sum-num { color: var(--danger); }
+.sum-pedir .sum-num { color: var(--warning); }
+.sum-ok .sum-num { color: var(--success); }
+.cards { display: grid; gap: 14px; }
+.sabor-card { overflow: hidden; }
+.sabor-card.sug-urgente { border-left: 6px solid var(--danger); }
+.sabor-card.sug-pedir { border-left: 6px solid var(--warning); }
+.sabor-card.sug-justo { border-left: 6px solid #c18b2c; }
+.sabor-card.sug-ok { border-left: 6px solid var(--success); }
+.sabor-top {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 20px 22px 10px;
+}
+.sabor-name { font-size: 1.08rem; font-weight: 800; letter-spacing: -0.02em; }
+.sabor-sug {
+    display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;
+}
+.sug-urgente-badge { background: var(--danger-soft); color: var(--danger); }
+.sug-pedir-badge { background: var(--warning-soft); color: var(--warning); }
+.sug-justo-badge { background: #fff7e6; color: #a3701d; }
+.sug-ok-badge { background: var(--success-soft); color: var(--success); }
+.sug-sin-badge { background: rgba(153, 97, 58, 0.08); color: var(--muted); }
+.sabor-detail { padding: 0 22px 22px; display: grid; gap: 14px; }
+.detail-section {
+    background: rgba(255,255,255,0.68);
+    border: 1px solid rgba(112, 80, 59, 0.10);
+    border-radius: 18px;
+    padding: 14px 16px;
+}
+.detail-label {
+    font-size: 0.73rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.11em; font-weight: 800; margin-bottom: 12px;
+}
+.detail-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.detail-item {
+    padding: 10px 12px; border-radius: 14px; background: rgba(153, 97, 58, 0.06); min-width: 140px;
+}
+.detail-item span { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+.detail-item strong { font-size: 0.92rem; }
+.hist-bar { display: flex; gap: 6px; align-items: flex-end; height: 42px; margin-top: 10px; }
+.hist-bar-item {
+    background: linear-gradient(180deg, rgba(153, 97, 58, 0.55), var(--accent));
+    border-radius: 8px 8px 0 0; min-width: 14px;
+}
+.actions-shell { padding: 12px; margin-top: 14px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+    flex: 1 1 180px; display: inline-flex; align-items: center; justify-content: center;
+    padding: 15px 18px; border-radius: 18px; text-decoration: none; font-size: 0.92rem; font-weight: 800;
+}
+.btn-back { background: rgba(153, 97, 58, 0.08); border: 1px solid rgba(153, 97, 58, 0.12); color: var(--accent-strong); }
+.btn-primary { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%); color: #fffaf4; }
+.empty-note { color: var(--muted); font-style: italic; }
+@media (max-width: 760px) {
+    body { padding: 14px 12px 28px; }
+    .header { flex-direction: column; }
+    .header a { width: 100%; text-align: center; }
+    .summary { grid-template-columns: 1fr; }
+    .sabor-top { flex-direction: column; }
+}
 </style>
 </head>
 <body>
-<div class="header" style="display:flex;justify-content:space-between;align-items:center;">
-    <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">Sugerencia de pedido - {{ data.nombre_hoja }}</div></div>
-    <a href="/entrada/seleccion" style="color:#fff;opacity:0.8;font-size:0.75rem;text-decoration:none;">Inicio</a>
-</div>
-<div class="container">
-    <div class="meta">
-        Proyeccion para <strong>7 dias</strong> basada en {{ n_turnos_hist }} turnos confirmados
+<div class="page-shell">
+    <div class="header">
+        <div>
+            <div class="eyebrow">Pedido sugerido</div>
+            <h1>{{ data.sucursal.nombre }}</h1>
+            <div class="sub">Sugerencia de pedido - {{ data.nombre_hoja }}</div>
+        </div>
+        <a href="/entrada/seleccion">Inicio</a>
     </div>
+
+    <div class="meta">Proyeccion para <strong>7 dias</strong> basada en {{ n_turnos_hist }} turnos confirmados.</div>
 
     {% set ns = namespace(urgentes=0, pedir=0, ok=0) %}
     {% for p in pedidos %}
@@ -74,19 +156,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
     <div class="summary">
         <div class="sum-card sum-urgente">
-            <div class="sum-num">{{ ns.urgentes }}</div>
             <div class="sum-label">Urgentes</div>
+            <div class="sum-num">{{ ns.urgentes }}</div>
         </div>
         <div class="sum-card sum-pedir">
-            <div class="sum-num">{{ ns.pedir }}</div>
             <div class="sum-label">Pedir</div>
+            <div class="sum-num">{{ ns.pedir }}</div>
         </div>
         <div class="sum-card sum-ok">
-            <div class="sum-num">{{ ns.ok }}</div>
             <div class="sum-label">Stock OK</div>
+            <div class="sum-num">{{ ns.ok }}</div>
         </div>
     </div>
 
+    <div class="cards">
     {% for p in pedidos %}
     {% set sug_class = 'sug-urgente' if 'Urgente' in p.sugerencia else ('sug-pedir' if 'Pedir' in p.sugerencia else ('sug-justo' if 'justo' in p.sugerencia else ('sug-ok' if 'suficiente' in p.sugerencia else ''))) %}
     {% set badge_class = 'sug-urgente-badge' if 'Urgente' in p.sugerencia else ('sug-pedir-badge' if 'Pedir' in p.sugerencia else ('sug-justo-badge' if 'justo' in p.sugerencia else ('sug-ok-badge' if 'suficiente' in p.sugerencia else 'sug-sin-badge'))) %}
@@ -97,31 +180,29 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             <div class="sabor-sug {{ badge_class }}">{{ p.sugerencia }}</div>
         </div>
         <div class="sabor-detail">
-            <!-- Stock actual desglosado -->
             <div class="detail-section">
                 <div class="detail-label">Stock actual en heladera</div>
                 <div class="detail-row">
-                    <div class="detail-item"><span>Abierta:</span> <strong>{{ p.abierta or 0 }}g</strong></div>
+                    <div class="detail-item"><span>Abierta</span><strong>{{ p.abierta or 0 }}g</strong></div>
                     {% if p.cerradas %}
-                    <div class="detail-item"><span>Cerradas:</span> <strong>{{ p.cerradas|join('g, ') }}g</strong></div>
+                    <div class="detail-item"><span>Cerradas</span><strong>{{ p.cerradas|join('g, ') }}g</strong></div>
                     {% endif %}
                     {% if p.celiaca %}
-                    <div class="detail-item"><span>Celiaca:</span> <strong>{{ p.celiaca }}g</strong></div>
+                    <div class="detail-item"><span>Celiaca</span><strong>{{ p.celiaca }}g</strong></div>
                     {% endif %}
                     {% if p.entrantes %}
-                    <div class="detail-item"><span>Entrantes:</span> <strong>{{ p.entrantes|join('g, ') }}g</strong></div>
+                    <div class="detail-item"><span>Entrantes</span><strong>{{ p.entrantes|join('g, ') }}g</strong></div>
                     {% endif %}
-                    <div class="detail-item"><span>Total:</span> <strong>{{ "{:,}".format(p.stock_actual) }}g</strong></div>
+                    <div class="detail-item"><span>Total</span><strong>{{ "{:,}".format(p.stock_actual) }}g</strong></div>
                 </div>
             </div>
 
             {% if p.ventas_hist %}
-            <!-- Historial de ventas diarias -->
             <div class="detail-section">
                 <div class="detail-label">Ventas diarias (ultimos {{ p.ventas_hist|length }} dias con venta)</div>
                 <div class="detail-row">
                     {% for v in p.ventas_hist[-7:] %}
-                    <div class="detail-item" style="font-size:0.75rem;">{{ "{:,}".format(v) }}g</div>
+                    <div class="detail-item" style="min-width:110px;"><span>Dia</span><strong>{{ "{:,}".format(v) }}g</strong></div>
                     {% endfor %}
                 </div>
                 {% if p.ventas_hist|length > 1 %}
@@ -129,43 +210,43 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
                 <div class="hist-bar">
                     {% set max_v = show_ventas|max if show_ventas|max > 0 else 1 %}
                     {% for v in show_ventas %}
-                    <div class="hist-bar-item" style="height:{{ (v / max_v * 28)|int + 2 }}px;width:{{ (100 / show_ventas|length)|int - 2 }}%;"></div>
+                    <div class="hist-bar-item" style="height:{{ (v / max_v * 34)|int + 4 }}px;width:{{ (100 / show_ventas|length)|int - 2 }}%;"></div>
                     {% endfor %}
                 </div>
                 {% endif %}
             </div>
 
-            <!-- Calculo semanal -->
             <div class="detail-section">
                 <div class="detail-label">Proyeccion semanal</div>
                 <div class="detail-row">
-                    <div class="detail-item"><span>Promedio:</span> <strong>{{ "{:,.0f}".format(p.venta_promedio) }}g/dia</strong></div>
+                    <div class="detail-item"><span>Promedio</span><strong>{{ "{:,.0f}".format(p.venta_promedio) }}g/dia</strong></div>
                     {% if p.tendencia and (p.tendencia > 50 or p.tendencia < -50) %}
-                    <div class="detail-item"><span>Tendencia:</span> <strong style="color:{{ '#c62828' if p.tendencia > 0 else '#2e7d32' }}">{{ "{:+,.0f}".format(p.tendencia) }}g</strong></div>
+                    <div class="detail-item"><span>Tendencia</span><strong style="color:{{ '#8f3b38' if p.tendencia > 0 else '#2f6a41' }}">{{ "{:+,.0f}".format(p.tendencia) }}g</strong></div>
                     {% endif %}
-                    <div class="detail-item"><span>Necesario (7 dias):</span> <strong>{{ "{:,.0f}".format(p.stock_necesario) }}g</strong></div>
+                    <div class="detail-item"><span>Necesario (7 dias)</span><strong>{{ "{:,.0f}".format(p.stock_necesario) }}g</strong></div>
                 </div>
-                <div class="detail-row" style="margin-top:4px;">
+                <div class="detail-row" style="margin-top:10px;">
                     {% if p.dias_cubiertos is not none %}
-                    <div class="detail-item"><span>Stock cubre:</span> <strong style="color:{{ '#c62828' if p.dias_cubiertos < 2 else ('#e65100' if p.dias_cubiertos < 4 else '#2e7d32') }}">{{ p.dias_cubiertos }} dias</strong></div>
+                    <div class="detail-item"><span>Stock cubre</span><strong style="color:{{ '#8f3b38' if p.dias_cubiertos < 2 else ('#b46a1f' if p.dias_cubiertos < 4 else '#2f6a41') }}">{{ p.dias_cubiertos }} dias</strong></div>
                     {% endif %}
                     {% if p.latas_pedir and p.latas_pedir > 0 %}
-                    <div class="detail-item"><span>Latas a pedir:</span> <strong>{{ p.latas_pedir }}</strong></div>
+                    <div class="detail-item"><span>Latas a pedir</span><strong>{{ p.latas_pedir }}</strong></div>
                     {% endif %}
                 </div>
             </div>
             {% else %}
-            <div class="detail-section" style="color:#999;font-style:italic;">
-                Sin ventas registradas en dias anteriores
-            </div>
+            <div class="detail-section empty-note">Sin ventas registradas en dias anteriores.</div>
             {% endif %}
         </div>
     </div>
     {% endfor %}
+    </div>
 
-    <div class="actions">
-        <a href="/entrada/revision/{{ data.turno.id }}" class="btn btn-back">Analisis</a>
-        <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-primary">Turno</a>
+    <div class="actions-shell">
+        <div class="actions">
+            <a href="/entrada/revision/{{ data.turno.id }}" class="btn btn-back">Analisis</a>
+            <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-primary">Turno</a>
+        </div>
     </div>
 </div>
 </body>

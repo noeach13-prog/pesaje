@@ -5,48 +5,123 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ data.sucursal.nombre }} - Planilla {{ data.nombre_hoja }}</title>
 <style>
+:root {
+    --bg: #f7f1e8;
+    --panel: rgba(255, 252, 247, 0.95);
+    --line: rgba(112, 80, 59, 0.14);
+    --ink: #30241d;
+    --muted: #7c675b;
+    --accent: #99613a;
+    --accent-strong: #7f4c2b;
+    --accent-soft: #f4e7da;
+    --info: #465d71;
+    --success: #2f6a41;
+    --warning: #b46a1f;
+    --danger: #8f3b38;
+    --shadow: 0 20px 54px rgba(74, 48, 31, 0.10);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; font-size: 13px; }
-.header { background: #1e3a5f; color: #fff; padding: 10px 16px; }
-.header h1 { font-size: 1rem; } .header .sub { font-size: 0.7rem; opacity: 0.8; }
-.container { max-width: 1100px; margin: 0 auto; padding: 8px; overflow-x: auto; }
-.meta { background: #fff; padding: 6px 12px; border-radius: 6px; margin-bottom: 6px; font-size: 0.75rem; color: #555; display: flex; gap: 12px; flex-wrap: wrap; }
-
-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.75rem; }
-th { padding: 5px 3px; text-align: center; font-size: 0.65rem; text-transform: uppercase; position: sticky; top: 0; white-space: nowrap; }
-th:first-child { text-align: left; min-width: 120px; }
-td { padding: 4px 3px; border-bottom: 1px solid #f0f0f0; text-align: right; font-variant-numeric: tabular-nums; }
-td:first-child { text-align: left; font-weight: 500; font-size: 0.75rem; }
-tr:hover { background: #f8f9fa; }
-
-/* Columnas del turno actual */
-.th-actual { background: #1e3a5f; color: #fff; }
-/* Columnas del turno anterior */
-.th-ant { background: #78909c; color: #fff; }
-/* Separador */
-.th-sep { background: #455a64; color: #fff; width: 4px; padding: 0; }
-.td-sep { background: #eceff1; width: 4px; padding: 0; }
-
-/* Diferencia visual */
-.td-ant { color: #888; font-size: 0.7rem; }
-.td-diff { font-size: 0.6rem; font-weight: 600; }
-.diff-up { color: #c62828; }
-.diff-down { color: #2e7d32; }
-.diff-new { color: #1565c0; font-style: italic; }
-.diff-gone { color: #c62828; font-style: italic; }
-
-.actions { display: flex; gap: 8px; margin: 10px 0; }
-.btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
-.btn-dl { background: #2e7d32; color: #fff; }
-.btn-back { background: #f5f5f5; color: #333; }
+body {
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top left, rgba(173, 123, 82, 0.12), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(151, 99, 61, 0.10), transparent 26%),
+        linear-gradient(180deg, #fbf7f1 0%, #f6ede3 100%);
+    min-height: 100vh;
+    padding: 24px 16px 36px;
+}
+.page-shell { width: 100%; max-width: 1280px; margin: 0 auto; }
+.header,
+.meta,
+.table-card,
+.actions-shell {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+}
+.header {
+    padding: 20px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+.eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px;
+    margin-bottom: 10px; background: rgba(153, 97, 58, 0.08); color: var(--accent-strong);
+    font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.11em;
+}
+.eyebrow::before { content: ''; width: 8px; height: 8px; border-radius: 999px; background: var(--accent); }
+.header h1 { font-size: clamp(1.5rem, 3vw, 1.9rem); line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 4px; }
+.header .sub { color: var(--muted); font-size: 0.92rem; }
+.header a {
+    text-decoration: none; color: var(--accent-strong); background: rgba(153, 97, 58, 0.08);
+    border: 1px solid rgba(153, 97, 58, 0.12); padding: 11px 14px; border-radius: 16px; font-weight: 800; font-size: 0.84rem;
+}
+.meta { padding: 18px 20px; margin-bottom: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+.meta span {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px;
+    background: rgba(153, 97, 58, 0.06); color: var(--ink); font-size: 0.88rem;
+}
+.table-card { overflow: hidden; }
+.table-head { padding: 18px 20px 0; }
+.table-title { font-size: 1.04rem; font-weight: 800; margin-bottom: 4px; }
+.table-copy { color: var(--muted); font-size: 0.86rem; margin-bottom: 14px; }
+.table-wrap { overflow: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 1120px; background: transparent; font-size: 0.78rem; }
+th {
+    padding: 10px 8px; text-align: center; text-transform: uppercase; letter-spacing: 0.07em;
+    font-size: 0.68rem; position: sticky; top: 0; white-space: nowrap; z-index: 2;
+}
+th:first-child { text-align: left; min-width: 170px; left: 0; z-index: 3; }
+td {
+    padding: 9px 8px; border-bottom: 1px solid rgba(112, 80, 59, 0.10); text-align: right; font-variant-numeric: tabular-nums;
+    background: rgba(255,255,255,0.60);
+}
+td:first-child {
+    position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 700; background: rgba(255, 252, 247, 0.98);
+}
+tr:hover td { background: rgba(252, 246, 238, 0.86); }
+tr:hover td:first-child { background: rgba(252, 246, 238, 0.98); }
+.th-actual { background: #3a281f; color: #fff8f1; }
+.th-ant { background: #72675f; color: #fff8f1; }
+.th-sep { background: #59453a; color: #fff8f1; width: 10px; padding: 0; }
+.td-sep { background: rgba(125, 103, 91, 0.12); width: 10px; padding: 0; }
+.td-ant { color: var(--muted); font-size: 0.76rem; }
+.td-diff { display: inline-block; margin-top: 2px; font-size: 0.64rem; font-weight: 800; }
+.diff-up { color: var(--danger); }
+.diff-down { color: var(--success); }
+.diff-new { color: var(--accent-strong); font-style: italic; }
+.diff-gone { color: var(--warning); font-style: italic; }
+.actions-shell { padding: 12px; margin-top: 14px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+    flex: 1 1 200px; display: inline-flex; align-items: center; justify-content: center;
+    padding: 15px 18px; border-radius: 18px; text-decoration: none; font-size: 0.92rem; font-weight: 800;
+}
+.btn-dl { background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%); color: #fffaf4; }
+.btn-back { background: rgba(153, 97, 58, 0.08); border: 1px solid rgba(153, 97, 58, 0.12); color: var(--accent-strong); }
+@media (max-width: 780px) {
+    body { padding: 14px 12px 28px; }
+    .header { flex-direction: column; }
+    .header a { width: 100%; text-align: center; }
+}
 </style>
 </head>
 <body>
-<div class="header" style="display:flex;justify-content:space-between;align-items:center;">
-    <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">Planilla: {{ data.nombre_hoja }}{% if data_ant %} vs {{ data_ant.nombre_hoja }}{% endif %}</div></div>
-    <a href="/entrada/seleccion" style="color:#fff;opacity:0.8;font-size:0.75rem;text-decoration:none;">Inicio</a>
-</div>
-<div class="container">
+<div class="page-shell">
+    <div class="header">
+        <div>
+            <div class="eyebrow">Planilla comparativa</div>
+            <h1>{{ data.sucursal.nombre }}</h1>
+            <div class="sub">Planilla: {{ data.nombre_hoja }}{% if data_ant %} vs {{ data_ant.nombre_hoja }}{% endif %}</div>
+        </div>
+        <a href="/entrada/seleccion">Inicio</a>
+    </div>
+
     <div class="meta">
         <span>Fecha: <strong>{{ data.turno.fecha }}</strong></span>
         <span>Sabores: <strong>{{ data.sabores|length }}</strong></span>
@@ -54,88 +129,98 @@ tr:hover { background: #f8f9fa; }
         <span>Comparando con: <strong>{{ data_ant.nombre_hoja }} ({{ data_ant.turno.fecha }})</strong></span>
         {% endif %}
     </div>
-    <table>
-        <thead>
-            <tr>
-                <th class="th-actual" rowspan="2" style="text-align:left;">Sabor</th>
-                <th class="th-actual" colspan="9">{{ data.nombre_hoja }}</th>
-                {% if data_ant %}
-                <th class="th-sep" rowspan="2"></th>
-                <th class="th-ant" colspan="9">{{ data_ant.nombre_hoja }} (anterior)</th>
-                {% endif %}
-            </tr>
-            <tr>
-                <th class="th-actual">Ab</th><th class="th-actual">Cel</th>
-                <th class="th-actual">C1</th><th class="th-actual">C2</th><th class="th-actual">C3</th>
-                <th class="th-actual">C4</th><th class="th-actual">C5</th><th class="th-actual">C6</th>
-                <th class="th-actual">E1</th>
-                {% if data_ant %}
-                <th class="th-ant">Ab</th><th class="th-ant">Cel</th>
-                <th class="th-ant">C1</th><th class="th-ant">C2</th><th class="th-ant">C3</th>
-                <th class="th-ant">C4</th><th class="th-ant">C5</th><th class="th-ant">C6</th>
-                <th class="th-ant">E1</th>
-                {% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% set all_sabores = [] %}
-            {% set seen = {} %}
-            {% for s in data.sabores %}
-                {% if s.nombre_norm not in seen %}
-                    {% set _ = all_sabores.append(s.nombre_norm) %}
-                    {% set _ = seen.update({s.nombre_norm: true}) %}
-                {% endif %}
-            {% endfor %}
-            {% if data_ant %}
-                {% for s in data_ant.sabores %}
-                    {% if s.nombre_norm not in seen %}
-                        {% set _ = all_sabores.append(s.nombre_norm) %}
-                        {% set _ = seen.update({s.nombre_norm: true}) %}
-                    {% endif %}
-                {% endfor %}
-            {% endif %}
 
-            {% set actual_map = {} %}
-            {% for s in data.sabores %}
-                {% set _ = actual_map.update({s.nombre_norm: s}) %}
-            {% endfor %}
-
-            {% for nombre in all_sabores|sort %}
-            {% set s = actual_map.get(nombre) %}
-            {% set a = ant.get(nombre) if ant else none %}
-            <tr>
-                <td>{{ nombre }}</td>
-                {# Actual #}
-                {% set fields = ['abierta', 'celiaca', 'cerrada_1', 'cerrada_2', 'cerrada_3', 'cerrada_4', 'cerrada_5', 'cerrada_6', 'entrante_1'] %}
-                {% for f in fields %}
-                {% set v = s[f] if s and s[f] is not none else none %}
-                {% set va = a[f] if a and a[f] is not none else none %}
-                <td>
-                    {% if v is not none %}{{ v }}{% endif %}
-                    {% if v is not none and va is not none and v != va %}
-                    <br><span class="td-diff {{ 'diff-down' if (v - va) < 0 else 'diff-up' }}">{{ '{:+d}'.format(v - va) }}</span>
-                    {% elif v is not none and va is none %}
-                    <br><span class="td-diff diff-new">nuevo</span>
-                    {% elif v is none and va is not none %}
-                    <br><span class="td-diff diff-gone">salio</span>
+    <div class="table-card">
+        <div class="table-head">
+            <div class="table-title">Vista de pesos</div>
+            <div class="table-copy">Comparación entre la planilla del turno actual y el turno anterior, con resaltado de variaciones por campo.</div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="th-actual" rowspan="2" style="text-align:left;">Sabor</th>
+                        <th class="th-actual" colspan="9">{{ data.nombre_hoja }}</th>
+                        {% if data_ant %}
+                        <th class="th-sep" rowspan="2"></th>
+                        <th class="th-ant" colspan="9">{{ data_ant.nombre_hoja }} (anterior)</th>
+                        {% endif %}
+                    </tr>
+                    <tr>
+                        <th class="th-actual">Ab</th><th class="th-actual">Cel</th>
+                        <th class="th-actual">C1</th><th class="th-actual">C2</th><th class="th-actual">C3</th>
+                        <th class="th-actual">C4</th><th class="th-actual">C5</th><th class="th-actual">C6</th>
+                        <th class="th-actual">E1</th>
+                        {% if data_ant %}
+                        <th class="th-ant">Ab</th><th class="th-ant">Cel</th>
+                        <th class="th-ant">C1</th><th class="th-ant">C2</th><th class="th-ant">C3</th>
+                        <th class="th-ant">C4</th><th class="th-ant">C5</th><th class="th-ant">C6</th>
+                        <th class="th-ant">E1</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% set all_sabores = [] %}
+                    {% set seen = {} %}
+                    {% for s in data.sabores %}
+                        {% if s.nombre_norm not in seen %}
+                            {% set _ = all_sabores.append(s.nombre_norm) %}
+                            {% set _ = seen.update({s.nombre_norm: true}) %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if data_ant %}
+                        {% for s in data_ant.sabores %}
+                            {% if s.nombre_norm not in seen %}
+                                {% set _ = all_sabores.append(s.nombre_norm) %}
+                                {% set _ = seen.update({s.nombre_norm: true}) %}
+                            {% endif %}
+                        {% endfor %}
                     {% endif %}
-                </td>
-                {% endfor %}
-                {# Separador + Anterior #}
-                {% if data_ant %}
-                <td class="td-sep"></td>
-                {% for f in fields %}
-                {% set va = a[f] if a and a[f] is not none else none %}
-                <td class="td-ant">{% if va is not none %}{{ va }}{% endif %}</td>
-                {% endfor %}
-                {% endif %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <div class="actions">
-        <a href="/entrada/exportar-turno/{{ data.turno.id }}" class="btn btn-dl">Descargar Excel</a>
-        <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Turno</a>
+
+                    {% set actual_map = {} %}
+                    {% for s in data.sabores %}
+                        {% set _ = actual_map.update({s.nombre_norm: s}) %}
+                    {% endfor %}
+
+                    {% for nombre in all_sabores|sort %}
+                    {% set s = actual_map.get(nombre) %}
+                    {% set a = ant.get(nombre) if ant else none %}
+                    <tr>
+                        <td>{{ nombre }}</td>
+                        {% set fields = ['abierta', 'celiaca', 'cerrada_1', 'cerrada_2', 'cerrada_3', 'cerrada_4', 'cerrada_5', 'cerrada_6', 'entrante_1'] %}
+                        {% for f in fields %}
+                        {% set v = s[f] if s and s[f] is not none else none %}
+                        {% set va = a[f] if a and a[f] is not none else none %}
+                        <td>
+                            {% if v is not none %}{{ v }}{% endif %}
+                            {% if v is not none and va is not none and v != va %}
+                            <br><span class="td-diff {{ 'diff-down' if (v - va) < 0 else 'diff-up' }}">{{ '{:+d}'.format(v - va) }}</span>
+                            {% elif v is not none and va is none %}
+                            <br><span class="td-diff diff-new">nuevo</span>
+                            {% elif v is none and va is not none %}
+                            <br><span class="td-diff diff-gone">salio</span>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        {% if data_ant %}
+                        <td class="td-sep"></td>
+                        {% for f in fields %}
+                        {% set va = a[f] if a and a[f] is not none else none %}
+                        <td class="td-ant">{% if va is not none %}{{ va }}{% endif %}</td>
+                        {% endfor %}
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="actions-shell">
+        <div class="actions">
+            <a href="/entrada/exportar-turno/{{ data.turno.id }}" class="btn btn-dl">Descargar Excel</a>
+            <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Turno</a>
+        </div>
     </div>
 </div>
 </body>

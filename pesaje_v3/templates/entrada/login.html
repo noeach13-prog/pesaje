@@ -5,190 +5,284 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pesaje - Acceso</title>
 <style>
+:root {
+    --bg: #f7f1e8;
+    --bg-soft: #fffaf3;
+    --card: rgba(255, 252, 247, 0.94);
+    --ink: #2f241d;
+    --muted: #7d695d;
+    --line: rgba(111, 81, 58, 0.16);
+    --accent: #9b6339;
+    --accent-strong: #7e4f2f;
+    --accent-soft: #f2e4d7;
+    --accent-soft-2: #fbf2e7;
+    --danger-bg: #fff0ee;
+    --danger-text: #8e342d;
+    --shadow: 0 28px 60px rgba(74, 48, 31, 0.12);
+    --shadow-soft: 0 14px 30px rgba(74, 48, 31, 0.08);
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #f0f2f5;
-    color: #2c3e50;
-    display: flex; justify-content: center; align-items: center;
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
-    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top left, rgba(173, 123, 82, 0.12), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(149, 97, 58, 0.10), transparent 30%),
+        linear-gradient(180deg, #fbf6ef 0%, #f6ede3 100%);
 }
-
+body::before {
+    content: '';
+    position: fixed;
+    inset: 18px;
+    border: 1px solid rgba(145, 106, 79, 0.12);
+    border-radius: 32px;
+    pointer-events: none;
+}
+.login-shell {
+    width: 100%;
+    max-width: 470px;
+}
 .login-card {
-    background: #fff;
-    border-radius: 16px;
-    width: 100%; max-width: 420px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 28px;
     overflow: hidden;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
 }
-
-/* Header */
 .card-header {
-    background: #1e3a5f;
-    padding: 28px 32px 24px;
-    text-align: center;
+    position: relative;
+    padding: 34px 34px 28px;
+    background:
+        linear-gradient(145deg, rgba(76, 48, 31, 0.96), rgba(52, 34, 23, 0.96)),
+        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0));
+    color: #fffaf4;
+}
+.card-header::after {
+    content: '';
+    position: absolute;
+    inset: auto 34px 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,238,222,0.45), rgba(255,255,255,0));
+}
+.eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.10);
+    color: rgba(255,247,239,0.90);
+    font-size: 0.73rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+.eyebrow::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #e7b88e;
+    box-shadow: 0 0 0 4px rgba(231, 184, 142, 0.18);
 }
 .card-header h1 {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: 0.3px;
-    margin-bottom: 6px;
+    font-size: clamp(1.7rem, 4vw, 2rem);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 10px;
 }
-.card-header .subtitle {
-    color: rgba(255,255,255,0.65);
-    font-size: 0.8rem;
-    font-weight: 400;
-    letter-spacing: 0.2px;
+.subtitle {
+    color: rgba(255, 243, 233, 0.74);
+    font-size: 0.96rem;
+    line-height: 1.5;
+    max-width: 28ch;
 }
-
-/* Body */
 .card-body {
-    padding: 28px 32px 20px;
+    padding: 28px 34px 26px;
 }
-
-/* Error */
-.error-msg {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #991b1b;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 0.82rem;
+.helper {
+    font-size: 0.86rem;
+    color: var(--muted);
+    line-height: 1.55;
     margin-bottom: 20px;
-    line-height: 1.4;
 }
-
-/* Fields */
+.error-msg {
+    background: var(--danger-bg);
+    border: 1px solid rgba(173, 73, 59, 0.18);
+    color: var(--danger-text);
+    padding: 12px 14px;
+    border-radius: 16px;
+    font-size: 0.84rem;
+    line-height: 1.45;
+    margin-bottom: 18px;
+}
 .field { margin-bottom: 18px; }
 .field label {
     display: block;
-    font-weight: 600;
-    font-size: 0.78rem;
+    margin-bottom: 8px;
+    font-size: 0.76rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #64748b;
-    margin-bottom: 6px;
+    letter-spacing: 0.12em;
+    color: #8d7262;
 }
 .field select,
 .field input[type="text"],
 .field input[type="password"] {
     width: 100%;
-    padding: 13px 14px;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 10px;
-    font-size: 15px;
-    color: #1e293b;
-    background: #f8fafc;
-    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    padding: 15px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(128, 93, 67, 0.16);
+    background: linear-gradient(180deg, #fffdf9 0%, #f8f1e8 100%);
+    color: var(--ink);
+    font-size: 0.98rem;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
     -webkit-appearance: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
 }
 .field select:focus,
 .field input:focus {
     outline: none;
-    border-color: #1e3a5f;
-    box-shadow: 0 0 0 3px rgba(30,58,95,0.1);
-    background: #fff;
+    border-color: rgba(155, 99, 57, 0.42);
+    box-shadow: 0 0 0 4px rgba(155, 99, 57, 0.10);
+    transform: translateY(-1px);
 }
 .field select {
     cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+    padding-right: 44px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%23806a5d' viewBox='0 0 16 16'%3E%3Cpath d='M8 11.2L2.8 5.8h10.4z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 14px center;
-    padding-right: 36px;
+    background-position: right 16px center;
 }
-
-/* PIN field */
 .pin-field input {
     text-align: center;
-    letter-spacing: 10px;
-    font-size: 22px;
+    letter-spacing: 0.42em;
+    font-size: 1.45rem;
     font-weight: 700;
     font-family: 'SF Mono', 'Consolas', 'Courier New', monospace;
-    padding: 14px;
+    padding-inline: 22px;
 }
 .pin-field input::placeholder {
-    letter-spacing: 6px;
-    font-weight: 400;
-    color: #cbd5e1;
+    color: #d1beb0;
+    letter-spacing: 0.28em;
 }
-
-/* Button */
 .btn-enter {
     width: 100%;
-    padding: 14px;
-    background: #1e3a5f;
-    color: #fff;
+    margin-top: 8px;
+    padding: 16px 20px;
     border: none;
-    border-radius: 10px;
-    font-size: 0.95rem;
-    font-weight: 600;
+    border-radius: 18px;
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
-    margin-top: 4px;
-    letter-spacing: 0.3px;
+    color: #fffaf4;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    box-shadow: 0 16px 30px rgba(126, 79, 47, 0.25);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
 }
-.btn-enter:hover { background: #15304f; }
-.btn-enter:active { transform: scale(0.985); }
+.btn-enter:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.02);
+    box-shadow: 0 18px 34px rgba(126, 79, 47, 0.28);
+}
+.btn-enter:active { transform: translateY(1px); }
 .btn-enter:disabled {
-    background: #94a3b8;
     cursor: not-allowed;
+    filter: grayscale(0.1);
+    box-shadow: none;
+    opacity: 0.76;
 }
-
-/* Footer */
 .card-footer {
-    padding: 14px 32px;
-    background: #f8fafc;
-    border-top: 1px solid #f1f5f9;
-    text-align: center;
+    padding: 18px 34px 24px;
+    background: linear-gradient(180deg, rgba(247, 239, 230, 0.35) 0%, rgba(247, 239, 230, 0.72) 100%);
+    border-top: 1px solid rgba(111, 81, 58, 0.10);
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
 }
-.card-footer span {
-    font-size: 0.7rem;
-    color: #94a3b8;
-    letter-spacing: 0.3px;
+.footer-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
     text-transform: uppercase;
+    letter-spacing: 0.10em;
+    color: #8d7467;
+    font-weight: 700;
+}
+.footer-chip::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(155, 99, 57, 0.55);
+}
+@media (max-width: 520px) {
+    body { padding: 14px; }
+    body::before { inset: 10px; border-radius: 24px; }
+    .card-header,
+    .card-body,
+    .card-footer { padding-left: 22px; padding-right: 22px; }
+    .card-header { padding-top: 26px; }
+    .card-footer { gap: 10px; }
+    .pin-field input { letter-spacing: 0.34em; }
 }
 </style>
 </head>
 <body>
-<div class="login-card">
-    <div class="card-header">
-        <h1>Sistema de Pesaje</h1>
-        <div class="subtitle">Control de stock y carga de sucursales</div>
+<main class="login-shell">
+    <div class="login-card">
+        <div class="card-header">
+            <div class="eyebrow">Pesaje v3</div>
+            <h1>Sistema de pesaje</h1>
+            <div class="subtitle">Acceso operativo para carga, control y seguimiento de turnos de sucursales.</div>
+        </div>
+
+        <div class="card-body">
+            <div class="helper">Ingresá con el código correspondiente a tu sucursal. La interfaz conserva la lógica actual y solo refuerza la lectura visual del módulo.</div>
+
+            {% if error %}
+            <div class="error-msg">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST" action="/entrada/login" id="loginForm">
+                <div class="field">
+                    <label for="sucursal">Sucursal</label>
+                    <select name="sucursal_id" id="sucursal" required>
+                        <option value="">Seleccionar sucursal...</option>
+                        {% for s in sucursales %}
+                        <option value="{{ s.id }}">{{ s.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="field pin-field">
+                    <label for="pin">Codigo de acceso</label>
+                    <input type="password" name="pin" id="pin" maxlength="6"
+                           inputmode="numeric" pattern="[0-9]*"
+                           placeholder="------" required autocomplete="off">
+                </div>
+
+                <button type="submit" class="btn-enter" id="btnEntrar">Ingresar</button>
+            </form>
+        </div>
+
+        <div class="card-footer">
+            <span class="footer-chip">Uso interno</span>
+            <span class="footer-chip">Acceso restringido</span>
+        </div>
     </div>
-
-    <div class="card-body">
-        {% if error %}
-        <div class="error-msg">{{ error }}</div>
-        {% endif %}
-
-        <form method="POST" action="/entrada/login" id="loginForm">
-            <div class="field">
-                <label for="sucursal">Sucursal</label>
-                <select name="sucursal_id" id="sucursal" required>
-                    <option value="">Seleccionar sucursal...</option>
-                    {% for s in sucursales %}
-                    <option value="{{ s.id }}">{{ s.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="field pin-field">
-                <label for="pin">Codigo de acceso</label>
-                <input type="password" name="pin" id="pin" maxlength="6"
-                       inputmode="numeric" pattern="[0-9]*"
-                       placeholder="------" required autocomplete="off">
-            </div>
-
-            <button type="submit" class="btn-enter" id="btnEntrar">Ingresar</button>
-        </form>
-    </div>
-
-    <div class="card-footer">
-        <span>Acceso restringido a personal autorizado</span>
-    </div>
-</div>
+</main>
 
 <script>
 document.getElementById('loginForm').addEventListener('submit', function() {
