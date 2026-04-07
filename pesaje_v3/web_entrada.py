@@ -531,74 +531,75 @@ def pedido(turno_id):
 
 def _calcular_sugerencia_pedido(db, data):
     """
-    Para cada sabor del turno, calcula sugerencia de pedido.
-    Usa historial de ventas CONFIRMADAS de la misma sucursal.
-    Lógica operativa, no analítica — no usa el pipeline.
+    Para cada sabor del turno, calcula sugerencia de pedido para 7 dias.
+    Usa historial de ventas CONFIRMADAS agrupadas por dia.
     """
     sid = data['turno']['sucursal_id']
     fecha = data['turno']['fecha']
-    tipo = data['turno']['tipo_turno']
 
-    # Buscar turnos confirmados anteriores de la misma sucursal
+    # Buscar turnos confirmados anteriores (suficientes para cubrir ~14 dias)
     turnos_hist = db.execute(
         """SELECT t.id, t.fecha, t.tipo_turno FROM turnos t
            WHERE t.sucursal_id = ? AND t.estado = 'confirmado' AND t.fecha < ?
-           ORDER BY t.fecha DESC LIMIT 10""",
+           ORDER BY t.fecha DESC LIMIT 30""",
         (sid, fecha),
     ).fetchall()
 
     n_turnos = len(turnos_hist)
-
-    # Para cada turno histórico, calcular ventas por sabor
-    # venta = diferencia entre turno anterior y el turno
-    # Simplificación: usar la abierta como proxy de consumo
-    # (abierta_anterior - abierta_actual = lo que se vendió de la abierta)
-    # Más robusto: usar total_anterior - total_actual
-
-    # Recoger todos los sabores con sus pesos por turno
-    hist_por_sabor = {}
     all_turnos = list(reversed(turnos_hist))  # cronológico
 
-    for i in range(len(all_turnos)):
-        t = all_turnos[i]
+    # Recoger stock total por turno y por sabor, con fecha
+    hist_por_sabor = {}  # nn → [(fecha, total), ...]
+    for t in all_turnos:
         sabs = db.execute(
             "SELECT nombre_norm, abierta, cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6 FROM sabores_turno WHERE turno_id=?",
             (t['id'],),
         ).fetchall()
-
         for s in sabs:
             nn = s['nombre_norm']
             ab = s['abierta'] or 0
             cerr = sum(s[f'cerrada_{j}'] or 0 for j in range(1, 7))
             total = ab + cerr
-
             if nn not in hist_por_sabor:
                 hist_por_sabor[nn] = []
-            hist_por_sabor[nn].append(total)
+            hist_por_sabor[nn].append((t['fecha'], total))
 
-    # Calcular ventas como diferencia entre turnos consecutivos
-    ventas_por_sabor = {}
-    for nn, totales in hist_por_sabor.items():
-        ventas = []
-        for i in range(1, len(totales)):
-            v = totales[i - 1] - totales[i]  # anterior - actual = venta
+    # Calcular ventas DIARIAS por sabor
+    # Agrupar por fecha: tomar el ultimo turno de cada dia como stock de cierre
+    # Venta del dia = stock cierre dia anterior - stock cierre dia actual
+    ventas_diarias_por_sabor = {}
+    for nn, registros in hist_por_sabor.items():
+        # Stock de cierre por dia (ultimo registro del dia)
+        cierre_por_dia = {}
+        for fch, total in registros:
+            cierre_por_dia[fch] = total  # el ultimo turno del dia (ya cronologico)
+
+        fechas_ord = sorted(cierre_por_dia.keys())
+        ventas_dia = []
+        for i in range(1, len(fechas_ord)):
+            v = cierre_por_dia[fechas_ord[i - 1]] - cierre_por_dia[fechas_ord[i]]
             if v > 0:
-                ventas.append(v)
-        ventas_por_sabor[nn] = ventas
+                ventas_dia.append(v)
+        ventas_diarias_por_sabor[nn] = ventas_dia
+
+    # Contar dias distintos en historial
+    fechas_hist = sorted({t['fecha'] for t in all_turnos})
+    n_dias_hist = len(fechas_hist)
 
     # Generar sugerencia para cada sabor del turno actual
+    DIAS_PROYECCION = 7
     pedidos = []
     for s in data['sabores']:
         nn = s['nombre_norm']
 
-        # Desglose del stock actual tal como lo cargó el empleado
+        # Desglose del stock actual
         ab = s['abierta'] or 0
         cel = s.get('celiaca') or 0
         cerradas = [s[f'cerrada_{i}'] for i in range(1, 7) if s.get(f'cerrada_{i}') is not None]
         entrantes = [s[f'entrante_{i}'] for i in range(1, 3) if s.get(f'entrante_{i}') is not None]
         stock_actual = ab + cel + sum(cerradas) + sum(entrantes)
 
-        ventas = ventas_por_sabor.get(nn, [])
+        ventas = ventas_diarias_por_sabor.get(nn, [])
         N = len(ventas)
 
         base = {
@@ -609,6 +610,7 @@ def _calcular_sugerencia_pedido(db, data):
             'entrantes': entrantes,
             'stock_actual': stock_actual,
             'ventas_hist': ventas,
+            'n_dias_hist': n_dias_hist,
         }
 
         if N == 0:
@@ -617,38 +619,57 @@ def _calcular_sugerencia_pedido(db, data):
                 'tendencia': None,
                 'venta_proyectada': None,
                 'stock_necesario': 0,
+                'dias_cubiertos': None,
+                'latas_pedir': 0,
                 'sugerencia': 'Sin historial suficiente',
             })
             pedidos.append(base)
             continue
 
-        venta_promedio = sum(ventas) / N
+        venta_diaria = sum(ventas) / N
         tendencia = (ventas[-1] - ventas[0]) / (N - 1) if N >= 2 else 0
-        venta_proyectada = max(0, venta_promedio + tendencia)
-        stock_necesario = venta_proyectada * 2
+        venta_proyectada = max(0, venta_diaria + tendencia)
+        stock_necesario = venta_proyectada * DIAS_PROYECCION
         deficit = stock_necesario - stock_actual
 
-        if deficit > 9000:
-            sug = 'Pedir urgente: 2 latas'
-        elif deficit > 3000:
-            sug = 'Pedir 1 lata (~6500g)'
-        elif deficit > 0:
+        # Cuantos dias cubre el stock actual
+        dias_cubiertos = stock_actual / venta_proyectada if venta_proyectada > 0 else 99
+
+        # Cuantas latas pedir (cada lata ~6500g)
+        latas_pedir = max(0, int(deficit / 6500) + (1 if deficit % 6500 > 1000 else 0)) if deficit > 0 else 0
+
+        if dias_cubiertos < 2:
+            sug = f'Urgente: pedir {latas_pedir} lata{"s" if latas_pedir != 1 else ""}'
+        elif dias_cubiertos < 4:
+            sug = f'Pedir {latas_pedir} lata{"s" if latas_pedir != 1 else ""}'
+        elif dias_cubiertos < 7:
             sug = 'Stock justo'
         else:
             sug = 'Stock suficiente'
 
         base.update({
-            'venta_promedio': venta_promedio,
+            'venta_promedio': venta_diaria,
             'tendencia': tendencia,
             'venta_proyectada': venta_proyectada,
             'stock_necesario': stock_necesario,
+            'dias_cubiertos': round(dias_cubiertos, 1),
+            'latas_pedir': latas_pedir,
             'sugerencia': sug,
         })
         pedidos.append(base)
 
-    # Ordenar: urgentes primero, luego pedir, luego justo, luego ok, luego sin historial
-    orden = {'Pedir urgente: 2 latas': 0, 'Pedir 1 lata (~6500g)': 1, 'Stock justo': 2, 'Stock suficiente': 3, 'Sin historial suficiente': 4}
-    pedidos.sort(key=lambda p: (orden.get(p['sugerencia'], 5), p['nombre']))
+    # Ordenar: urgentes primero
+    def _orden_sug(sug):
+        if 'Urgente' in sug:
+            return 0
+        if 'Pedir' in sug:
+            return 1
+        if 'justo' in sug:
+            return 2
+        if 'suficiente' in sug:
+            return 3
+        return 4
+    pedidos.sort(key=lambda p: (_orden_sug(p['sugerencia']), p['nombre']))
 
     return pedidos, n_turnos
 

@@ -61,31 +61,35 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 <div class="container">
     <div class="meta">
-        Basado en <strong>{{ n_turnos_hist }} turnos confirmados</strong> anteriores
+        Proyeccion para <strong>7 dias</strong> basada en {{ n_turnos_hist }} turnos confirmados
     </div>
 
-    {% set urgentes = pedidos | selectattr('sugerencia', 'eq', 'Pedir urgente: 2 latas') | list %}
-    {% set pedir_list = pedidos | selectattr('sugerencia', 'eq', 'Pedir 1 lata (~6500g)') | list %}
-    {% set ok_list = pedidos | selectattr('sugerencia', 'eq', 'Stock suficiente') | list %}
+    {% set ns = namespace(urgentes=0, pedir=0, ok=0) %}
+    {% for p in pedidos %}
+        {% if 'Urgente' in p.sugerencia %}{% set ns.urgentes = ns.urgentes + 1 %}
+        {% elif 'Pedir' in p.sugerencia %}{% set ns.pedir = ns.pedir + 1 %}
+        {% elif 'suficiente' in p.sugerencia %}{% set ns.ok = ns.ok + 1 %}
+        {% endif %}
+    {% endfor %}
 
     <div class="summary">
         <div class="sum-card sum-urgente">
-            <div class="sum-num">{{ urgentes|length }}</div>
+            <div class="sum-num">{{ ns.urgentes }}</div>
             <div class="sum-label">Urgentes</div>
         </div>
         <div class="sum-card sum-pedir">
-            <div class="sum-num">{{ pedir_list|length }}</div>
-            <div class="sum-label">Pedir 1 lata</div>
+            <div class="sum-num">{{ ns.pedir }}</div>
+            <div class="sum-label">Pedir</div>
         </div>
         <div class="sum-card sum-ok">
-            <div class="sum-num">{{ ok_list|length }}</div>
+            <div class="sum-num">{{ ns.ok }}</div>
             <div class="sum-label">Stock OK</div>
         </div>
     </div>
 
     {% for p in pedidos %}
-    {% set sug_class = 'sug-urgente' if 'urgente' in p.sugerencia else ('sug-pedir' if 'Pedir 1' in p.sugerencia else ('sug-justo' if 'justo' in p.sugerencia else ('sug-ok' if 'suficiente' in p.sugerencia else ''))) %}
-    {% set badge_class = 'sug-urgente-badge' if 'urgente' in p.sugerencia else ('sug-pedir-badge' if 'Pedir 1' in p.sugerencia else ('sug-justo-badge' if 'justo' in p.sugerencia else ('sug-ok-badge' if 'suficiente' in p.sugerencia else 'sug-sin-badge'))) %}
+    {% set sug_class = 'sug-urgente' if 'Urgente' in p.sugerencia else ('sug-pedir' if 'Pedir' in p.sugerencia else ('sug-justo' if 'justo' in p.sugerencia else ('sug-ok' if 'suficiente' in p.sugerencia else ''))) %}
+    {% set badge_class = 'sug-urgente-badge' if 'Urgente' in p.sugerencia else ('sug-pedir-badge' if 'Pedir' in p.sugerencia else ('sug-justo-badge' if 'justo' in p.sugerencia else ('sug-ok-badge' if 'suficiente' in p.sugerencia else 'sug-sin-badge'))) %}
 
     <div class="sabor-card {{ sug_class }}">
         <div class="sabor-top">
@@ -112,38 +116,47 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
             </div>
 
             {% if p.ventas_hist %}
-            <!-- Historial de ventas -->
+            <!-- Historial de ventas diarias -->
             <div class="detail-section">
-                <div class="detail-label">Ventas de los ultimos {{ p.ventas_hist|length }} turnos</div>
+                <div class="detail-label">Ventas diarias (ultimos {{ p.ventas_hist|length }} dias con venta)</div>
                 <div class="detail-row">
-                    {% for v in p.ventas_hist %}
+                    {% for v in p.ventas_hist[-7:] %}
                     <div class="detail-item" style="font-size:0.75rem;">{{ "{:,}".format(v) }}g</div>
                     {% endfor %}
                 </div>
                 {% if p.ventas_hist|length > 1 %}
+                {% set show_ventas = p.ventas_hist[-7:] %}
                 <div class="hist-bar">
-                    {% set max_v = p.ventas_hist|max if p.ventas_hist|max > 0 else 1 %}
-                    {% for v in p.ventas_hist %}
-                    <div class="hist-bar-item" style="height:{{ (v / max_v * 28)|int + 2 }}px;width:{{ (100 / p.ventas_hist|length)|int - 2 }}%;"></div>
+                    {% set max_v = show_ventas|max if show_ventas|max > 0 else 1 %}
+                    {% for v in show_ventas %}
+                    <div class="hist-bar-item" style="height:{{ (v / max_v * 28)|int + 2 }}px;width:{{ (100 / show_ventas|length)|int - 2 }}%;"></div>
                     {% endfor %}
                 </div>
                 {% endif %}
             </div>
 
-            <!-- Calculo -->
+            <!-- Calculo semanal -->
             <div class="detail-section">
-                <div class="detail-label">Calculo</div>
+                <div class="detail-label">Proyeccion semanal</div>
                 <div class="detail-row">
-                    <div class="detail-item"><span>Promedio:</span> <strong>{{ "{:,.0f}".format(p.venta_promedio) }}g/turno</strong></div>
+                    <div class="detail-item"><span>Promedio:</span> <strong>{{ "{:,.0f}".format(p.venta_promedio) }}g/dia</strong></div>
                     {% if p.tendencia and (p.tendencia > 50 or p.tendencia < -50) %}
                     <div class="detail-item"><span>Tendencia:</span> <strong style="color:{{ '#c62828' if p.tendencia > 0 else '#2e7d32' }}">{{ "{:+,.0f}".format(p.tendencia) }}g</strong></div>
                     {% endif %}
-                    <div class="detail-item"><span>Necesario (2 turnos):</span> <strong>{{ "{:,.0f}".format(p.stock_necesario) }}g</strong></div>
+                    <div class="detail-item"><span>Necesario (7 dias):</span> <strong>{{ "{:,.0f}".format(p.stock_necesario) }}g</strong></div>
+                </div>
+                <div class="detail-row" style="margin-top:4px;">
+                    {% if p.dias_cubiertos is not none %}
+                    <div class="detail-item"><span>Stock cubre:</span> <strong style="color:{{ '#c62828' if p.dias_cubiertos < 2 else ('#e65100' if p.dias_cubiertos < 4 else '#2e7d32') }}">{{ p.dias_cubiertos }} dias</strong></div>
+                    {% endif %}
+                    {% if p.latas_pedir and p.latas_pedir > 0 %}
+                    <div class="detail-item"><span>Latas a pedir:</span> <strong>{{ p.latas_pedir }}</strong></div>
+                    {% endif %}
                 </div>
             </div>
             {% else %}
             <div class="detail-section" style="color:#999;font-style:italic;">
-                Sin ventas registradas en turnos anteriores
+                Sin ventas registradas en dias anteriores
             </div>
             {% endif %}
         </div>
