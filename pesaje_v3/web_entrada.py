@@ -456,6 +456,47 @@ def api_borrar_turno():
     return jsonify(resultado)
 
 
+@entrada_bp.route('/entrada/api/carga-masiva', methods=['POST'])
+def api_carga_masiva():
+    """Carga masiva de turnos desde JSON. Para importar datos de Excel."""
+    payload = request.get_json()
+    if not payload or not isinstance(payload, list):
+        return jsonify({'ok': False, 'error': 'Se espera lista de turnos'}), 400
+
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+
+    db = get_db()
+    resultados = []
+    for item in payload:
+        fecha = item.get('fecha')
+        sabores = item.get('sabores', [])
+        label = item.get('label', fecha)
+        tipo = item.get('tipo', 'UNICO')
+
+        if not fecha or not sabores:
+            continue
+
+        # Si ya existe, borrar y recrear
+        existing = db.execute(
+            "SELECT id FROM turnos WHERE sucursal_id=? AND fecha=? AND tipo_turno=?",
+            (sid, fecha, tipo),
+        ).fetchone()
+        if existing:
+            db.execute("DELETE FROM turnos WHERE id=?", (existing['id'],))
+            db.commit()
+
+        tid = crear_turno(db, sid, fecha, tipo)
+        warnings = guardar_sabores(db, tid, sabores)
+        db.execute("UPDATE turnos SET estado='confirmado' WHERE id=?", (tid,))
+        db.commit()
+        resultados.append({'fecha': fecha, 'label': label, 'turno_id': tid, 'n_sabores': len(sabores)})
+
+    db.close()
+    return jsonify({'ok': True, 'turnos': resultados})
+
+
 @entrada_bp.route('/entrada/api/debug-turnos')
 def api_debug_turnos():
     """Debug: muestra datos crudos de todos los turnos."""
