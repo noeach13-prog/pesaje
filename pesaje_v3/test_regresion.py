@@ -1234,6 +1234,114 @@ def test_contrato_pfit_ambigu_nace_en_piso_viable():
 
 
 # ===================================================================
+# I) PF1 delta recalculado en TURNO_UNICO
+# ===================================================================
+
+def test_pf1_turno_unico_delta_recalculado_chocolate():
+    """
+    CASO REAL: CHOCOLATE Triunvirato D15 (Sabado 14 -> Domingo 15).
+    DIA cerradas=[5855, 6685, 6480], NOCHE cerradas=[6685, 6855, 6480].
+    5855 es typo de 6855 (+1000).
+
+    En TURNO_UNICO, 6855 de NOCHE estaba en new_cerr_b (no matcheaba DIA).
+    Al corregir 5855->6855, la 6855 de NOCHE ahora matchea DIA ->
+    new_cerr_b pierde 6855g.
+
+    delta correcto = offset - new_cerr_b_eliminado = +1000 - 6855 = -5855
+    venta_raw=6640, venta_corregida = 6640 + (-5855) = 785g
+    """
+    from pesaje_v3.generadores_c3 import _recalcular_delta_pf1
+    from pesaje_v3.modelos import SaborCrudo, TurnoCrudo, DatosDia
+
+    d = TurnoCrudo(nombre_hoja='T_DIA', indice=0, sabores={
+        'CHOCOLATE': SaborCrudo(nombre='CHOCOLATE', nombre_norm='CHOCOLATE',
+                                abierta=5545, celiaca=None,
+                                cerradas=[5855, 6685, 6480], entrantes=[]),
+    })
+    n = TurnoCrudo(nombre_hoja='T_NOCHE', indice=1, sabores={
+        'CHOCOLATE': SaborCrudo(nombre='CHOCOLATE', nombre_norm='CHOCOLATE',
+                                abierta=4760, celiaca=None,
+                                cerradas=[6685, 6855, 6480], entrantes=[]),
+    })
+    datos = DatosDia(dia_label='test', turno_dia=d, turno_noche=n, contexto=[],
+                     modo='TURNO_UNICO')
+
+    delta = _recalcular_delta_pf1('CHOCOLATE', datos, 5855, 6855, es_dia=True)
+
+    assert delta == -5855, \
+        f'delta={delta}, esperaba -5855 (offset +1000 menos new_cerr_b 6855)'
+
+    # Verificar que venta corregida = 785g
+    venta_raw = 6640  # calculado con 5855 + new_cerr_b=6855
+    assert venta_raw + delta == 785, f'venta_corregida={venta_raw + delta}, esperaba 785'
+
+
+def test_pf1_turno_unico_offset_solo_total_a():
+    """
+    TURNO_UNICO donde el offset solo cambia total_a (no afecta new_cerr_b).
+    La cerrada corregida no matchea ninguna cerrada de NOCHE ni antes ni despues.
+    En este caso delta == offset (comportamiento identico al shortcut viejo).
+    """
+    from pesaje_v3.generadores_c3 import _recalcular_delta_pf1
+    from pesaje_v3.modelos import SaborCrudo, TurnoCrudo, DatosDia
+
+    d = TurnoCrudo(nombre_hoja='T_DIA', indice=0, sabores={
+        'TEST': SaborCrudo(nombre='TEST', nombre_norm='TEST',
+                           abierta=3000, celiaca=None,
+                           cerradas=[5400, 6600], entrantes=[]),
+    })
+    n = TurnoCrudo(nombre_hoja='T_NOCHE', indice=1, sabores={
+        'TEST': SaborCrudo(nombre='TEST', nombre_norm='TEST',
+                           abierta=2500, celiaca=None,
+                           cerradas=[6600], entrantes=[]),
+    })
+    datos = DatosDia(dia_label='test', turno_dia=d, turno_noche=n, contexto=[],
+                     modo='TURNO_UNICO')
+
+    # 5400 -> 6400 (+1000). 6400 no matchea ninguna cerrada NOCHE.
+    # new_cerr_b no cambia. delta debe ser = offset = +1000.
+    delta = _recalcular_delta_pf1('TEST', datos, 5400, 6400, es_dia=True)
+
+    assert delta == 1000, \
+        f'delta={delta}, esperaba 1000 (offset puro, sin cambio en new_cerr_b)'
+
+
+def test_pf1_dia_noche_delta_es_offset():
+    """
+    DIA_NOCHE: new_cerr_b siempre es 0, asi que delta == offset.
+    Verifica que el recalculo no rompe el caso simple.
+    """
+    from pesaje_v3.generadores_c3 import _recalcular_delta_pf1
+    from pesaje_v3.modelos import SaborCrudo, TurnoCrudo, DatosDia
+
+    d = TurnoCrudo(nombre_hoja='T_DIA', indice=0, sabores={
+        'TEST': SaborCrudo(nombre='TEST', nombre_norm='TEST',
+                           abierta=3000, celiaca=None,
+                           cerradas=[5855, 6685], entrantes=[]),
+    })
+    n = TurnoCrudo(nombre_hoja='T_NOCHE', indice=1, sabores={
+        'TEST': SaborCrudo(nombre='TEST', nombre_norm='TEST',
+                           abierta=2500, celiaca=None,
+                           cerradas=[6685, 6855], entrantes=[]),
+    })
+    datos = DatosDia(dia_label='test', turno_dia=d, turno_noche=n, contexto=[],
+                     modo='DIA_NOCHE')
+
+    # 5855 -> 6855 en DIA, DIA_NOCHE: delta = +1000 (offset puro)
+    # porque new_cerr_b es siempre 0 en DIA_NOCHE
+    delta = _recalcular_delta_pf1('TEST', datos, 5855, 6855, es_dia=True)
+
+    assert delta == 1000, \
+        f'delta={delta}, esperaba 1000 (DIA_NOCHE, offset puro)'
+
+    # NOCHE: corregir 6855->5855 reduce total_b en 1000 -> venta sube 1000
+    # offset = -1000, -offset = +1000 = delta correcto
+    delta_n = _recalcular_delta_pf1('TEST', datos, 6855, 5855, es_dia=False)
+    assert delta_n == 1000, \
+        f'delta_noche={delta_n}, esperaba +1000 (NOCHE menor -> venta mayor)'
+
+
+# ===================================================================
 # MAIN
 # ===================================================================
 

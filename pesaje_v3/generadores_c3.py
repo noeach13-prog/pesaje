@@ -42,6 +42,68 @@ def _get_varianza(obs: ObservacionC3, peso: int):
 # PF1: Error de digito en cerrada
 # ===================================================================
 
+def _recalcular_delta_pf1(nombre: str, datos, peso_original: int,
+                           peso_corregido: int, es_dia: bool) -> int:
+    """
+    Recalcula el delta de venta al corregir una cerrada de peso_original a peso_corregido.
+
+    En vez de asumir delta=offset, reconstruye la contabilidad del sabor con
+    el peso corregido y calcula la diferencia real. Esto es necesario en
+    TURNO_UNICO donde corregir una cerrada DIA puede cambiar new_cerr_b
+    (la cerrada NOCHE que antes no matcheaba, ahora sí matchea).
+
+    En DIA_NOCHE new_cerr_b siempre es 0, así que el resultado coincide
+    con el shortcut delta=offset.
+    """
+    from .capa2_contrato import _matching_entrantes, _new_cerradas_b
+
+    d = datos.turno_dia.sabores.get(nombre)
+    n = datos.turno_noche.sabores.get(nombre)
+    if not d or not n:
+        return peso_corregido - peso_original if es_dia else -(peso_corregido - peso_original)
+
+    modo = getattr(datos, 'modo', 'DIA_NOCHE')
+
+    # Construir listas de cerradas con la corrección aplicada
+    def _aplicar(cerradas, p_orig, p_corr):
+        result = []
+        reemplazado = False
+        for c in cerradas:
+            if int(c) == p_orig and not reemplazado:
+                result.append(p_corr)
+                reemplazado = True
+            else:
+                result.append(int(c))
+        return result
+
+    if es_dia:
+        cerr_dia_corr = _aplicar(d.cerradas, peso_original, peso_corregido)
+        cerr_noche = [int(c) for c in n.cerradas]
+    else:
+        cerr_dia_corr = [int(c) for c in d.cerradas]
+        cerr_noche = _aplicar(n.cerradas, peso_original, peso_corregido)
+
+    # Contabilidad original
+    cerr_dia_orig = [int(c) for c in d.cerradas]
+    cerr_noche_orig = [int(c) for c in n.cerradas]
+    ent_dia = [int(e) for e in d.entrantes]
+    ent_noche = [int(e) for e in n.entrantes]
+
+    total_a_orig = (d.abierta or 0) + (d.celiaca or 0) + sum(cerr_dia_orig) + sum(ent_dia)
+    total_b = (n.abierta or 0) + (n.celiaca or 0) + sum(cerr_noche_orig) + sum(ent_noche)
+    new_ent_b_orig = _matching_entrantes(ent_dia, ent_noche)
+    new_cerr_b_orig = _new_cerradas_b(cerr_dia_orig, cerr_noche_orig) if modo == 'TURNO_UNICO' else 0
+    venta_orig = total_a_orig + new_ent_b_orig + new_cerr_b_orig - total_b
+
+    # Contabilidad corregida
+    total_a_corr = (d.abierta or 0) + (d.celiaca or 0) + sum(cerr_dia_corr) + sum(ent_dia)
+    total_b_corr = (n.abierta or 0) + (n.celiaca or 0) + sum(cerr_noche) + sum(ent_noche)
+    new_cerr_b_corr = _new_cerradas_b(cerr_dia_corr, cerr_noche) if modo == 'TURNO_UNICO' else 0
+    venta_corr = total_a_corr + new_ent_b_orig + new_cerr_b_corr - total_b_corr
+
+    return venta_corr - venta_orig
+
+
 def generar_hipotesis_pf1(nombre: str, sc: SaborContable, datos: DatosDia,
                           obs: ObservacionC3, flags: List[FlagC3]) -> List[HipotesisCorreccion]:
     """Devuelve TODAS las hipotesis para cada offset valido, no solo la primera."""
@@ -87,10 +149,15 @@ def generar_hipotesis_pf1(nombre: str, sc: SaborContable, datos: DatosDia,
                 continue
 
             conf = PF1_CONF_STRONG if sightings >= PF1_MIN_SIGHTINGS_STRONG else PF1_CONF_WEAK
-            if es_dia:
-                delta = offset
-            else:
-                delta = -offset
+
+            # Delta: recalcular contabilidad completa con el peso corregido.
+            # En TURNO_UNICO, corregir una cerrada DIA puede cambiar el matching
+            # contra NOCHE (new_cerr_b), haciendo que delta != offset.
+            # En DIA_NOCHE, el shortcut delta=offset sigue siendo correcto
+            # porque new_cerr_b siempre es 0.
+            delta = _recalcular_delta_pf1(
+                nombre, datos, peso, peso_corregido, es_dia,
+            )
 
             slot = SlotCerrada(peso=peso, turno=lado.value, indice_slot=indice)
             fuente = FuenteEvidencia(TipoFuente.SIGHTINGS,
