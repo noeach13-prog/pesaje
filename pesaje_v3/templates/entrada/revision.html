@@ -60,6 +60,14 @@ tr.row-neg { background: #fce4ec; }
 .ts { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 12px; background: #fff; border-radius: 8px; margin-bottom: 8px; font-size: 0.75rem; }
 .ts-l { color: #999; } .ts-v { font-weight: 500; }
 
+/* Explicacion expandible */
+.exp-box { cursor: pointer; }
+.exp-header { font-size: 0.7rem; color: #666; padding: 4px 6px 4px 20px; display: flex; justify-content: space-between; align-items: center; }
+.exp-toggle { font-size: 0.6rem; color: #aaa; transition: transform 0.2s; }
+.exp-box.open .exp-toggle { transform: rotate(180deg); }
+.exp-detail { display: none; font-size: 0.72rem; color: #444; padding: 6px 20px 10px; margin: 0; white-space: pre-wrap; font-family: inherit; line-height: 1.5; background: #f8f9fa; border-top: 1px solid #eee; }
+.exp-box.open .exp-detail { display: block; }
+
 .actions { display: flex; gap: 8px; margin: 12px 0; }
 .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
 .btn-back { background: #f5f5f5; color: #333; }
@@ -138,7 +146,17 @@ tr.row-neg { background: #fce4ec; }
                         {% endif %}
                     </td>
                 </tr>
-                {% if s.correccion %}
+                {% if s.explicacion %}
+                <tr class="exp-row"><td colspan="5" style="padding:0;">
+                    <div class="exp-box" onclick="this.classList.toggle('open')">
+                        <div class="exp-header">
+                            {% if s.correccion %}{{ s.correccion }}{% else %}Ver detalle{% endif %}
+                            <span class="exp-toggle">&#9660;</span>
+                        </div>
+                        <pre class="exp-detail">{{ s.explicacion }}</pre>
+                    </div>
+                </td></tr>
+                {% elif s.correccion %}
                 <tr><td colspan="5" style="font-size:0.7rem;color:#666;padding:2px 6px 6px 20px;">{{ s.correccion }}</td></tr>
                 {% endif %}
                 {% endfor %}

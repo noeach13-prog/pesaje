@@ -159,16 +159,27 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int) -> Dict:
                 sabor_info['correccion'] = f'Doble registro: entrante duplica cerrada ({intradup_por_sabor[nombre]}g descontado)'
                 sabor_info['confianza'] = 0.70
 
+            # Explicación clara para verificación humana
+            d = datos_dia.turno_dia.sabores.get(nombre)
+            n = datos_dia.turno_noche.sabores.get(nombre)
+            if status != 'OK':
+                sabor_info['explicacion'] = _explicar_caso(
+                    nombre, sc, d, n, proto, c4_corr, web_corr,
+                    intradup_por_sabor.get(nombre, 0), vf, status,
+                )
+
             # Alerta si hay problema
             if vf < -200:
                 resultado['alertas'].append({
                     'nivel': 'analisis', 'severidad': 'error', 'sabor': nombre,
-                    'codigo': 'VENTA_NEG', 'detalle': f'Venta = {vf}g (negativa)',
+                    'codigo': 'VENTA_NEG',
+                    'detalle': f'{nombre}: la venta da {vf}g (negativa). Revisar si faltan cerradas o si la abierta esta mal.',
                 })
-            elif status == 'H0' and abs(vf) > 1000:
+            elif status == 'H0':
                 resultado['alertas'].append({
                     'nivel': 'analisis', 'severidad': 'warning', 'sabor': nombre,
-                    'codigo': 'H0', 'detalle': f'Sin resolver: venta raw = {sc.venta_raw}g',
+                    'codigo': 'H0',
+                    'detalle': sabor_info.get('explicacion', f'{nombre}: no se pudo corregir automaticamente.'),
                 })
 
             venta_total += vf
@@ -243,6 +254,116 @@ def validar_turno_completo(db: sqlite3.Connection, turno_id: int) -> Dict:
     resultado['n_warnings'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'warning')
 
     return resultado
+
+
+def _explicar_caso(nombre, sc, d, n, proto, c4_corr, web_corr, dup_peso, vf, status):
+    """
+    Genera explicacion en espanol claro para verificacion humana.
+    Sin jerga tecnica. Dice que se encontro, que datos mirar, y que se hizo.
+    """
+    ab_d = d.abierta if d else 0
+    ab_n = n.abierta if n else 0
+    cerr_d = [int(c) for c in d.cerradas] if d else []
+    cerr_n = [int(c) for c in n.cerradas] if n else []
+    ent_d = [int(e) for e in d.entrantes] if d else []
+
+    L = [f'{nombre}:']
+    L.append(f'Turno anterior: abierta {ab_d}g, cerradas {cerr_d or "ninguna"}, entrantes {ent_d or "ninguno"}')
+    L.append(f'Turno actual: abierta {ab_n}g, cerradas {cerr_n or "ninguna"}')
+    L.append(f'Venta sin corregir: {sc.venta_raw}g')
+
+    if web_corr and dup_peso:
+        L.append('')
+        L.append(f'PROBLEMA: En el turno anterior, el entrante ({dup_peso}g) tiene el mismo peso que una cerrada.')
+        L.append(f'Eso significa que la misma lata se anoto dos veces: una como cerrada y otra como entrante.')
+        L.append(f'CORRECCION: Se desconto {dup_peso}g del calculo porque es el peso duplicado.')
+        L.append(f'Venta corregida: {vf}g')
+        L.append('')
+        L.append(f'VERIFICAR: Fijarse si en el turno anterior habia realmente un entrante nuevo o si fue error de carga.')
+
+    elif proto:
+        codigo = proto.codigo
+        if codigo == 'PF1':
+            L.append('')
+            L.append(f'PROBLEMA: Una cerrada tiene un peso que no aparece en otros turnos.')
+            L.append(f'Parece un error al escribir el numero (error de digito).')
+            L.append(f'CORRECCION: Se ajusto el peso al valor que aparece en los demas turnos.')
+            L.append(f'Venta corregida: {vf}g (diferencia: {proto.delta:+d}g)')
+            L.append('')
+            L.append(f'VERIFICAR: Revisar la cerrada marcada y compararla con los turnos anteriores y siguientes.')
+
+        elif 'PFIT' in codigo:
+            L.append('')
+            L.append(f'PROBLEMA: En el turno anterior hay entrantes que pesan igual que cerradas del mismo turno.')
+            L.append(f'Es probable que la misma lata se haya anotado dos veces.')
+            L.append(f'CORRECCION: Se descontaron los entrantes duplicados del calculo.')
+            L.append(f'Venta corregida: {vf}g (diferencia: {proto.delta:+d}g)')
+            L.append('')
+            L.append(f'VERIFICAR: Fijarse si los entrantes eran latas nuevas reales o si se copiaron de las cerradas.')
+
+        elif codigo == 'PF4':
+            L.append('')
+            L.append(f'PROBLEMA: Una cerrada del turno anterior no aparece en el turno actual.')
+            L.append(f'Si no se abrio ni se vendio, puede ser que se olvido de anotarla.')
+            L.append(f'CORRECCION: Se agrego la cerrada faltante al calculo.')
+            L.append(f'Venta corregida: {vf}g (diferencia: {proto.delta:+d}g)')
+            L.append('')
+            L.append(f'VERIFICAR: Buscar la lata en la heladera. Si sigue ahi, la correccion es correcta.')
+
+        elif codigo == 'PF5':
+            L.append('')
+            L.append(f'PROBLEMA: Una cerrada aparece en el turno actual pero no estaba en el anterior.')
+            L.append(f'Puede ser que se olvido de anotarla antes.')
+            L.append(f'CORRECCION: Se ajusto el calculo considerando que la cerrada ya estaba.')
+            L.append(f'Venta corregida: {vf}g (diferencia: {proto.delta:+d}g)')
+
+        elif codigo == 'PF7':
+            L.append('')
+            L.append(f'PROBLEMA: La abierta cambio de una forma que no se explica con las cerradas.')
+            ab_diff = ab_n - ab_d
+            L.append(f'La abierta paso de {ab_d}g a {ab_n}g ({ab_diff:+d}g).')
+            if ab_diff > 0:
+                L.append(f'Subio sin que se haya abierto una cerrada nueva.')
+            else:
+                L.append(f'El valor parece incorrecto comparado con turnos cercanos.')
+            L.append(f'CORRECCION: Se uso un valor de referencia de otros turnos.')
+            L.append(f'Venta corregida: {vf}g (diferencia: {proto.delta:+d}g)')
+            L.append('')
+            L.append(f'VERIFICAR: Revisar si la abierta se peso bien o si se cambio de batea sin anotar.')
+
+        else:
+            L.append('')
+            L.append(f'Se detecto una anomalia y se corrigio automaticamente.')
+            L.append(f'Venta corregida: {vf}g (diferencia: {proto.delta:+d}g)')
+
+    elif c4_corr:
+        L.append('')
+        L.append(f'Se detecto una anomalia que requirio analisis avanzado.')
+        L.append(f'Venta corregida: {vf}g (diferencia: {c4_corr.delta:+d}g)')
+        L.append('')
+        L.append(f'VERIFICAR: Comparar los pesos de las cerradas con los turnos anteriores y siguientes.')
+
+    elif status == 'H0':
+        L.append('')
+        L.append(f'PROBLEMA: El sistema detecto algo inusual pero no pudo corregirlo automaticamente.')
+        if sc.venta_raw < -200:
+            L.append(f'La venta da negativa ({sc.venta_raw}g): aparecio mas stock del que habia.')
+            L.append(f'Posibles causas: entrante no registrado, error en abierta, o cerrada que falto anotar antes.')
+        elif sc.venta_raw > 8000:
+            L.append(f'La venta es muy alta ({sc.venta_raw}g). Posible entrante duplicado o cerrada que desaparecio sin abrirse.')
+        else:
+            cerr_desaparecidas = [c for c in cerr_d if not any(abs(c - cn) <= 200 for cn in cerr_n)]
+            cerr_nuevas = [c for c in cerr_n if not any(abs(c - cd) <= 200 for cd in cerr_d)]
+            if cerr_desaparecidas:
+                L.append(f'Cerradas que estaban antes y ahora no estan: {cerr_desaparecidas}')
+                L.append(f'Si se abrieron, deberia verse en la abierta. Si no, falta anotarlas.')
+            if cerr_nuevas:
+                L.append(f'Cerradas nuevas que aparecieron: {cerr_nuevas}')
+                L.append(f'Si son latas que llegaron, deberian estar como entrantes.')
+        L.append('')
+        L.append(f'VERIFICAR: Revisar los pesos de este sabor en los turnos cercanos y confirmar si hay un error de carga.')
+
+    return '\n'.join(L)
 
 
 def _validar_nivel3_turno(db, turno_id, turno, suc) -> List[Dict]:
