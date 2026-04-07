@@ -254,23 +254,23 @@ tr.row-neg { background: #fce4ec; }
         {% set has_relevant = [] %}
         {% for s in senales %}{% if s.tipo in ['R1', 'R2'] %}{% set _ = has_relevant.append(s) %}{% endif %}{% endfor %}
         {% if has_relevant %}
-        <div class="c5-row" style="padding:6px 0;">
+        <div class="c5-row" style="padding:6px 0;border-bottom:1px solid #e1bee7;">
             <strong>{{ nombre }}</strong>
+            {% if analisis.c5_explicaciones and nombre in analisis.c5_explicaciones %}
+            <pre style="font-family:inherit;font-size:0.78rem;color:#444;padding:4px 8px;margin:4px 0 0;white-space:pre-wrap;line-height:1.5;background:#faf4fc;border-radius:4px;">{{ analisis.c5_explicaciones[nombre] }}</pre>
+            {% else %}
             {% for s in has_relevant %}
             <div style="font-size:0.78rem;color:#555;padding-left:8px;margin-top:2px;">
                 {% if 'R1_FUERTE' in s.subtipo %}La venta de este sabor esta muy por fuera del rango habitual del mes. Revisar si los datos del turno estan bien cargados.
                 {% elif 'R1_MODERADO' in s.subtipo %}La venta es mas alta o baja de lo usual para este sabor. No necesariamente es un error, pero vale la pena verificar.
                 {% elif 'R1_LEVE' in s.subtipo %}Leve desvio respecto al promedio del mes. Probablemente normal, pero queda marcado.
-                {% elif 'R2_FUERTE' in s.subtipo %}Hay varias rarezas estructurales combinadas en este sabor (cerradas en zona ambigua, matching en borde, etc). Revisar los pesos.
-                {% elif 'R2a' in s.subtipo %}Hay cerradas con diferencia entre 30-75g entre turnos (zona ambigua de matching).
-                {% elif 'R2b' in s.subtipo %}La abierta no cambio entre turnos pero la venta final es alta. Raro.
-                {% elif 'R2c' in s.subtipo %}Hay un entrante sin historial previo en otros turnos.
-                {% elif 'R2d' in s.subtipo %}Hay una cerrada que solo aparece en este turno (sin historial).
+                {% elif 'R2_FUERTE' in s.subtipo %}Hay varias rarezas estructurales combinadas en este sabor. Revisar los pesos.
                 {% elif 'R2e' in s.subtipo %}Hay cerradas con diferencia de 25-35g (justo en el borde de la tolerancia del sistema).
                 {% else %}{{ s.detalle }}
                 {% endif %}
             </div>
             {% endfor %}
+            {% endif %}
         </div>
         {% endif %}
         {% endfor %}

@@ -183,6 +183,80 @@ def _evaluar_r3(ventas_finales: Dict[str, int],
 
 
 # ===================================================================
+# DIAGNOSTICO ACCIONABLE
+# ===================================================================
+
+def _diagnostico_accionable(nombre: str, venta_final: int,
+                             senales: List[SenalResidual],
+                             stats: Dict[str, 'EstadisticaSabor'],
+                             sc: SaborClasificado,
+                             datos: DatosDia,
+                             correcciones: List[Correccion]) -> str:
+    """Genera explicación en español con diagnóstico y acción sugerida."""
+    if not senales:
+        return ''
+
+    tipos = {s.tipo for s in senales}
+    L = []
+
+    est = stats.get(nombre)
+    d = datos.turno_dia.sabores.get(nombre)
+    n = datos.turno_noche.sabores.get(nombre)
+
+    # R1: desvío histórico
+    r1 = next((s for s in senales if s.tipo == 'R1'), None)
+    if r1 and est and est.std > 0:
+        z = (venta_final - est.media) / est.std
+        direccion = 'alta' if z > 0 else 'baja'
+
+        L.append(f'{nombre}: la venta de este turno ({venta_final}g) es {direccion} comparada con el promedio del mes ({est.media:.0f}g).')
+
+        if abs(z) > 2.0:
+            # Desvío fuerte — diagnosticar causa probable
+            if z > 2.0 and venta_final > 5000:
+                L.append(f'POSIBLE CAUSA: Una cerrada pudo no haberse registrado en el turno actual, inflando la venta.')
+                L.append(f'ACCION: Verificar con el empleado si todas las latas cerradas del sabor estan anotadas.')
+            elif z > 2.0:
+                L.append(f'POSIBLE CAUSA: Venta inusualmente alta. Puede ser un dia de mucha demanda o un error de pesaje en la abierta.')
+                L.append(f'ACCION: Comparar la abierta con los turnos anteriores y siguientes.')
+            elif z < -2.0 and venta_final < 0:
+                L.append(f'POSIBLE CAUSA: La venta negativa indica que aparecio mas stock del que habia. Probablemente falto registrar un entrante.')
+                L.append(f'ACCION: Preguntar al empleado si llego stock nuevo que no se anoto.')
+            elif z < -2.0:
+                L.append(f'POSIBLE CAUSA: Venta muy baja. Puede haber una cerrada anotada de mas o un error en la abierta.')
+                L.append(f'ACCION: Revisar si los pesos de las cerradas coinciden con los turnos cercanos.')
+        elif abs(z) > 1.5:
+            L.append(f'Desvio leve respecto al promedio. Probablemente normal, pero queda marcado por si se repite.')
+
+    # R2: rareza estructural
+    r2 = next((s for s in senales if s.tipo == 'R2'), None)
+    if r2:
+        sub = r2.detalle
+        if 'R2a' in sub and 'R2e' in sub:
+            L.append(f'OBSERVACION: Hay cerradas con diferencias de peso en zona ambigua (30-75g) y justo en el borde de tolerancia (25-35g).')
+            L.append(f'ACCION: Verificar que no se hayan intercambiado latas entre sabores o que no haya error de pesaje.')
+        elif 'R2a' in sub:
+            L.append(f'OBSERVACION: Hay cerradas con diferencia de 30-75g entre turnos. El sistema las considero como la misma lata, pero podrian ser latas distintas.')
+            L.append(f'ACCION: Comparar los pesos de cerradas con los turnos anteriores para confirmar identidad.')
+        elif 'R2b' in sub:
+            L.append(f'OBSERVACION: La abierta no cambio entre turnos pero la venta final es alta. Eso es raro.')
+            L.append(f'ACCION: Verificar si la abierta se peso correctamente en ambos turnos.')
+        elif 'R2d' in sub:
+            L.append(f'OBSERVACION: Hay una cerrada que solo aparece en este turno y no tiene historial en turnos cercanos.')
+            L.append(f'ACCION: Verificar si es una lata nueva que deberia figurar como entrante.')
+        elif 'R2e' in sub:
+            L.append(f'OBSERVACION: Hay cerradas con diferencia justo en el borde de tolerancia (25-35g). El matching podria ser incorrecto.')
+            L.append(f'ACCION: Revisar si esas cerradas son la misma lata o latas distintas.')
+
+    # Corrección existente + señal = contexto adicional
+    corr = next((c for c in correcciones if c.nombre_norm == nombre), None)
+    if corr and r1:
+        L.append(f'NOTA: Este sabor ya tiene una correccion aplicada (delta={corr.delta:+d}g). La senal C5 evalua el resultado DESPUES de la correccion.')
+
+    return '\n'.join(L)
+
+
+# ===================================================================
 # MOTOR PRINCIPAL CAPA 5
 # ===================================================================
 
@@ -191,6 +265,7 @@ class ResultadoC5Sabor:
     nombre_norm: str
     status: StatusC5
     senales: List[SenalResidual] = field(default_factory=list)
+    explicacion: str = ''  # Diagnóstico accionable para el supervisor
 
 
 @dataclass
@@ -267,10 +342,15 @@ def segunda_pasada(
         else:
             status = StatusC5.LIMPIO_CONFIRMADO
 
+        # Generar explicación accionable
+        explicacion = _diagnostico_accionable(
+            nombre, vf, senales, stats, sc, datos, correcciones)
+
         resultado.sabores[nombre] = ResultadoC5Sabor(
             nombre_norm=nombre,
             status=status,
             senales=senales,
+            explicacion=explicacion,
         )
 
     # Maximo 5 reaperturas, priorizar por peso total de senales

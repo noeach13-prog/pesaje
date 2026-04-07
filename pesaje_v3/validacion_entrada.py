@@ -496,6 +496,7 @@ def _agregar_c5_profundo(db, turno, resultado):
                             media_dia=media_dia, std_dia=std_dia)
 
         c5_senales = {}
+        c5_explicaciones = {}
         if hasattr(c5, 'sabores'):
             for nn, c5_sab in c5.sabores.items():
                 if c5_sab.senales:
@@ -503,6 +504,8 @@ def _agregar_c5_profundo(db, turno, resultado):
                         {'tipo': s.tipo, 'subtipo': s.subtipo, 'detalle': s.detalle}
                         for s in c5_sab.senales
                     ]
+                if c5_sab.explicacion:
+                    c5_explicaciones[nn] = c5_sab.explicacion
 
         # Señales a nivel día (R3)
         c5_dia = []
@@ -514,6 +517,7 @@ def _agregar_c5_profundo(db, turno, resultado):
 
         resultado['profundo'] = True
         resultado['c5_senales'] = c5_senales
+        resultado['c5_explicaciones'] = c5_explicaciones
         resultado['c5_senales_dia'] = c5_dia
         for sab in resultado.get('sabores', []):
             if sab['nombre'] in c5_senales:
