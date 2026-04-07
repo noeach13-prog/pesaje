@@ -695,7 +695,8 @@ def _paso3_hipotesis(sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3,
 # PASO 4: Evaluar cada hipótesis contra TODOS los planos
 # ═══════════════════════════════════════════════════════════════
 
-def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3):
+def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: PlanoP3,
+                    forward_cerradas: Optional[List[int]] = None):
     for h in hips:
         h.planos_favor = []
         h.planos_neutros = []
@@ -806,6 +807,14 @@ def _paso4_evaluar(hips: List[Hipotesis], sc, p1: PlanoP1, p2: PlanoP2, p3: Plan
             h.planos_neutros.append('P2')
 
         elif h.tipo == 'APERTURA_REAL':
+            # Guardia forward: si la cerrada reaparece en el turno siguiente,
+            # no pudo haber sido abierta — fue omitida.
+            if forward_cerradas:
+                reappears = any(abs(h.peso - fc) <= 50 for fc in forward_cerradas)
+                if reappears:
+                    h.planos_contra.append('P2_FORWARD_REAPPEARS')
+                    continue  # No evaluar más planos, ya vetado
+
             if h.sightings >= 2:
                 h.planos_favor.append('P2')
             else:
@@ -1148,7 +1157,17 @@ def _resolver_sabor(nombre: str, clasificado: SaborClasificado,
         return None
 
     # PASO 4
-    _paso4_evaluar(hips, sc, p1, p2, p3)
+    # Extraer cerradas del turno forward para guardia de APERTURA_REAL
+    forward_cerradas = None
+    forward_turnos = [t for t in datos.contexto
+                      if t.indice > datos.turno_noche.indice]
+    if forward_turnos:
+        ft = min(forward_turnos, key=lambda t: t.indice)
+        ft_sab = ft.sabores.get(nombre)
+        if ft_sab:
+            forward_cerradas = [int(c) for c in ft_sab.cerradas]
+
+    _paso4_evaluar(hips, sc, p1, p2, p3, forward_cerradas=forward_cerradas)
 
     # PASO 5: Seleccionar mejor hipótesis individual
     mejor = _paso5_seleccionar(hips, sc, p2)
@@ -1477,7 +1496,17 @@ def _estimar_h0(nombre: str, clasificado: SaborClasificado,
     p2 = _paso2_plano2(nombre, datos, timeline, lifecycle=lifecycle)
     p3 = _paso2_plano3(nombre, datos, timeline)
     hips = _paso3_hipotesis(sc, p1, p2, p3, timeline=timeline)
-    _paso4_evaluar(hips, sc, p1, p2, p3)
+
+    forward_cerradas = None
+    forward_turnos = [t for t in datos.contexto
+                      if t.indice > datos.turno_noche.indice]
+    if forward_turnos:
+        ft = min(forward_turnos, key=lambda t: t.indice)
+        ft_sab = ft.sabores.get(nombre)
+        if ft_sab:
+            forward_cerradas = [int(c) for c in ft_sab.cerradas]
+
+    _paso4_evaluar(hips, sc, p1, p2, p3, forward_cerradas=forward_cerradas)
 
     # Buscar mejor viable (sin contra)
     viables = [h for h in hips if h.n_contra == 0]
@@ -1496,13 +1525,37 @@ def _estimar_h0(nombre: str, clasificado: SaborClasificado,
         venta_est = sc.venta_raw + best.delta_stock + best.delta_latas * 280
         razon = f'{best.n_contra} plano(s) en contra: {best.planos_contra}'
 
+    # Ajuste adicional: si una cerrada del forward falta en NOCHE pero
+    # existía antes (omisión no detectada por P2 porque no "aparece"),
+    # estimar su impacto sumándola al stock NOCHE (reduce la venta).
+    delta_forward_omision = 0
+    if forward_cerradas:
+        n_sab = datos.turno_noche.sabores.get(nombre)
+        cerr_b = [int(c) for c in n_sab.cerradas] if n_sab else []
+        d_sab = datos.turno_dia.sabores.get(nombre)
+        cerr_a = [int(c) for c in d_sab.cerradas] if d_sab else []
+
+        for fc in forward_cerradas:
+            # Cerrada en forward que no está en NOCHE ni en DIA
+            in_b = any(abs(fc - cb) <= 50 for cb in cerr_b)
+            in_a = any(abs(fc - ca) <= 50 for ca in cerr_a)
+            if not in_b and not in_a:
+                # Cerrada que solo aparece en forward: omitida en este período
+                delta_forward_omision -= fc
+
+    if delta_forward_omision != 0:
+        venta_est += delta_forward_omision
+        motivo = f'[{best.tipo}] {best.accion[:40]} + [OMISION_ESTIMADA_FORWARD] {abs(delta_forward_omision)}g'
+    else:
+        motivo = f'[{best.tipo}] {best.accion[:60]}'
+
     return EstimacionH0(
         nombre_norm=nombre,
         venta_raw=sc.venta_raw,
         venta_estimada=venta_est,
         delta=venta_est - sc.venta_raw,
         hipotesis_tipo=best.tipo,
-        motivo=f'[{best.tipo}] {best.accion[:60]}',
+        motivo=motivo,
         n_planos_favor=best.n_favor,
         razon_no_confirmada=razon,
     )
@@ -1537,4 +1590,85 @@ def resolver_escalados(datos: DatosDia, contabilidad: ContabilidadDia,
     # pueda rescatar H0 no confirmados individualmente y actualizar sin_resolver.
     _analisis_conjunto(resultado.correcciones, resultado.estimaciones_h0, resultado)
 
+    # 4. Ajuste forward: si una cerrada del turno siguiente no existe
+    #    ni en DIA ni en NOCHE, es omisión bilateral. Ajustar la venta corregida.
+    _ajustar_forward_omision(resultado, datos, contabilidad)
+
     return resultado
+
+
+def _ajustar_forward_omision(resultado: 'ResultadoC4', datos: DatosDia,
+                              contabilidad: 'ContabilidadDia'):
+    """Detecta cerradas que estaban en DIA, faltan en NOCHE, y reaparecen en forward.
+
+    Condición estricta: la cerrada debe
+    1. Estar en DIA (matchear una cerrada de turno_dia)
+    2. NO estar en NOCHE (ni en cerradas ni en entrantes)
+    3. Reaparecer en el turno forward inmediato (prueba que no fue abierta)
+
+    Esto indica omisión en NOCHE: la lata seguía ahí pero no se registró.
+    """
+    forward_turnos = [t for t in datos.contexto
+                      if t.indice > datos.turno_noche.indice]
+    if not forward_turnos:
+        return
+
+    ft = min(forward_turnos, key=lambda t: t.indice)
+
+    for nombre in list(contabilidad.sabores.keys()):
+        sc = contabilidad.sabores[nombre]
+        if sc.solo_dia or sc.solo_noche:
+            continue
+        # Solo aplicar a sabores con corrección o H0 (ya escalados)
+        corr = next((c for c in resultado.correcciones if c.nombre_norm == nombre), None)
+        est = next((e for e in resultado.estimaciones_h0 if e.nombre_norm == nombre), None)
+        if not corr and not est:
+            continue
+
+        ft_sab = ft.sabores.get(nombre)
+        if not ft_sab or not ft_sab.cerradas:
+            continue
+
+        d_sab = datos.turno_dia.sabores.get(nombre)
+        n_sab = datos.turno_noche.sabores.get(nombre)
+        cerr_a = [int(c) for c in d_sab.cerradas] if d_sab else []
+        cerr_b = [int(c) for c in n_sab.cerradas] if n_sab else []
+        ent_b = [int(e) for e in n_sab.entrantes] if n_sab else []
+        ent_a = [int(e) for e in d_sab.entrantes] if d_sab else []
+
+        delta_omision = 0
+        pesos_omitidos = []
+
+        for fc in ft_sab.cerradas:
+            fc_int = int(fc)
+            # Condición 1: matchea una cerrada de DIA (estaba en el stock)
+            in_a = any(abs(fc_int - ca) <= 50 for ca in cerr_a)
+            if not in_a:
+                continue  # No estaba en DIA, no es omisión de NOCHE
+
+            # Condición 2: NO está en NOCHE (ni cerradas ni entrantes)
+            # Cerradas: tolerancia 200g (MISMATCH_LEVE acepta hasta 200g)
+            # Entrantes: tolerancia 50g (solo si es la misma lata física)
+            in_b = any(abs(fc_int - cb) <= 200 for cb in cerr_b)
+            in_ent_b = any(abs(fc_int - eb) <= 50 for eb in ent_b)
+            in_ent_a = any(abs(fc_int - ea) <= 50 for ea in ent_a)
+            if in_b or in_ent_b or in_ent_a:
+                continue  # Ya contabilizada
+
+            # Condición 3: reaparece en forward (ya confirmada por estar en ft_sab)
+            # La cerrada estaba en DIA, falta en NOCHE, reaparece en forward → omisión NOCHE
+            delta_omision -= fc_int
+            pesos_omitidos.append(fc_int)
+
+        if not pesos_omitidos:
+            continue
+
+        if corr:
+            corr.delta += delta_omision
+            corr.venta_corregida += delta_omision
+            corr.motivo += f' + [OMISION_NOCHE_FORWARD] cerr {pesos_omitidos} en DIA, falta NOCHE, reaparece forward'
+
+        if est:
+            est.venta_estimada += delta_omision
+            est.delta += delta_omision
+            est.motivo += f' + [OMISION_NOCHE_FORWARD] cerr {pesos_omitidos}'
