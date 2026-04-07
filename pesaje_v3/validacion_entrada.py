@@ -827,44 +827,180 @@ def _explicar_caso(nombre, sc, d, n, proto, c4_corr, web_corr, dup_peso, vf, sta
             L.append(f'  Venta corregida: {vf}g')
 
     elif c4_corr:
-        L.append('')
-        L.append('QUE PASO:')
-        # Traducir motivo técnico a lenguaje claro
         m = c4_corr.motivo or ''
-        if 'PHANTOM_DIA' in m:
-            L.append(f'  Una cerrada del turno anterior no deberia estar (es "fantasma"). Se elimino del calculo.')
-        elif 'PHANTOM_NOCHE' in m:
-            L.append(f'  Una cerrada del turno actual no deberia estar (es "fantasma"). Se elimino del calculo.')
-        elif 'OMISION_DIA' in m:
-            L.append(f'  Faltaba una cerrada en el turno anterior. Se agrego al calculo porque aparece en turnos cercanos.')
-        elif 'OMISION_NOCHE' in m:
-            L.append(f'  Faltaba una cerrada en el turno actual. Se agrego al calculo.')
-        elif 'MISMATCH_LEVE' in m:
-            L.append(f'  Una cerrada cambio levemente de peso entre turnos (varianza de pesaje). Se ajusto.')
-        elif 'GENEALOGIA' in m:
-            L.append(f'  Un entrante se convirtio en cerrada (o viceversa). Se ajusto el calculo.')
-        elif 'ENTRANTE_MISMO_CAN' in m:
-            L.append(f'  Un entrante resulto ser la misma lata que una cerrada (doble registro). Se desconto.')
-        elif 'APERTURA_REAL' in m:
-            L.append(f'  Se confirmo que una cerrada fue abierta durante el turno.')
-        elif 'CONTINUIDAD' in m:
-            L.append(f'  Una cerrada cambio de peso entre turnos pero es la misma lata fisica (varianza de pesaje).')
-        elif 'COMPOSICION' in m:
-            L.append(f'  Se detectaron multiples problemas combinados que se resolvieron en conjunto.')
-        else:
-            L.append(f'  Se detecto una anomalia que requirio analisis cruzado con turnos cercanos.')
+
+        # --- Extraer pesos involucrados del motivo para referencia ---
+        import re
+        pesos_mencionados = [int(x) for x in re.findall(r'\b(\d{4,5})\b', m)]
+
         L.append('')
-        L.append('QUE SE HIZO:')
-        L.append(f'  Se analizo el historial de este sabor en turnos cercanos para encontrar la causa.')
-        L.append(f'  Diferencia aplicada: {c4_corr.delta:+d}g')
-        L.append(f'  Venta corregida: {vf}g')
+        L.append('ANALISIS:')
+
+        if 'PHANTOM_DIA' in m:
+            peso = pesos_mencionados[0] if pesos_mencionados else '?'
+            L.append(f'  La cerrada de {peso}g del turno anterior no aparece en turnos cercanos.')
+            L.append(f'  Revisando el historial, esa lata solo aparece en este turno y en ningun otro.')
+            L.append(f'  Eso indica que fue un error de carga: la lata no existia realmente.')
+            L.append(f'  Al quitarla del calculo, la venta baja {abs(c4_corr.delta)}g.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Se elimino la cerrada fantasma de {peso}g del turno anterior.')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'PHANTOM_NOCHE' in m:
+            peso = pesos_mencionados[0] if pesos_mencionados else '?'
+            L.append(f'  La cerrada de {peso}g del turno actual no aparece en el turno anterior ni en turnos cercanos.')
+            L.append(f'  No hay entrante que la explique y no estaba antes. Es una lata "fantasma".')
+            L.append(f'  Al quitarla del turno actual, la venta sube {abs(c4_corr.delta)}g.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Se elimino la cerrada fantasma de {peso}g del turno actual.')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'OMISION_DIA' in m:
+            peso = pesos_mencionados[0] if pesos_mencionados else '?'
+            L.append(f'  La cerrada de {peso}g no aparece en el turno anterior, pero SI aparece en turnos cercanos.')
+            L.append(f'  Eso indica que la lata estaba en la heladera pero el empleado olvido anotarla.')
+            L.append(f'  Al agregarla al turno anterior, el stock inicial sube y la venta baja {abs(c4_corr.delta)}g.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Se agrego la cerrada de {peso}g al turno anterior (estaba pero no se registro).')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'OMISION_NOCHE' in m or 'OMISION_BILATERAL' in m:
+            peso = pesos_mencionados[0] if pesos_mencionados else '?'
+            L.append(f'  La cerrada de {peso}g estaba en el turno anterior pero no aparece en el turno actual.')
+            L.append(f'  Sin embargo, reaparece en el turno siguiente, asi que no se abrio ni se perdio.')
+            L.append(f'  El empleado olvido registrarla en este turno.')
+            L.append(f'  Al agregarla al turno actual, la venta baja {abs(c4_corr.delta)}g.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Se agrego la cerrada de {peso}g al turno actual (omitida pero presente fisicamente).')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'MISMATCH_LEVE' in m:
+            if len(pesos_mencionados) >= 2:
+                p1, p2 = pesos_mencionados[0], pesos_mencionados[1]
+                diff = abs(p1 - p2)
+                L.append(f'  La cerrada paso de {p1}g a {p2}g entre turnos (diferencia de {diff}g).')
+                L.append(f'  Esa diferencia es menor a 200g, que es la varianza normal de pesaje.')
+                L.append(f'  Son la misma lata fisica pesada en momentos distintos.')
+            else:
+                L.append(f'  Una cerrada cambio levemente de peso entre turnos (varianza de pesaje).')
+            L.append(f'  Se ajusto el calculo para usar el peso correcto.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Ajuste por varianza de pesaje: {c4_corr.delta:+d}g')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'GENEALOGIA' in m:
+            if len(pesos_mencionados) >= 2:
+                p1, p2 = pesos_mencionados[0], pesos_mencionados[1]
+                L.append(f'  La cerrada de {p1}g se relaciona con el entrante de {p2}g.')
+                L.append(f'  El entrante que llego en un turno anterior se convirtio en cerrada.')
+                L.append(f'  Eso genera una diferencia en el calculo porque el peso cambio ligeramente.')
+            else:
+                L.append(f'  Un entrante que llego en un turno previo se convirtio en cerrada en este turno.')
+            L.append(f'  Se ajusto el calculo para reconocer que es la misma lata.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Entrante reclasificado como cerrada: {c4_corr.delta:+d}g')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'ENTRANTE_MISMO_CAN' in m or 'ENTRANTE_DUP' in m:
+            if len(pesos_mencionados) >= 2:
+                p1, p2 = pesos_mencionados[0], pesos_mencionados[1]
+                L.append(f'  El entrante de {p1}g y la cerrada de {p2}g son la misma lata.')
+                L.append(f'  El empleado anoto la misma lata dos veces: como entrante y como cerrada.')
+                L.append(f'  Eso infla el stock y hace que la venta parezca mas alta de lo real.')
+            else:
+                L.append(f'  Un entrante resulto ser la misma lata que una cerrada (doble registro).')
+            L.append(f'  Se desconto el peso duplicado del calculo.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Entrante duplicado descontado: {c4_corr.delta:+d}g')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'APERTURA_REAL' in m:
+            peso = pesos_mencionados[0] if pesos_mencionados else '?'
+            L.append(f'  La cerrada de {peso}g fue abierta durante el turno.')
+            L.append(f'  La abierta paso de {ab_d}g a {ab_n}g, lo cual es consistente con abrir una lata.')
+            L.append(f'  La cerrada desaparecio porque su contenido se paso a la batea abierta.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Apertura confirmada. La venta incluye lo que se vendio de esa lata.')
+            L.append(f'  Venta: {vf}g')
+
+        elif 'CONTINUIDAD' in m:
+            if len(pesos_mencionados) >= 2:
+                p1, p2 = pesos_mencionados[0], pesos_mencionados[1]
+                diff = abs(p1 - p2)
+                L.append(f'  La cerrada de {p1}g del turno anterior aparece como {p2}g en el turno actual.')
+                L.append(f'  La diferencia de {diff}g esta dentro de la varianza normal de pesaje.')
+                L.append(f'  Es la misma lata fisica, solo cambio el peso por como se puso en la balanza.')
+            else:
+                L.append(f'  Una cerrada cambio de peso entre turnos pero es la misma lata fisica.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Ajuste por continuidad fisica: {c4_corr.delta:+d}g')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        elif 'COMPOSICION' in m:
+            # Contar cuantas correcciones compuestas
+            n_parts = m.count('+')
+            L.append(f'  Se detectaron {n_parts + 1} problemas combinados en este sabor.')
+            L.append(f'  Cada uno por separado no explica el caso, pero juntos si.')
+            # Desglosar las partes del motivo
+            parts = [p.strip() for p in m.split('+') if p.strip()]
+            for i, part in enumerate(parts, 1):
+                if 'PHANTOM' in part:
+                    L.append(f'  {i}. Una cerrada fantasma fue eliminada.')
+                elif 'OMISION' in part:
+                    L.append(f'  {i}. Una cerrada omitida fue recuperada.')
+                elif 'MISMATCH' in part:
+                    L.append(f'  {i}. Se ajusto una varianza de pesaje.')
+                elif 'GENEALOGIA' in part:
+                    L.append(f'  {i}. Un entrante fue reclasificado como cerrada.')
+                elif 'CONTINUIDAD' in part:
+                    L.append(f'  {i}. Se reconocio continuidad fisica de una lata.')
+                elif 'BILATERAL' in part:
+                    L.append(f'  {i}. Una cerrada omitida fue detectada por el turno siguiente.')
+                else:
+                    L.append(f'  {i}. Ajuste adicional.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Correccion combinada: {c4_corr.delta:+d}g')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        else:
+            L.append(f'  Se detecto una anomalia en los datos de este sabor.')
+            L.append(f'  El sistema analizo los turnos cercanos y encontro una explicacion.')
+            L.append('')
+            L.append('CONCLUSION:')
+            L.append(f'  Correccion aplicada: {c4_corr.delta:+d}g')
+            L.append(f'  Venta corregida: {vf}g (antes {sc.venta_raw}g)')
+
+        # Confianza
         if c4_corr.confianza:
             nivel = 'alta' if c4_corr.confianza >= 0.85 else ('media' if c4_corr.confianza >= 0.70 else 'baja')
-            L.append(f'  Confianza de la correccion: {nivel} ({int(c4_corr.confianza*100)}%)')
+            L.append(f'  Confianza: {nivel} ({int(c4_corr.confianza*100)}%)')
+
+        # Que verificar
         L.append('')
         L.append('QUE VERIFICAR:')
-        L.append(f'  Comparar las cerradas de este sabor con los 2-3 turnos anteriores y siguientes.')
-        L.append(f'  Si un peso aparece en muchos turnos y solo falta en este, la correccion es correcta.')
+        if 'PHANTOM' in m:
+            L.append(f'  Revisar si la cerrada marcada como fantasma realmente existia o fue un error de tipeo.')
+        elif 'OMISION' in m:
+            L.append(f'  Buscar la lata en la heladera. Si sigue ahi, la correccion es correcta.')
+        elif 'MISMATCH' in m or 'CONTINUIDAD' in m:
+            L.append(f'  Comparar el peso de la cerrada con los turnos anteriores y siguientes.')
+            L.append(f'  Si el peso se mantiene estable salvo este turno, fue error de pesaje.')
+        elif 'GENEALOGIA' in m or 'ENTRANTE' in m:
+            L.append(f'  Verificar con el empleado si el entrante era una lata nueva real o si la copio de las cerradas.')
+        elif 'APERTURA' in m:
+            L.append(f'  Verificar que la batea abierta se haya pesado correctamente.')
+        else:
+            L.append(f'  Comparar los pesos con los turnos anteriores y siguientes en el historial de abajo.')
 
     elif status == 'H0':
         L.append('')
