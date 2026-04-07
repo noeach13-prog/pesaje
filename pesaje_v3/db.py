@@ -62,6 +62,8 @@ def init_db():
         ('San Martín', 'DIA_NOCHE', '1234', '2512'),
         ('Triunvirato', 'TURNO_UNICO', '5678', '2512'),
         ('Unión', 'TURNO_UNICO', '9012', '2512'),
+        ('San Miguel', 'DIA_NOCHE', '3456', '2512'),
+        ('Florida', 'DIA_NOCHE', '7890', '2512'),
     ]:
         conn.execute(
             "INSERT OR IGNORE INTO sucursales (nombre, modo, pin, pin_supervisor) VALUES (?, ?, ?, ?)",
