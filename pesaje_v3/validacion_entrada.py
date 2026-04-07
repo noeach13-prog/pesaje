@@ -171,9 +171,8 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                 status = 'OK'
 
             # Venta negativa es fisicamente imposible.
-            # Diagnosticar: si la abierta subio mucho sin cerrada registrada,
-            # se abrio una lata no anotada. Estimar venta como lo que habia
-            # de abierta (que se vendio) + ajuste de lata abierta.
+            # Si la abierta subio mucho (>4000g), se abrio una lata (registrada o no).
+            # La venta real es lo que habia de abierta antes de la apertura.
             if vf < 0:
                 d_sab = datos_dia.turno_dia.sabores.get(nombre)
                 n_sab = datos_dia.turno_noche.sabores.get(nombre)
@@ -181,9 +180,8 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                 ab_n = (n_sab.abierta or 0) if n_sab else 0
                 rise = ab_n - ab_d
 
-                if rise > 4000 and sc.n_cerr_a == 0:
-                    # La abierta subio porque se abrio una lata no registrada.
-                    # Venta real ~ ab_d (lo que habia de abierta se vendio).
+                if rise > 4000:
+                    # Abierta subio: se abrio una lata. Venta ~ ab_d.
                     vf = max(0, ab_d)
                 else:
                     vf = 0
@@ -377,7 +375,7 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                     ab_d = (d_sab.abierta or 0) if d_sab else 0
                     ab_n = (n_sab.abierta or 0) if n_sab else 0
                     rise = ab_n - ab_d
-                    if rise > 4000 and sc.n_cerr_a == 0:
+                    if rise > 4000:
                         vf = max(0, ab_d)
                     else:
                         vf = 0
