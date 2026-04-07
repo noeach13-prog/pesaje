@@ -196,7 +196,13 @@ def _armar_turno_unico(db, sucursal_id, fecha, modo, n_ctx):
 
 def _cargar_contexto(db, sucursal_id, fecha, modo, n_ctx, excluir_ids):
     """Carga turnos adyacentes como contexto para el pipeline.
-    Ordena por cercanía a la fecha target. Los más cercanos primero."""
+
+    CRITICO: los indices deben reflejar el orden cronologico real.
+    Turnos ANTES de la fecha target tienen indices < 0 (antes de turno_dia=0).
+    Turnos DESPUES tienen indices > 1 (despues de turno_noche=1).
+    El pipeline usa indice para distinguir backward (< turno_dia.indice)
+    de forward (> turno_noche.indice).
+    """
     from datetime import date as date_cls
 
     target = date_cls.fromisoformat(fecha)
@@ -210,12 +216,26 @@ def _cargar_contexto(db, sucursal_id, fecha, modo, n_ctx, excluir_ids):
         (sucursal_id,),
     ).fetchall()
 
-    # Ordenar por cercanía a la fecha target
-    rows_sorted = sorted(rows, key=lambda r: abs((date_cls.fromisoformat(r['fecha']) - target).days))
+    # Separar en antes y despues de la fecha target
+    antes = [r for r in rows if r['fecha'] < fecha]
+    despues = [r for r in rows if r['fecha'] > fecha]
+
+    # Los mas cercanos a la fecha, limitados a n_ctx por lado
+    antes_cercanos = antes[-n_ctx:] if antes else []  # ultimos N antes
+    despues_cercanos = despues[:n_ctx] if despues else []  # primeros N despues
 
     contexto = []
-    for idx, row in enumerate(rows_sorted[:n_ctx * 2]):
-        tc = _turno_db_to_crudo(db, row['id'], modo, indice=idx + 2)  # indice > 1 para contexto
+
+    # Antes: indices negativos descendentes (-1, -2, -3...)
+    # El mas cercano tiene indice -1 (justo antes de turno_dia=0)
+    for i, row in enumerate(reversed(antes_cercanos)):
+        tc = _turno_db_to_crudo(db, row['id'], modo, indice=-(i + 1))
+        if tc and tc.sabores:
+            contexto.append(tc)
+
+    # Despues: indices desde 2 en adelante (justo despues de turno_noche=1)
+    for i, row in enumerate(despues_cercanos):
+        tc = _turno_db_to_crudo(db, row['id'], modo, indice=i + 2)
         if tc and tc.sabores:
             contexto.append(tc)
 
