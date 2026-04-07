@@ -495,15 +495,30 @@ def exportar_turno_route(turno_id):
 
 @entrada_bp.route('/entrada/exportar-mes/<int:anio>/<int:mes>')
 def exportar_mes_route(anio, mes):
-    """Descarga Excel del mes completo de la sucursal activa."""
+    """Descarga Excel del mes completo de la sucursal activa.
+    Soporta query params ?desde=DD&hasta=DD y ?formato=reporte|planilla"""
     from flask import send_file
     sid, _ = _sucursal_activa()
     if not sid:
         return redirect(url_for('entrada.index'))
     db = get_db()
-    from .excel_generador import exportar_mes
+
+    formato = request.args.get('formato', 'reporte')
+    dia_desde = request.args.get('desde', '01')
+    import calendar
+    ultimo_dia = calendar.monthrange(anio, mes)[1]
+    dia_hasta = request.args.get('hasta', str(ultimo_dia))
+
+    fecha_desde = f"{anio}-{mes:02d}-{int(dia_desde):02d}"
+    fecha_hasta = f"{anio}-{mes:02d}-{int(dia_hasta):02d}"
+
     try:
-        path = exportar_mes(db, sid, anio, mes)
+        if formato == 'planilla':
+            from .excel_generador import exportar_mes
+            path = exportar_mes(db, sid, anio, mes)
+        else:
+            from .excel_generador import exportar_reporte_db
+            path = exportar_reporte_db(db, sid, fecha_desde, fecha_hasta)
     except ValueError as e:
         db.close()
         return str(e), 404

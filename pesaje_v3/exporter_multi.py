@@ -175,7 +175,7 @@ def _nota_legible(sc: SaborClasificado, corr: Optional[Correccion]) -> str:
 # HOJA 1: GUÍA DE LECTURA
 # ===================================================================
 
-def _write_guia(ws):
+def _write_guia(ws, subtitulo: str = ''):
     ws.column_dimensions['A'].width = 5
     ws.column_dimensions['B'].width = 26
     ws.column_dimensions['C'].width = 58
@@ -185,16 +185,17 @@ def _write_guia(ws):
 
     # Título
     ws.merge_cells(f'B{row}:C{row}')
-    _cell(ws, row, 2, 'REPORTE DE VENTAS — GUÍA DE LECTURA',
+    _cell(ws, row, 2, 'REPORTE DE VENTAS — GUIA DE LECTURA',
           font=_font(bold=True, color=C_WHITE, size=14),
           fill=_fill(C_HEADER_DARK),
           align=_align(h='left', indent=1))
     ws.row_dimensions[row].height = 28
     row += 1
 
+    if not subtitulo:
+        subtitulo = 'Analisis automatico de stock de helados'
     ws.merge_cells(f'B{row}:C{row}')
-    _cell(ws, row, 2,
-          'Análisis automático de stock de helados — San Martín Febrero 2026',
+    _cell(ws, row, 2, subtitulo,
           font=_font(italic=True, color='555555', size=10),
           fill=_fill('EEF4FF'),
           align=_align(h='left', indent=1))
@@ -618,25 +619,26 @@ def _write_detalle_tecnico(ws, resultados):
 # FUNCIÓN PRINCIPAL
 # ===================================================================
 
-def exportar_multi(resultados, path_output: str):
+def exportar_multi(resultados, path_output: str, subtitulo: str = ''):
     """
     Genera el Excel unificado.
 
     Args:
         resultados: lista de (datos, contabilidad, clasificacion, c4, resultado)
         path_output: ruta de salida
+        subtitulo: texto para la guía (ej: 'San Martin — Febrero 2026')
     """
     wb = openpyxl.Workbook()
 
     # Mapeo dia_label → nombre de hoja Excel
     sheet_names = {}
     for datos, cont, c3, c4, resultado in resultados:
-        sheet_names[resultado.dia_label] = f'Día {resultado.dia_label}'
+        sheet_names[resultado.dia_label] = f'Dia {resultado.dia_label}'
 
     # ── Hoja 1: Guía ─────────────────────────────────────────────
     ws_guia = wb.active
-    ws_guia.title = 'Guía'
-    _write_guia(ws_guia)
+    ws_guia.title = 'Guia'
+    _write_guia(ws_guia, subtitulo=subtitulo)
 
     # ── Hoja 2: Resumen ───────────────────────────────────────────
     ws_resumen = wb.create_sheet('Resumen')

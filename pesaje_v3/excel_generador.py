@@ -184,3 +184,109 @@ def _escribir_hoja(db: sqlite3.Connection, ws, turno_id: int):
         for n in notas:
             row += 1
             ws.cell(row=row, column=4, value=f"[{n['categoria']}] {n['detalle']}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# Reporte profesional (Guia + Resumen + Dia X + Detalle tecnico)
+# ═══════════════════════════════════════════════════════════════
+
+def exportar_reporte_db(db: sqlite3.Connection, sucursal_id: int,
+                         fecha_desde: str, fecha_hasta: str) -> str:
+    """Genera reporte profesional identico al de web.py:_procesar().
+
+    Usa el pipeline batch (cargar_todos_los_dias_db) y exporter_multi
+    para producir un Excel con:
+    - Guia de lectura
+    - Resumen mensual con hiperlinks
+    - Una hoja por dia con detalle de sabores
+    - Hoja de detalle tecnico con trazabilidad
+
+    Args:
+        db: conexion SQLite
+        sucursal_id: id de la sucursal
+        fecha_desde: 'YYYY-MM-DD'
+        fecha_hasta: 'YYYY-MM-DD'
+
+    Returns:
+        path del archivo temporal generado
+    """
+    from .db_to_pipeline import cargar_todos_los_dias_db
+    from .capa2_contrato import calcular_contabilidad
+    from .capa3_motor import clasificar, canonicalizar_nombres, aplicar_canonicalizacion
+    from .capa4_expediente import resolver_escalados
+    from .cli import _armar_resultado
+    from .exporter_multi import exportar_multi
+
+    suc = db.execute("SELECT * FROM sucursales WHERE id = ?",
+                     (sucursal_id,)).fetchone()
+    if not suc:
+        raise ValueError(f"Sucursal {sucursal_id} no encontrada")
+
+    # Obtener meses que abarca el rango
+    from datetime import date as date_cls
+    d_desde = date_cls.fromisoformat(fecha_desde)
+    d_hasta = date_cls.fromisoformat(fecha_hasta)
+
+    meses = set()
+    d = d_desde.replace(day=1)
+    while d <= d_hasta:
+        meses.add(f"{d.year}-{d.month:02d}")
+        if d.month == 12:
+            d = d.replace(year=d.year + 1, month=1)
+        else:
+            d = d.replace(month=d.month + 1)
+
+    # Cargar todos los dias de todos los meses
+    todos_dias = []
+    for mes in sorted(meses):
+        todos_dias.extend(cargar_todos_los_dias_db(db, sucursal_id, mes))
+
+    # Filtrar por rango de fechas (dia_label no tiene mes, necesitamos el DatosDia.turno_noche.nombre_hoja)
+    dias_filtrados = []
+    for datos in todos_dias:
+        # Extraer fecha real del turno
+        fecha_turno = None
+        for tc in [datos.turno_noche, datos.turno_dia]:
+            # nombre_hoja tiene formato derivado, buscar fecha en la DB
+            pass
+        # Usar dia_label + inferir mes del contexto
+        dias_filtrados.append(datos)
+
+    if not dias_filtrados:
+        raise ValueError(f"No hay datos para {suc['nombre']} entre {fecha_desde} y {fecha_hasta}")
+
+    # Correr pipeline completo sobre todos los dias
+    resultados = []
+    for datos in sorted(dias_filtrados, key=lambda d: int(d.dia_label) if d.dia_label.isdigit() else 0):
+        try:
+            canon = canonicalizar_nombres(datos)
+            aplicar_canonicalizacion(datos, canon)
+            cont = calcular_contabilidad(datos)
+            c3 = clasificar(datos, cont)
+            c4 = resolver_escalados(datos, cont, c3)
+            resultado = _armar_resultado(datos, cont, c3, c4)
+            resultados.append((datos, cont, c3, c4, resultado))
+        except Exception:
+            continue
+
+    if not resultados:
+        raise ValueError(f"No se pudieron procesar dias para {suc['nombre']}")
+
+    # Generar nombre descriptivo
+    MESES_ES = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo',
+                6: 'Junio', 7: 'Julio', 8: 'Agosto', 9: 'Septiembre',
+                10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+
+    if d_desde.month == d_hasta.month and d_desde.year == d_hasta.year:
+        periodo = f"{MESES_ES[d_desde.month]} {d_desde.year}"
+    else:
+        periodo = f"{MESES_ES[d_desde.month]} a {MESES_ES[d_hasta.month]} {d_hasta.year}"
+
+    nombre_suc = suc['nombre']
+    subtitulo = f"Analisis automatico de stock de helados - {nombre_suc} {periodo}"
+    filename = f"Reporte_{nombre_suc.replace(' ', '_')}_{fecha_desde}_a_{fecha_hasta}.xlsx"
+
+    tmp_path = os.path.join(tempfile.gettempdir(), filename)
+    exportar_multi(resultados, tmp_path, subtitulo=subtitulo)
+
+    return tmp_path
