@@ -171,20 +171,33 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                 status = 'OK'
 
             # Venta negativa es fisicamente imposible.
-            # Si la abierta subio mucho (>4000g), se abrio una lata (registrada o no).
-            # La venta real es lo que habia de abierta antes de la apertura.
+            # Diagnosticar causa y estimar si hay datos suficientes.
+            motivo_cero = None
             if vf < 0:
                 d_sab = datos_dia.turno_dia.sabores.get(nombre)
                 n_sab = datos_dia.turno_noche.sabores.get(nombre)
                 ab_d = (d_sab.abierta or 0) if d_sab else 0
                 ab_n = (n_sab.abierta or 0) if n_sab else 0
+                cerr_d = [int(c) for c in d_sab.cerradas] if d_sab else []
+                cerr_n = [int(c) for c in n_sab.cerradas] if n_sab else []
                 rise = ab_n - ab_d
+                tiene_datos_dia = d_sab and (ab_d > 0 or cerr_d)
 
                 if rise > 4000:
-                    # Abierta subio: se abrio una lata. Venta ~ ab_d.
                     vf = max(0, ab_d)
+                    if ab_d > 0:
+                        motivo_cero = f'Se abrio una lata no registrada (abierta subio {rise}g). Venta estimada en {vf}g (lo que habia de abierta).'
+                    else:
+                        motivo_cero = f'Se abrio una lata no registrada (abierta subio {rise}g). No habia abierta previa, no se puede calcular cuanto se vendio.'
+                elif not tiene_datos_dia:
+                    vf = 0
+                    motivo_cero = f'El sabor no fue registrado en el turno anterior. Sin dato de stock inicial, no se puede calcular la venta. Verificar con el empleado si olvido anotarlo.'
+                elif rise > 0 and rise <= 4000 and any(abs(cd - cn) <= 200 for cd in cerr_d for cn in cerr_n):
+                    vf = 0
+                    motivo_cero = f'La abierta subio {rise}g (se abrio una cerrada). La venta da negativa por varianza de pesaje en las cerradas ({sc.venta_raw}g). Marcar como venta no calculable.'
                 else:
                     vf = 0
+                    motivo_cero = f'La venta da {sc.venta_raw}g (negativa). Probablemente falto registrar un entrante o hay un error en los pesos. Verificar los datos con el empleado.'
 
             sabor_info = {
                 'nombre': nombre,
@@ -216,6 +229,16 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                 )
                 # Historial para H0 y CORREGIDOS
                 sabor_info['historial'] = _timeline_sabor(nombre, datos_dia)
+
+            # Agregar motivo del clamp a 0 si aplica
+            if motivo_cero:
+                exp_base = sabor_info.get('explicacion', '')
+                sabor_info['explicacion'] = (exp_base + '\n\n' + motivo_cero).strip() if exp_base else motivo_cero
+                if status == 'OK':
+                    # Era OK pero quedó en 0 → marcar como H0
+                    sabor_info['status'] = 'H0'
+                    status = 'H0'
+                    n_h0 += 1
 
             # Alerta si hay problema
             if vf < -200:
@@ -369,16 +392,32 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                 else:
                     status = 'OK'
 
+                motivo_cero = None
                 if vf < 0:
                     d_sab = datos.turno_dia.sabores.get(nombre)
                     n_sab = datos.turno_noche.sabores.get(nombre)
                     ab_d = (d_sab.abierta or 0) if d_sab else 0
                     ab_n = (n_sab.abierta or 0) if n_sab else 0
+                    cerr_d = [int(c) for c in d_sab.cerradas] if d_sab else []
+                    cerr_n = [int(c) for c in n_sab.cerradas] if n_sab else []
                     rise = ab_n - ab_d
+                    tiene_datos_dia = d_sab and (ab_d > 0 or cerr_d)
+
                     if rise > 4000:
                         vf = max(0, ab_d)
+                        if ab_d > 0:
+                            motivo_cero = f'Se abrio una lata no registrada (abierta subio {rise}g). Venta estimada en {vf}g.'
+                        else:
+                            motivo_cero = f'Se abrio una lata no registrada (abierta subio {rise}g). No habia abierta previa, no se puede calcular.'
+                    elif not tiene_datos_dia:
+                        vf = 0
+                        motivo_cero = f'El sabor no fue registrado en el turno anterior. Sin dato de stock inicial, no se puede calcular la venta.'
+                    elif rise > 0 and rise <= 4000 and any(abs(cd - cn) <= 200 for cd in cerr_d for cn in cerr_n):
+                        vf = 0
+                        motivo_cero = f'La abierta subio {rise}g (se abrio una cerrada). Venta negativa por varianza de pesaje ({sc.venta_raw}g).'
                     else:
                         vf = 0
+                        motivo_cero = f'La venta da {sc.venta_raw}g (negativa). Probablemente falto registrar un entrante o hay un error en los pesos.'
 
                 sabor_info = {
                     'nombre': nombre,
@@ -405,6 +444,14 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                         0, vf, status,
                     )
                     sabor_info['historial'] = _timeline_sabor(nombre, datos)
+
+                if motivo_cero:
+                    exp_base = sabor_info.get('explicacion', '')
+                    sabor_info['explicacion'] = (exp_base + '\n\n' + motivo_cero).strip() if exp_base else motivo_cero
+                    if status == 'OK':
+                        sabor_info['status'] = 'H0'
+                        status = 'H0'
+                        n_h0 += 1
 
                 if vf < -200:
                     resultado['alertas'].append({
