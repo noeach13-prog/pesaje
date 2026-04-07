@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ data.sucursal.nombre }} - Planilla {{ data.nombre_hoja }}</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
+.header { background: #1e3a5f; color: #fff; padding: 12px 16px; }
+.header h1 { font-size: 1rem; } .header .sub { font-size: 0.75rem; opacity: 0.8; }
+.container { max-width: 900px; margin: 0 auto; padding: 8px; overflow-x: auto; }
+.meta { background: #fff; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 0.8rem; color: #555; display: flex; gap: 16px; flex-wrap: wrap; }
+table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.8rem; }
+th { background: #1e3a5f; color: #fff; padding: 6px 4px; text-align: center; font-size: 0.7rem; text-transform: uppercase; position: sticky; top: 0; white-space: nowrap; }
+th:first-child { text-align: left; min-width: 140px; }
+td { padding: 5px 4px; border-bottom: 1px solid #f0f0f0; text-align: right; font-variant-numeric: tabular-nums; }
+td:first-child { text-align: left; font-weight: 500; }
+tr:hover { background: #f8f9fa; }
+.empty-cell { color: #ddd; }
+.actions { display: flex; gap: 8px; margin: 12px 0; }
+.btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
+.btn-back { background: #f5f5f5; color: #333; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>{{ data.sucursal.nombre }}</h1>
+    <div class="sub">Planilla: {{ data.nombre_hoja }}</div>
+</div>
+<div class="container">
+    <div class="meta">
+        <span>Fecha: <strong>{{ data.turno.fecha }}</strong></span>
+        <span>Turno: <strong>{{ data.turno.tipo_turno }}</strong></span>
+        <span>Estado: <strong>{{ data.turno.estado }}</strong></span>
+        <span>Sabores: <strong>{{ data.sabores|length }}</strong></span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Sabor</th><th>Abierta</th><th>Celiaca</th>
+                <th>C1</th><th>C2</th><th>C3</th><th>C4</th><th>C5</th><th>C6</th>
+                <th>E1</th><th>E2</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in data.sabores %}
+            <tr>
+                <td>{{ s.nombre }}</td>
+                <td>{{ s.abierta if s.abierta is not none else '' }}</td>
+                <td>{{ s.celiaca if s.celiaca is not none else '' }}</td>
+                {% for i in range(1, 7) %}
+                <td>{{ s['cerrada_' ~ i] if s['cerrada_' ~ i] is not none else '' }}</td>
+                {% endfor %}
+                {% for i in range(1, 3) %}
+                <td>{{ s['entrante_' ~ i] if s['entrante_' ~ i] is not none else '' }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div class="actions">
+        <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Volver al turno</a>
+    </div>
+</div>
+</body>
+</html>

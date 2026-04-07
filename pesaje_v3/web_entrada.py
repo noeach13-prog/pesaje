@@ -410,6 +410,148 @@ def api_desbloquear():
     return jsonify(resultado)
 
 
+@entrada_bp.route('/entrada/planilla/<int:turno_id>')
+def planilla(turno_id):
+    """Vista planilla: datos crudos tipo Excel, sin análisis."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return redirect(url_for('entrada.index'))
+    db = get_db()
+    data = obtener_turno(db, turno_id)
+    db.close()
+    if not data or data['turno']['sucursal_id'] != sid:
+        return redirect(url_for('entrada.seleccion'))
+    return render_template('entrada/planilla.html', data=data)
+
+
+@entrada_bp.route('/entrada/pedido/<int:turno_id>')
+def pedido(turno_id):
+    """Sugerencia de pedido por sabor basada en historial confirmado."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return redirect(url_for('entrada.index'))
+    db = get_db()
+    data = obtener_turno(db, turno_id)
+    if not data or data['turno']['sucursal_id'] != sid:
+        db.close()
+        return redirect(url_for('entrada.seleccion'))
+
+    pedidos, n_turnos_hist = _calcular_sugerencia_pedido(db, data)
+    db.close()
+    return render_template('entrada/pedido.html',
+                           data=data, pedidos=pedidos, n_turnos_hist=n_turnos_hist)
+
+
+def _calcular_sugerencia_pedido(db, data):
+    """
+    Para cada sabor del turno, calcula sugerencia de pedido.
+    Usa historial de ventas CONFIRMADAS de la misma sucursal.
+    Lógica operativa, no analítica — no usa el pipeline.
+    """
+    sid = data['turno']['sucursal_id']
+    fecha = data['turno']['fecha']
+    tipo = data['turno']['tipo_turno']
+
+    # Buscar turnos confirmados anteriores de la misma sucursal
+    turnos_hist = db.execute(
+        """SELECT t.id, t.fecha, t.tipo_turno FROM turnos t
+           WHERE t.sucursal_id = ? AND t.estado = 'confirmado' AND t.fecha < ?
+           ORDER BY t.fecha DESC LIMIT 10""",
+        (sid, fecha),
+    ).fetchall()
+
+    n_turnos = len(turnos_hist)
+
+    # Para cada turno histórico, calcular ventas por sabor
+    # venta = diferencia entre turno anterior y el turno
+    # Simplificación: usar la abierta como proxy de consumo
+    # (abierta_anterior - abierta_actual = lo que se vendió de la abierta)
+    # Más robusto: usar total_anterior - total_actual
+
+    # Recoger todos los sabores con sus pesos por turno
+    hist_por_sabor = {}
+    all_turnos = list(reversed(turnos_hist))  # cronológico
+
+    for i in range(len(all_turnos)):
+        t = all_turnos[i]
+        sabs = db.execute(
+            "SELECT nombre_norm, abierta, cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6 FROM sabores_turno WHERE turno_id=?",
+            (t['id'],),
+        ).fetchall()
+
+        for s in sabs:
+            nn = s['nombre_norm']
+            ab = s['abierta'] or 0
+            cerr = sum(s[f'cerrada_{j}'] or 0 for j in range(1, 7))
+            total = ab + cerr
+
+            if nn not in hist_por_sabor:
+                hist_por_sabor[nn] = []
+            hist_por_sabor[nn].append(total)
+
+    # Calcular ventas como diferencia entre turnos consecutivos
+    ventas_por_sabor = {}
+    for nn, totales in hist_por_sabor.items():
+        ventas = []
+        for i in range(1, len(totales)):
+            v = totales[i - 1] - totales[i]  # anterior - actual = venta
+            if v > 0:
+                ventas.append(v)
+        ventas_por_sabor[nn] = ventas
+
+    # Generar sugerencia para cada sabor del turno actual
+    pedidos = []
+    for s in data['sabores']:
+        nn = s['nombre_norm']
+        ab = s['abierta'] or 0
+        cerr = sum(s[f'cerrada_{i}'] or 0 for i in range(1, 7))
+        stock_actual = ab + cerr
+
+        ventas = ventas_por_sabor.get(nn, [])
+        N = len(ventas)
+
+        if N == 0:
+            pedidos.append({
+                'nombre': nn,
+                'stock_actual': stock_actual,
+                'venta_promedio': None,
+                'tendencia': None,
+                'venta_proyectada': None,
+                'sugerencia': 'Sin historial suficiente',
+            })
+            continue
+
+        venta_promedio = sum(ventas) / N
+        tendencia = (ventas[-1] - ventas[0]) / (N - 1) if N >= 2 else 0
+        venta_proyectada = max(0, venta_promedio + tendencia)
+        stock_necesario = venta_proyectada * 2
+        deficit = stock_necesario - stock_actual
+
+        if deficit > 9000:
+            sug = 'Pedir urgente: 2 latas'
+        elif deficit > 3000:
+            sug = 'Pedir 1 lata (~6500g)'
+        elif deficit > 0:
+            sug = 'Stock justo'
+        else:
+            sug = 'Stock suficiente'
+
+        pedidos.append({
+            'nombre': nn,
+            'stock_actual': stock_actual,
+            'venta_promedio': venta_promedio,
+            'tendencia': tendencia,
+            'venta_proyectada': venta_proyectada,
+            'sugerencia': sug,
+        })
+
+    # Ordenar: urgentes primero, luego pedir, luego justo, luego ok, luego sin historial
+    orden = {'Pedir urgente: 2 latas': 0, 'Pedir 1 lata (~6500g)': 1, 'Stock justo': 2, 'Stock suficiente': 3, 'Sin historial suficiente': 4}
+    pedidos.sort(key=lambda p: (orden.get(p['sugerencia'], 5), p['nombre']))
+
+    return pedidos, n_turnos
+
+
 @entrada_bp.route('/entrada/revision/<int:turno_id>')
 def revision(turno_id):
     """Página de revisión con resultados de validación."""

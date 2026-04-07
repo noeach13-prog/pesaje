@@ -190,8 +190,9 @@ tr.row-neg { background: #fce4ec; }
     {% endif %}
 
     <div class="actions">
-        <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Volver al turno</a>
-        <a href="/entrada/seleccion" class="btn btn-primary">Nuevo turno</a>
+        <a href="/entrada/planilla/{{ data.turno.id }}" class="btn" style="background:#1e3a5f;color:#fff;">Planilla</a>
+        <a href="/entrada/pedido/{{ data.turno.id }}" class="btn" style="background:#e65100;color:#fff;">Pedido</a>
+        <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-back">Turno</a>
     </div>
 </div>
 </body>

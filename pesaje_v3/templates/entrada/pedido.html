@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ data.sucursal.nombre }} - Sugerencia de pedido</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; font-size: 14px; }
+.header { background: #1e3a5f; color: #fff; padding: 12px 16px; }
+.header h1 { font-size: 1rem; } .header .sub { font-size: 0.75rem; opacity: 0.8; }
+.container { max-width: 700px; margin: 0 auto; padding: 8px; }
+.meta { background: #fff; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 0.8rem; color: #555; display: flex; gap: 16px; flex-wrap: wrap; }
+
+table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.8rem; border-radius: 8px; overflow: hidden; }
+th { background: #1e3a5f; color: #fff; padding: 8px 6px; text-align: left; font-size: 0.7rem; text-transform: uppercase; }
+th:nth-child(n+2) { text-align: right; }
+td { padding: 6px; border-bottom: 1px solid #f0f0f0; }
+td:nth-child(n+2) { text-align: right; font-variant-numeric: tabular-nums; }
+tr:hover { background: #f8f9fa; }
+
+.sug-urgente { background: #fce4ec; color: #c62828; font-weight: 700; }
+.sug-pedir { background: #fff3e0; color: #e65100; font-weight: 600; }
+.sug-justo { background: #fff8e1; color: #f9a825; }
+.sug-ok { background: #e8f5e9; color: #2e7d32; }
+.sug-sin { color: #999; font-style: italic; }
+
+.trend-up { color: #c62828; } .trend-down { color: #2e7d32; } .trend-flat { color: #888; }
+
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+.sum-card { background: #fff; border-radius: 8px; padding: 10px; text-align: center; }
+.sum-num { font-size: 1.3rem; font-weight: 700; }
+.sum-label { font-size: 0.65rem; color: #888; text-transform: uppercase; }
+.sum-urgente .sum-num { color: #c62828; }
+.sum-pedir .sum-num { color: #e65100; }
+.sum-ok .sum-num { color: #2e7d32; }
+
+.actions { display: flex; gap: 8px; margin: 12px 0; }
+.btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; }
+.btn-back { background: #f5f5f5; color: #333; }
+.btn-primary { background: #1565c0; color: #fff; }
+</style>
+</head>
+<body>
+<div class="header">
+    <h1>{{ data.sucursal.nombre }}</h1>
+    <div class="sub">Sugerencia de pedido - {{ data.nombre_hoja }}</div>
+</div>
+<div class="container">
+    <div class="meta">
+        <span>Fecha: <strong>{{ data.turno.fecha }}</strong></span>
+        <span>Historial: <strong>{{ n_turnos_hist }} turnos</strong></span>
+    </div>
+
+    {% set urgentes = pedidos | selectattr('sugerencia', 'eq', 'Pedir urgente: 2 latas') | list %}
+    {% set pedir = pedidos | selectattr('sugerencia', 'eq', 'Pedir 1 lata (~6500g)') | list %}
+    {% set ok = pedidos | selectattr('sugerencia', 'eq', 'Stock suficiente') | list %}
+
+    <div class="summary">
+        <div class="sum-card sum-urgente">
+            <div class="sum-num">{{ urgentes|length }}</div>
+            <div class="sum-label">Urgentes</div>
+        </div>
+        <div class="sum-card sum-pedir">
+            <div class="sum-num">{{ pedir|length }}</div>
+            <div class="sum-label">Pedir 1 lata</div>
+        </div>
+        <div class="sum-card sum-ok">
+            <div class="sum-num">{{ ok|length }}</div>
+            <div class="sum-label">Stock OK</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Sabor</th>
+                <th>Stock actual</th>
+                <th>Venta prom.</th>
+                <th>Tendencia</th>
+                <th>Proyectada</th>
+                <th>Sugerencia</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in pedidos %}
+            <tr>
+                <td>{{ p.nombre }}</td>
+                <td>{{ "{:,}".format(p.stock_actual) }}g</td>
+                <td>{% if p.venta_promedio is not none %}{{ "{:,.0f}".format(p.venta_promedio) }}g{% else %}-{% endif %}</td>
+                <td>
+                    {% if p.tendencia is not none %}
+                    <span class="{{ 'trend-up' if p.tendencia > 50 else ('trend-down' if p.tendencia < -50 else 'trend-flat') }}">
+                        {{ "{:+,.0f}".format(p.tendencia) }}g
+                    </span>
+                    {% else %}-{% endif %}
+                </td>
+                <td>{% if p.venta_proyectada is not none %}{{ "{:,.0f}".format(p.venta_proyectada) }}g{% else %}-{% endif %}</td>
+                <td class="{{ 'sug-urgente' if 'urgente' in p.sugerencia else ('sug-pedir' if 'Pedir 1' in p.sugerencia else ('sug-justo' if 'justo' in p.sugerencia else ('sug-ok' if 'suficiente' in p.sugerencia else 'sug-sin'))) }}">
+                    {{ p.sugerencia }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="actions">
+        <a href="/entrada/revision/{{ data.turno.id }}" class="btn btn-back">Volver al analisis</a>
+        <a href="/entrada/turno/{{ data.turno.id }}" class="btn btn-primary">Volver al turno</a>
+    </div>
+</div>
+</body>
+</html>
