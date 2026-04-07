@@ -503,22 +503,36 @@ def _calcular_sugerencia_pedido(db, data):
     pedidos = []
     for s in data['sabores']:
         nn = s['nombre_norm']
+
+        # Desglose del stock actual tal como lo cargó el empleado
         ab = s['abierta'] or 0
-        cerr = sum(s[f'cerrada_{i}'] or 0 for i in range(1, 7))
-        stock_actual = ab + cerr
+        cel = s.get('celiaca') or 0
+        cerradas = [s[f'cerrada_{i}'] for i in range(1, 7) if s.get(f'cerrada_{i}') is not None]
+        entrantes = [s[f'entrante_{i}'] for i in range(1, 3) if s.get(f'entrante_{i}') is not None]
+        stock_actual = ab + cel + sum(cerradas) + sum(entrantes)
 
         ventas = ventas_por_sabor.get(nn, [])
         N = len(ventas)
 
+        base = {
+            'nombre': nn,
+            'abierta': ab if ab else None,
+            'celiaca': cel if cel else None,
+            'cerradas': cerradas,
+            'entrantes': entrantes,
+            'stock_actual': stock_actual,
+            'ventas_hist': ventas,
+        }
+
         if N == 0:
-            pedidos.append({
-                'nombre': nn,
-                'stock_actual': stock_actual,
+            base.update({
                 'venta_promedio': None,
                 'tendencia': None,
                 'venta_proyectada': None,
+                'stock_necesario': 0,
                 'sugerencia': 'Sin historial suficiente',
             })
+            pedidos.append(base)
             continue
 
         venta_promedio = sum(ventas) / N
@@ -536,14 +550,14 @@ def _calcular_sugerencia_pedido(db, data):
         else:
             sug = 'Stock suficiente'
 
-        pedidos.append({
-            'nombre': nn,
-            'stock_actual': stock_actual,
+        base.update({
             'venta_promedio': venta_promedio,
             'tendencia': tendencia,
             'venta_proyectada': venta_proyectada,
+            'stock_necesario': stock_necesario,
             'sugerencia': sug,
         })
+        pedidos.append(base)
 
     # Ordenar: urgentes primero, luego pedir, luego justo, luego ok, luego sin historial
     orden = {'Pedir urgente: 2 latas': 0, 'Pedir 1 lata (~6500g)': 1, 'Stock justo': 2, 'Stock suficiente': 3, 'Sin historial suficiente': 4}
