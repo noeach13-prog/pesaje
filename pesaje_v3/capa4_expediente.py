@@ -1563,9 +1563,125 @@ def resolver_escalados(datos: DatosDia, contabilidad: ContabilidadDia,
         if corr:
             resultado.correcciones.append(corr)
 
-    # 3. Análisis CONJUNTO cross-sabor
+    # 3. OMISION_BILATERAL_RESIDUAL — ajuste de segundo orden post-C4.
+    # Scope: solo subfamilia escalada/residual (sabores con corrección o H0).
+    # NO es la doctrina bilateral general. Si mañana un caso legítimo queda
+    # con residuo > cerrada pero G3 lo frena, eso marca el borde de esta
+    # versión, no un fallo de la regla.
+    _ajustar_omision_bilateral_residual(resultado, datos, contabilidad)
+
+    # 4. Análisis CONJUNTO cross-sabor
     # Pasa correcciones + estimaciones_h0 + resultado para que el bloque B
     # pueda rescatar H0 no confirmados individualmente y actualizar sin_resolver.
     _analisis_conjunto(resultado.correcciones, resultado.estimaciones_h0, resultado)
 
     return resultado
+
+
+def _ajustar_omision_bilateral_residual(resultado: 'ResultadoC4', datos: DatosDia,
+                                         contabilidad: 'ContabilidadDia'):
+    """Ajuste residual: restituye cerradas omitidas que el pipeline local no cubrió.
+
+    Estatuto: NO es hipótesis rival de C3/C4. Es capa adicional sobre corrección/H0
+    existente. Solo actúa cuando el episodio sigue roto después de agotar
+    explicaciones locales. Complementa, no reemplaza.
+
+    Tres condiciones operacionales (G1 habilita, G2 identifica, G3 legitima):
+      G1: venta_final > cerr_forward (residuo aloja el peso de la omisión)
+      G2: cerr_DIA sin pareja en NOCHE reaparece en forward (target concreto)
+      G3: 0 <= venta_corregida < venta_final (mejora sin producir absurdos)
+    """
+    forward_turnos = [t for t in datos.contexto
+                      if t.indice > datos.turno_noche.indice]
+    if not forward_turnos:
+        return
+
+    ft = min(forward_turnos, key=lambda t: t.indice)
+
+    for nombre in list(contabilidad.sabores.keys()):
+        sc = contabilidad.sabores[nombre]
+        if sc.solo_dia or sc.solo_noche:
+            continue
+
+        # Solo sabores ya escalados (con corrección o estimación H0)
+        corr = next((c for c in resultado.correcciones if c.nombre_norm == nombre), None)
+        est = next((e for e in resultado.estimaciones_h0 if e.nombre_norm == nombre), None)
+        if not corr and not est:
+            continue
+
+        venta_actual = corr.venta_corregida if corr else (est.venta_estimada if est else sc.venta_raw)
+
+        ft_sab = ft.sabores.get(nombre)
+        if not ft_sab or not ft_sab.cerradas:
+            continue
+
+        d_sab = datos.turno_dia.sabores.get(nombre)
+        n_sab = datos.turno_noche.sabores.get(nombre)
+        if not d_sab:
+            continue
+
+        cerr_a = [int(c) for c in d_sab.cerradas]
+        cerr_b = [int(c) for c in n_sab.cerradas] if n_sab else []
+        ent_b = [int(e) for e in n_sab.entrantes] if n_sab else []
+
+        # --- G2: identificar cerradas del forward sin pareja en NOCHE ---
+        # Matching greedy: cada cerrada NOCHE solo puede cubrir una del forward
+        cerr_b_used = set()
+        omisiones = []
+
+        for fc in ft_sab.cerradas:
+            fc_int = int(fc)
+
+            # ¿Matchea una cerrada de DIA? (debe haber existido antes)
+            in_a = any(abs(fc_int - ca) <= 50 for ca in cerr_a)
+            if not in_a:
+                continue
+
+            # ¿Tiene pareja en NOCHE cerradas? (tolerancia 200g = MISMATCH_LEVE)
+            matched_b = False
+            for i, cb in enumerate(cerr_b):
+                if i not in cerr_b_used and abs(fc_int - cb) <= 200:
+                    cerr_b_used.add(i)
+                    matched_b = True
+                    break
+            if matched_b:
+                continue
+
+            # ¿Es un entrante de NOCHE? (tolerancia 50g = misma lata)
+            if any(abs(fc_int - eb) <= 50 for eb in ent_b):
+                continue
+
+            # G2 cumplida: cerrada en DIA, sin pareja en NOCHE, reaparece en forward
+            omisiones.append(fc_int)
+
+        if not omisiones:
+            continue
+
+        # Aplicar una omisión a la vez (la más pesada primero — mayor impacto)
+        omisiones.sort(reverse=True)
+
+        for peso_omitido in omisiones:
+            # --- G1: el residuo aloja el peso ---
+            if venta_actual <= peso_omitido:
+                continue  # raw ≤ cerrada → probablemente apertura real, no omisión
+
+            # --- G3: coherencia post-ajuste ---
+            venta_nueva = venta_actual - peso_omitido
+            if venta_nueva < 0:
+                continue  # produciría negativo
+            if venta_nueva >= venta_actual:
+                continue  # no mejora (imposible aritméticamente, pero guardia explícita)
+
+            # Las 3 condiciones pasan. Aplicar ajuste residual.
+            tag = f' + [OMISION_BILATERAL_RESIDUAL] cerr {peso_omitido}g en DIA, falta NOCHE, forward confirma'
+
+            if corr:
+                corr.delta -= peso_omitido
+                corr.venta_corregida -= peso_omitido
+                corr.motivo += tag
+            elif est:
+                est.venta_estimada -= peso_omitido
+                est.delta -= peso_omitido
+                est.motivo += tag
+
+            venta_actual -= peso_omitido  # actualizar para siguiente omisión del mismo sabor
