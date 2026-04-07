@@ -1603,11 +1603,12 @@ def _ajustar_omision_bilateral_residual(resultado: 'ResultadoC4', datos: DatosDi
         if sc.solo_dia or sc.solo_noche:
             continue
 
-        # Solo sabores ya escalados (con corrección o estimación H0)
+        # Sabores con corrección, H0, o venta_raw alta sin corrección (ENGINE sin proto)
         corr = next((c for c in resultado.correcciones if c.nombre_norm == nombre), None)
         est = next((e for e in resultado.estimaciones_h0 if e.nombre_norm == nombre), None)
-        if not corr and not est:
-            continue
+        sin_correccion = not corr and not est
+        if sin_correccion and sc.venta_raw < 5000:
+            continue  # Sin corrección y venta baja → no hay residuo material
 
         venta_actual = corr.venta_corregida if corr else (est.venta_estimada if est else sc.venta_raw)
 
@@ -1673,15 +1674,30 @@ def _ajustar_omision_bilateral_residual(resultado: 'ResultadoC4', datos: DatosDi
                 continue  # no mejora (imposible aritméticamente, pero guardia explícita)
 
             # Las 3 condiciones pasan. Aplicar ajuste residual.
-            tag = f' + [OMISION_BILATERAL_RESIDUAL] cerr {peso_omitido}g en DIA, falta NOCHE, forward confirma'
+            tag = f'[OMISION_BILATERAL_RESIDUAL] cerr {peso_omitido}g en DIA, falta NOCHE, forward confirma'
 
             if corr:
                 corr.delta -= peso_omitido
                 corr.venta_corregida -= peso_omitido
-                corr.motivo += tag
+                corr.motivo += f' + {tag}'
             elif est:
                 est.venta_estimada -= peso_omitido
                 est.delta -= peso_omitido
-                est.motivo += tag
+                est.motivo += f' + {tag}'
+            else:
+                # Sin corrección previa: crear corrección nueva (familia ampliada)
+                new_corr = Correccion(
+                    nombre_norm=nombre,
+                    venta_raw=sc.venta_raw,
+                    delta=-peso_omitido,
+                    venta_corregida=sc.venta_raw - peso_omitido,
+                    motivo=tag,
+                    confianza=0.70,
+                    tipo_justificacion=TipoJustificacion.B,
+                    banda=Banda.ESTIMADO,
+                    tipo_resolucion=TipoResolucion.RESUELTO_INDIVIDUAL,
+                )
+                resultado.correcciones.append(new_corr)
+                corr = new_corr  # para siguiente omisión del mismo sabor
 
-            venta_actual -= peso_omitido  # actualizar para siguiente omisión del mismo sabor
+            venta_actual -= peso_omitido
