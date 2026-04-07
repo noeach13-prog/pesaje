@@ -12,6 +12,7 @@ from flask import (
     Blueprint, render_template, request, redirect,
     url_for, jsonify, session,
 )
+from .validacion_entrada import invalidar_cache_mes
 
 from .db import (
     get_db, obtener_sucursales, verificar_pin, crear_turno,
@@ -275,6 +276,7 @@ def api_guardar():
         registrar_actividad(db, turno_id, ts, 'guardar', f'{len(sabores)} sabores')
 
     db.close()
+    invalidar_cache_mes(sid)
 
     return jsonify({
         'ok': True,
@@ -442,6 +444,7 @@ def api_desbloquear():
     if resultado.get('ok') and ts:
         registrar_actividad(db, turno_id, ts, 'desbloquear', 'Desbloqueado por supervisor')
     db.close()
+    invalidar_cache_mes(sid)
     return jsonify(resultado)
 
 
@@ -733,6 +736,7 @@ def api_borrar_turno():
 
     resultado = borrar_turno(db, turno_id, pin)
     db.close()
+    invalidar_cache_mes(sid)
     return jsonify(resultado)
 
 
@@ -844,4 +848,5 @@ def api_confirmar():
                             f'{resultado["n_sabores"]} sabores, {resultado["total_peso"]}g')
         resultado['analisis'] = analisis
     db.close()
+    invalidar_cache_mes(sid)
     return jsonify(resultado)

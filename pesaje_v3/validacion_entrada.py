@@ -240,6 +240,34 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
     return resultado
 
 
+# Cache de analizar_mes: evita correr el pipeline completo multiples veces
+# para el mismo mes cuando el supervisor revisa varios turnos seguidos.
+# Se invalida cuando cambia el ultimo turno modificado del mes.
+_cache_mes = {}  # (sucursal_id, mes) → {'ts': max_updated, 'data': resultado}
+
+
+def _cache_key_ts(db, sucursal_id, mes):
+    """Timestamp del ultimo cambio en turnos del mes (para invalidación)."""
+    row = db.execute(
+        """SELECT MAX(COALESCE(fin_carga, inicio_carga, created_at)) as ts
+           FROM turnos WHERE sucursal_id=? AND fecha LIKE ?""",
+        (sucursal_id, f"{mes}%"),
+    ).fetchone()
+    return row['ts'] if row else None
+
+
+def invalidar_cache_mes(sucursal_id: int = None, mes: str = None):
+    """Invalida cache manualmente (ej: después de guardar/confirmar turno)."""
+    if sucursal_id and mes:
+        _cache_mes.pop((sucursal_id, mes), None)
+    elif sucursal_id:
+        keys = [k for k in _cache_mes if k[0] == sucursal_id]
+        for k in keys:
+            del _cache_mes[k]
+    else:
+        _cache_mes.clear()
+
+
 def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
     """Corre el pipeline completo sobre TODOS los turnos del mes.
 
@@ -247,11 +275,21 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
     Retorna dict {dia_label: resultado_analisis} donde cada resultado
     tiene la misma estructura que analizar_turno().
 
+    Usa cache por (sucursal_id, mes) invalidado por timestamp de
+    ultimo turno modificado. Evita corridas redundantes (~170s cada una)
+    cuando el supervisor revisa varios turnos del mismo mes.
+
     Args:
         db: conexión SQLite
         sucursal_id: id de la sucursal
         mes: formato 'YYYY-MM' (ej: '2026-02')
     """
+    # Cache check
+    cache_key = (sucursal_id, mes)
+    ts = _cache_key_ts(db, sucursal_id, mes)
+    if cache_key in _cache_mes and _cache_mes[cache_key]['ts'] == ts:
+        return _cache_mes[cache_key]['data']
+
     from .db_to_pipeline import cargar_todos_los_dias_db
     from .capa2_contrato import calcular_contabilidad
     from .capa3_motor import clasificar, canonicalizar_nombres, aplicar_canonicalizacion
@@ -379,6 +417,9 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                 'totales': {},
                 'tiene_analisis': False,
             }
+
+    # Store in cache
+    _cache_mes[cache_key] = {'ts': ts, 'data': resultados}
 
     return resultados
 
