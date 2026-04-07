@@ -233,9 +233,13 @@ def segunda_pasada(
     senales_r3 = _evaluar_r3(ventas_finales, stats, media_dia, std_dia)
     resultado.senales_dia = senales_r3
 
-    # Evaluar cada sabor LIMPIO
-    limpios = clasificacion.limpios
-    for nombre, sc in limpios.items():
+    # Evaluar TODOS los sabores (no solo LIMPIO).
+    # R1 (desvío histórico) es útil para CORREGIDOS y ENGINE también:
+    # una venta corregida que sigue siendo outlier merece revisión.
+    # R2 (rareza estructural) sigue siendo más relevante para LIMPIO.
+    for nombre, sc in clasificacion.sabores.items():
+        if sc.status in (StatusC3.SOLO_DIA, StatusC3.SOLO_NOCHE):
+            continue
         senales = []
         vf = ventas_finales.get(nombre, 0)
 

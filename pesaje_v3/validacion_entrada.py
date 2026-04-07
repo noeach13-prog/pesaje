@@ -424,8 +424,54 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
     return resultados
 
 
+def _calcular_stats_mes(db, sucursal_id, mes):
+    """Calcula estadísticas históricas del mes para C5 (R1 y R3).
+
+    Retorna (stats, media_dia, std_dia) donde:
+    - stats: Dict[nombre_norm, EstadisticaSabor] con media/std por sabor
+    - media_dia: promedio de venta total diaria del mes
+    - std_dia: desvío estándar de venta total diaria
+    """
+    from .capa5_residual import calcular_estadisticas
+    import math
+
+    res_mes = analizar_mes(db, sucursal_id, mes)
+    if not res_mes:
+        return {}, 0, 0
+
+    # Recoger ventas finales por sabor y totales por día
+    ventas_por_sabor = {}  # nombre → [venta_d1, venta_d2, ...]
+    totales_dia = []
+
+    for dia_label, r in res_mes.items():
+        if not r.get('tiene_analisis'):
+            continue
+        total_dia = 0
+        for s in r.get('sabores', []):
+            nombre = s['nombre']
+            vf = s['final']
+            if nombre not in ventas_por_sabor:
+                ventas_por_sabor[nombre] = []
+            ventas_por_sabor[nombre].append(vf)
+            total_dia += vf
+        totales_dia.append(total_dia)
+
+    stats = calcular_estadisticas(ventas_por_sabor)
+
+    # Media y std del total diario
+    media_dia = sum(totales_dia) / len(totales_dia) if totales_dia else 0
+    if len(totales_dia) >= 2:
+        var = sum((t - media_dia) ** 2 for t in totales_dia) / (len(totales_dia) - 1)
+        std_dia = math.sqrt(var) if var > 0 else 0
+    else:
+        std_dia = 0
+
+    return stats, media_dia, std_dia
+
+
 def _agregar_c5_profundo(db, turno, resultado):
-    """Agrega señales C5 a un resultado ya calculado."""
+    """Agrega señales C5 a un resultado ya calculado.
+    Usa stats del mes completo para R1 (desvío histórico) y R3 (día anómalo)."""
     try:
         from .capa5_residual import segunda_pasada
         datos_dia = armar_datos_dia(db, turno['sucursal_id'], turno['fecha'])
@@ -441,7 +487,13 @@ def _agregar_c5_profundo(db, turno, resultado):
         cont = calcular_contabilidad(datos_dia)
         c3 = clasificar(datos_dia, cont)
         c4 = resolver_escalados(datos_dia, cont, c3)
-        c5 = segunda_pasada(datos_dia, c3, c4.correcciones, stats={})
+
+        # Calcular stats del mes para R1 y R3
+        mes = turno['fecha'][:7]
+        stats, media_dia, std_dia = _calcular_stats_mes(db, turno['sucursal_id'], mes)
+
+        c5 = segunda_pasada(datos_dia, c3, c4.correcciones, stats=stats,
+                            media_dia=media_dia, std_dia=std_dia)
 
         c5_senales = {}
         if hasattr(c5, 'sabores'):
@@ -452,8 +504,17 @@ def _agregar_c5_profundo(db, turno, resultado):
                         for s in c5_sab.senales
                     ]
 
+        # Señales a nivel día (R3)
+        c5_dia = []
+        if hasattr(c5, 'senales_dia') and c5.senales_dia:
+            c5_dia = [
+                {'tipo': s.tipo, 'subtipo': s.subtipo, 'detalle': s.detalle}
+                for s in c5.senales_dia
+            ]
+
         resultado['profundo'] = True
         resultado['c5_senales'] = c5_senales
+        resultado['c5_senales_dia'] = c5_dia
         for sab in resultado.get('sabores', []):
             if sab['nombre'] in c5_senales:
                 sab['c5_senales'] = c5_senales[sab['nombre']]
