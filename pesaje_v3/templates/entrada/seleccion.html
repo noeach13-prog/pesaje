@@ -6,87 +6,95 @@
 <title>{{ sucursal_nombre }} - Seleccionar turno</title>
 <style>
 :root {
-    --bg: #f5f0ea;
-    --card: #fff;
-    --ink: #2c2117;
-    --muted: #8a7868;
-    --accent: #8b5e34;
-    --accent-hover: #6d4828;
-    --accent-soft: #f3e8db;
-    --line: #e4ddd5;
-    --focus: rgba(139,94,52,0.15);
-    --success: #2e7d32;
-    --warning: #e65100;
+    --bg: #f7f1e8;
+    --card: rgba(255,252,247,0.95);
+    --ink: #2f241d;
+    --muted: #7d695d;
+    --accent: #9b6339;
+    --accent-deep: #7e4f2f;
+    --accent-soft: #f2e4d7;
+    --line: rgba(111,81,58,0.14);
+    --focus: rgba(155,99,57,0.12);
+    --success: #3a7d44;
+    --warning: #c45e20;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: 'Segoe UI', -apple-system, sans-serif;
-    background: var(--bg);
+    background: linear-gradient(180deg, #fbf6ef 0%, #f0e8de 100%);
     color: var(--ink);
     min-height: 100vh;
     padding: 16px;
 }
+.shell { max-width: 520px; margin: 0 auto; }
+
 .header {
-    background: var(--ink);
-    color: #fff;
-    padding: 16px 20px;
-    border-radius: 14px;
-    max-width: 500px;
-    margin: 0 auto 16px;
+    background: linear-gradient(145deg, rgba(66,42,27,0.96), rgba(46,30,20,0.96));
+    color: #fffaf4;
+    padding: 20px 24px;
+    border-radius: 20px;
+    margin-bottom: 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
-.header h1 { font-size: 1.1rem; }
-.header .sub { font-size: 0.75rem; opacity: 0.6; }
-.header a { color: #fff; opacity: 0.7; font-size: 0.75rem; text-decoration: none; }
-.header a:hover { opacity: 1; }
+.header h1 { font-size: 1.2rem; font-weight: 700; }
+.header .sub { font-size: 0.78rem; color: rgba(255,240,225,0.6); margin-top: 2px; }
+.header a {
+    color: rgba(255,240,225,0.7);
+    font-size: 0.75rem;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1);
+    transition: background 0.2s;
+}
+.header a:hover { background: rgba(255,255,255,0.08); }
 
 .card {
     background: var(--card);
-    border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
-    max-width: 500px;
-    margin: 0 auto 12px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: 0 12px 36px rgba(74,48,31,0.08);
     padding: 24px;
+    margin-bottom: 12px;
+    backdrop-filter: blur(8px);
 }
-.card-title {
-    font-size: 0.72rem;
-    font-weight: 700;
+.card-label {
+    font-size: 0.7rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
     color: var(--muted);
     margin-bottom: 16px;
 }
-
-/* Form fields */
 .field { margin-bottom: 16px; }
 .field label {
     display: block;
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    margin-bottom: 6px;
+    letter-spacing: 0.1em;
+    color: #8d7262;
+    margin-bottom: 7px;
 }
 .field input[type="date"] {
     width: 100%;
-    padding: 12px 14px;
-    border: 1.5px solid var(--line);
-    border-radius: 12px;
-    font-size: 15px;
+    padding: 14px 15px;
+    border: 1px solid rgba(128,93,67,0.14);
+    border-radius: 14px;
+    font-size: 0.96rem;
     color: var(--ink);
-    background: #faf8f5;
+    background: linear-gradient(180deg, #fffdf9, #f8f1e8);
     -webkit-appearance: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
 }
 .field input:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: rgba(155,99,57,0.4);
     box-shadow: 0 0 0 3px var(--focus);
 }
-
-/* Turno buttons */
 .turno-btns {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -94,111 +102,123 @@ body {
     margin-bottom: 16px;
 }
 .turno-btn {
-    padding: 14px 8px;
-    border: 1.5px solid var(--line);
-    border-radius: 12px;
+    padding: 16px 8px;
+    border: 1.5px solid rgba(128,93,67,0.14);
+    border-radius: 16px;
     text-align: center;
     cursor: pointer;
-    font-weight: 700;
-    font-size: 0.85rem;
+    font-weight: 800;
+    font-size: 0.88rem;
+    letter-spacing: 0.02em;
     transition: all 0.15s;
-    background: #faf8f5;
+    background: linear-gradient(180deg, #fffdf9, #f8f1e8);
 }
 .turno-btn:hover { border-color: var(--accent); }
 .turno-btn.active {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    color: #fffaf4;
+    border-color: transparent;
+    box-shadow: 0 8px 20px rgba(126,79,47,0.2);
 }
 .turno-btn.exists {
     border-color: var(--success);
-    position: relative;
 }
 .turno-btn.exists::after {
-    content: 'Ya cargado';
+    content: 'Cargado';
     display: block;
-    font-size: 0.65rem;
-    font-weight: 600;
+    font-size: 0.62rem;
+    font-weight: 700;
     color: var(--success);
-    margin-top: 2px;
+    margin-top: 3px;
 }
-.turno-btn.active.exists::after { color: rgba(255,255,255,0.8); }
+.turno-btn.active.exists::after { color: rgba(255,255,255,0.75); }
 
-/* Warning */
-.warn { display: none; background: #fff8ed; border: 1px solid #f0d4a8; padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; color: var(--warning); margin-bottom: 12px; }
-
-/* Buttons */
+.warn {
+    display: none;
+    background: #fff8ed;
+    border: 1px solid rgba(196,94,32,0.15);
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 0.82rem;
+    color: var(--warning);
+    margin-bottom: 12px;
+}
 .btn {
     width: 100%;
-    padding: 13px;
+    padding: 15px;
     border: none;
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-weight: 700;
+    border-radius: 16px;
     cursor: pointer;
-    transition: background 0.2s;
+    color: #fffaf4;
+    font-size: 0.96rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    box-shadow: 0 12px 28px rgba(126,79,47,0.22);
+    transition: transform 0.15s, box-shadow 0.15s;
 }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-primary:hover { background: var(--accent-hover); }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 
 .links {
-    max-width: 500px;
-    margin: 0 auto;
     display: flex;
     gap: 8px;
 }
-.links a {
+.link-card {
     flex: 1;
-    padding: 12px;
+    display: block;
+    padding: 14px;
     background: var(--card);
-    border-radius: 12px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
     text-align: center;
     text-decoration: none;
     font-size: 0.82rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--accent);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    transition: background 0.15s;
 }
-.links a:hover { background: var(--accent-soft); }
+.link-card:hover { background: var(--accent-soft); }
 </style>
 </head>
 <body>
-<div class="header">
-    <div>
-        <h1>{{ sucursal_nombre }}</h1>
-        <div class="sub">Seleccionar turno para cargar</div>
+<div class="shell">
+    <div class="header">
+        <div>
+            <h1>{{ sucursal_nombre }}</h1>
+            <div class="sub">Seleccionar turno para cargar</div>
+        </div>
+        <a href="/entrada/">Salir</a>
     </div>
-    <a href="/entrada/">Salir</a>
-</div>
 
-<div class="card">
-    <div class="card-title">Nuevo turno</div>
-    <form method="POST" action="/entrada/seleccion">
-        <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ prox_tipo or 'DIA' }}">
+    <div class="card">
+        <div class="card-label">Nuevo turno</div>
+        <form method="POST" action="/entrada/seleccion">
+            <input type="hidden" name="tipo_turno" id="tipoTurno" value="{{ prox_tipo or 'DIA' }}">
 
-        <div class="field">
-            <label for="fecha">Fecha</label>
-            <input type="date" name="fecha" id="fecha" value="{{ prox_fecha or hoy }}" required onchange="checkFecha()">
-        </div>
-
-        <div class="field">
-            <label>Tipo de turno</label>
-            <div class="turno-btns" id="turnoBtns">
-                <div class="turno-btn{{ ' active' if prox_tipo == 'DIA' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
-                <div class="turno-btn{{ ' active' if prox_tipo == 'NOCHE' else '' }}" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
-                <div class="turno-btn{{ ' active' if prox_tipo == 'UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
+            <div class="field">
+                <label for="fecha">Fecha</label>
+                <input type="date" name="fecha" id="fecha" value="{{ prox_fecha or hoy }}" required onchange="checkFecha()">
             </div>
-        </div>
 
-        <div class="warn" id="warnBox"></div>
-        <button type="submit" class="btn btn-primary" id="btnCrear">Crear turno</button>
-    </form>
-</div>
+            <div class="field">
+                <label>Tipo de turno</label>
+                <div class="turno-btns" id="turnoBtns">
+                    <div class="turno-btn{{ ' active' if prox_tipo == 'DIA' else '' }}" data-val="DIA" onclick="selTurno(this)">DIA</div>
+                    <div class="turno-btn{{ ' active' if prox_tipo == 'NOCHE' else '' }}" data-val="NOCHE" onclick="selTurno(this)">NOCHE</div>
+                    <div class="turno-btn{{ ' active' if prox_tipo == 'UNICO' else '' }}" data-val="UNICO" onclick="selTurno(this)">UNICO</div>
+                </div>
+            </div>
 
-<div class="links">
-    <a href="/entrada/historial">Historial</a>
-    <a href="/entrada/">Cambiar sucursal</a>
+            <div class="warn" id="warnBox"></div>
+            <button type="submit" class="btn" id="btnCrear">Crear turno</button>
+        </form>
+    </div>
+
+    <div class="links">
+        <a href="/entrada/historial" class="link-card">Historial</a>
+        <a href="/entrada/" class="link-card">Cambiar sucursal</a>
+    </div>
 </div>
 
 <script>

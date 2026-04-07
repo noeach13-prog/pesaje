@@ -6,19 +6,22 @@
 <title>Pesaje - Acceso</title>
 <style>
 :root {
-    --bg: #f5f0ea;
-    --card: #fff;
-    --ink: #2c2117;
-    --muted: #8a7868;
-    --accent: #8b5e34;
-    --accent-hover: #6d4828;
-    --line: #e4ddd5;
-    --focus: rgba(139,94,52,0.15);
+    --bg: #f7f1e8;
+    --card: rgba(255,252,247,0.95);
+    --ink: #2f241d;
+    --muted: #7d695d;
+    --accent: #9b6339;
+    --accent-deep: #7e4f2f;
+    --accent-soft: #f2e4d7;
+    --line: rgba(111,81,58,0.14);
+    --focus: rgba(155,99,57,0.12);
+    --danger-bg: #fff0ee;
+    --danger-text: #8e342d;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     font-family: 'Segoe UI', -apple-system, sans-serif;
-    background: var(--bg);
+    background: linear-gradient(180deg, #fbf6ef 0%, #f0e8de 100%);
     color: var(--ink);
     min-height: 100vh;
     display: flex;
@@ -28,118 +31,153 @@ body {
 }
 .card {
     background: var(--card);
-    border-radius: 20px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    box-shadow: 0 20px 50px rgba(74,48,31,0.10);
     width: 100%;
-    max-width: 400px;
+    max-width: 440px;
     overflow: hidden;
+    backdrop-filter: blur(8px);
 }
 .card-top {
-    background: var(--ink);
-    padding: 28px 28px 22px;
-    color: #fff;
+    padding: 30px 30px 24px;
+    background: linear-gradient(145deg, rgba(66,42,27,0.96), rgba(46,30,20,0.96));
+    color: #fffaf4;
+}
+.eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,240,225,0.8);
+    margin-bottom: 14px;
+}
+.eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 999px;
+    background: #e7b88e;
 }
 .card-top h1 {
-    font-size: 1.3rem;
+    font-size: 1.6rem;
     font-weight: 700;
-    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
 }
 .card-top p {
-    font-size: 0.82rem;
-    opacity: 0.6;
+    font-size: 0.85rem;
+    color: rgba(255,243,233,0.6);
 }
-.card-body {
-    padding: 24px 28px 20px;
-}
+.card-body { padding: 26px 30px 22px; }
 .error-msg {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #991b1b;
-    padding: 10px 12px;
-    border-radius: 10px;
+    background: var(--danger-bg);
+    border: 1px solid rgba(173,73,59,0.15);
+    color: var(--danger-text);
+    padding: 10px 14px;
+    border-radius: 14px;
     font-size: 0.82rem;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
-.field {
-    margin-bottom: 16px;
-}
+.field { margin-bottom: 18px; }
 .field label {
     display: block;
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--muted);
-    margin-bottom: 6px;
+    letter-spacing: 0.1em;
+    color: #8d7262;
+    margin-bottom: 7px;
 }
 .field select,
 .field input {
     width: 100%;
-    padding: 12px 14px;
-    border: 1.5px solid var(--line);
-    border-radius: 12px;
-    font-size: 15px;
+    padding: 14px 15px;
+    border: 1px solid rgba(128,93,67,0.14);
+    border-radius: 14px;
+    font-size: 0.96rem;
     color: var(--ink);
-    background: #faf8f5;
+    background: linear-gradient(180deg, #fffdf9, #f8f1e8);
     transition: border-color 0.2s, box-shadow 0.2s;
     -webkit-appearance: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
 }
 .field select:focus,
 .field input:focus {
     outline: none;
-    border-color: var(--accent);
+    border-color: rgba(155,99,57,0.4);
     box-shadow: 0 0 0 3px var(--focus);
 }
 .field select {
     cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238a7868' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+    padding-right: 40px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23806a5d' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 14px center;
-    padding-right: 36px;
+    background-position: right 15px center;
 }
 .pin-input {
     text-align: center;
     letter-spacing: 0.4em;
-    font-size: 1.3rem;
+    font-size: 1.35rem;
     font-weight: 700;
-    font-family: 'Consolas', monospace;
+    font-family: 'Consolas', 'SF Mono', monospace;
 }
-.pin-input::placeholder {
-    letter-spacing: 0.25em;
-    color: #ccc;
-}
+.pin-input::placeholder { color: #d1beb0; letter-spacing: 0.25em; }
 .btn {
     width: 100%;
-    padding: 13px;
-    background: var(--accent);
-    color: #fff;
+    margin-top: 6px;
+    padding: 15px;
     border: none;
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-weight: 700;
+    border-radius: 16px;
     cursor: pointer;
-    transition: background 0.2s;
-    margin-top: 4px;
+    color: #fffaf4;
+    font-size: 0.96rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    box-shadow: 0 12px 28px rgba(126,79,47,0.22);
+    transition: transform 0.15s, box-shadow 0.15s;
 }
-.btn:hover { background: var(--accent-hover); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 14px 32px rgba(126,79,47,0.26); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
 .card-foot {
-    padding: 12px 28px;
-    background: #faf8f5;
+    padding: 14px 30px;
+    background: rgba(247,239,230,0.5);
     border-top: 1px solid var(--line);
-    text-align: center;
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+}
+.foot-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 0.68rem;
-    color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
+    color: #8d7467;
+    font-weight: 700;
+}
+.foot-chip::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 999px;
+    background: rgba(155,99,57,0.45);
 }
 </style>
 </head>
 <body>
 <div class="card">
     <div class="card-top">
-        <h1>Sistema de Pesaje</h1>
-        <p>Control de stock y carga de sucursales</p>
+        <div class="eyebrow">Sistema de pesaje</div>
+        <h1>Acceso a sucursales</h1>
+        <p>Control de stock y carga de turnos</p>
     </div>
     <div class="card-body">
         {% if error %}
@@ -149,7 +187,7 @@ body {
             <div class="field">
                 <label>Sucursal</label>
                 <select name="sucursal_id" required>
-                    <option value="">Seleccionar...</option>
+                    <option value="">Seleccionar sucursal...</option>
                     {% for s in sucursales %}
                     <option value="{{ s.id }}">{{ s.nombre }}</option>
                     {% endfor %}
@@ -164,7 +202,10 @@ body {
             <button type="submit" class="btn" id="btn">Ingresar</button>
         </form>
     </div>
-    <div class="card-foot">Acceso restringido a personal autorizado</div>
+    <div class="card-foot">
+        <span class="foot-chip">Uso interno</span>
+        <span class="foot-chip">Acceso restringido</span>
+    </div>
 </div>
 <script>
 document.getElementById('f').addEventListener('submit', function() {
