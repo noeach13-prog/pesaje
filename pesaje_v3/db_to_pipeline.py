@@ -80,7 +80,7 @@ def _turno_db_to_crudo(db: sqlite3.Connection, turno_id: int,
 
 
 def armar_datos_dia(db: sqlite3.Connection, sucursal_id: int,
-                     fecha: str, turnos_contexto: int = 3) -> Optional[DatosDia]:
+                     fecha: str, turnos_contexto: int = 6) -> Optional[DatosDia]:
     """
     Arma un DatosDia completo desde la DB para una fecha dada.
 
