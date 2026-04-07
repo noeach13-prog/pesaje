@@ -80,42 +80,32 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
         c4 = resolver_escalados(datos_dia, cont, c3)
 
         # C5: segunda pasada — solo si el supervisor lo pide explicitamente
-        c5_cambios = []
+        # C5: segunda pasada — senales residuales de calidad
+        # C5 no modifica ventas. Agrega senales (R1, R2, etc.) que
+        # indican patrones sospechosos no resueltos por C3/C4.
+        c5_senales = {}
         if profundo and turno['estado'] == 'confirmado':
-            from .capa5_residual import segunda_pasada
-            c5 = segunda_pasada(datos_dia, c3, c4.correcciones, stats={})
-            # Detectar que cambio entre C4 y C5
-            c4_por_nombre = {c.nombre_norm: c for c in c4.correcciones}
-            c5_por_nombre = {c.nombre_norm: c for c in c5} if isinstance(c5, list) else {}
-            for nn, c5c in c5_por_nombre.items():
-                c4c = c4_por_nombre.get(nn)
-                if c4c and c4c.venta_corregida != c5c.venta_corregida:
-                    c5_cambios.append({
-                        'nombre': nn,
-                        'c4_venta': c4c.venta_corregida,
-                        'c5_venta': c5c.venta_corregida,
-                        'delta': c5c.venta_corregida - c4c.venta_corregida,
-                        'motivo': getattr(c5c, 'motivo', '')[:80],
-                    })
-                elif not c4c:
-                    c5_cambios.append({
-                        'nombre': nn,
-                        'c4_venta': None,
-                        'c5_venta': c5c.venta_corregida,
-                        'delta': c5c.delta,
-                        'motivo': getattr(c5c, 'motivo', '')[:80],
-                    })
-            # Usar correcciones C5 como fuente si hay
-            if c5_por_nombre:
-                c4_correcciones_final = c5 if isinstance(c5, list) else c4.correcciones
-            else:
-                c4_correcciones_final = c4.correcciones
-        else:
-            c4_correcciones_final = c4.correcciones
+            try:
+                from .capa5_residual import segunda_pasada
+                c5 = segunda_pasada(datos_dia, c3, c4.correcciones, stats={})
+                if hasattr(c5, 'sabores'):
+                    for nn, c5_sab in c5.sabores.items():
+                        if c5_sab.senales:
+                            c5_senales[nn] = [
+                                {'tipo': s.tipo, 'subtipo': s.subtipo, 'detalle': s.detalle}
+                                for s in c5_sab.senales
+                            ]
+            except Exception as e:
+                resultado['alertas'].append({
+                    'nivel': 'analisis', 'severidad': 'info', 'sabor': None,
+                    'codigo': 'C5_ERROR', 'detalle': f'Error en C5: {str(e)[:80]}',
+                })
+
+        c4_correcciones_final = c4.correcciones
 
         resultado['tiene_analisis'] = True
         resultado['profundo'] = profundo and turno['estado'] == 'confirmado'
-        resultado['c5_cambios'] = c5_cambios
+        resultado['c5_senales'] = c5_senales
 
         # Ventas por sabor
         venta_total = 0
@@ -165,6 +155,10 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
             elif c4_corr:
                 sabor_info['correccion'] = c4_corr.motivo[:80]
                 sabor_info['confianza'] = c4_corr.confianza
+
+            # Senales C5 si se ejecuto analisis profundo
+            if nombre in c5_senales:
+                sabor_info['c5_senales'] = c5_senales[nombre]
             # Explicación clara para verificación humana
             d = datos_dia.turno_dia.sabores.get(nombre)
             n = datos_dia.turno_noche.sabores.get(nombre)

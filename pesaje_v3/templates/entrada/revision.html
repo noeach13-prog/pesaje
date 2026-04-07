@@ -221,21 +221,20 @@ tr.row-neg { background: #fce4ec; }
     {% if analisis.profundo %}
     <div class="c5-banner">
         <div class="c5-title">Analisis profundo (C5) ejecutado</div>
-        {% if analisis.c5_cambios %}
-        <div class="c5-subtitle">{{ analisis.c5_cambios|length }} sabores con cambios respecto al analisis base:</div>
-        {% for c in analisis.c5_cambios %}
+        {% if analisis.c5_senales %}
+        <div class="c5-subtitle">{{ analisis.c5_senales|length }} sabores con senales residuales:</div>
+        {% for nombre, senales in analisis.c5_senales.items() %}
         <div class="c5-row">
-            <strong>{{ c.nombre }}</strong>:
-            base={{ "{:,}".format(c.c4_venta) if c.c4_venta is not none else 'sin correccion' }}g
-            → profundo={{ "{:,}".format(c.c5_venta) }}g
-            ({{ "{:+,}".format(c.delta) }}g)
-            {% if c.motivo %}<br><span style="font-size:0.7rem;color:#555;">{{ c.motivo }}</span>{% endif %}
+            <strong>{{ nombre }}</strong>:
+            {% for s in senales %}
+            <span style="background:#e1bee7;padding:1px 6px;border-radius:4px;font-size:0.7rem;">{{ s.tipo }}: {{ s.detalle }}</span>
+            {% endfor %}
         </div>
         {% endfor %}
         {% else %}
-        <div class="c5-subtitle">C5 no encontro mejoras. El resultado base es el mejor disponible.</div>
+        <div class="c5-subtitle">C5 no encontro senales residuales. El resultado base es confiable.</div>
         {% endif %}
-        <div class="c5-note">Nota: El analisis profundo es local (este turno + vecinos). Puede diferir del reporte mensual si hay patrones que cruzan dias no visibles aqui.</div>
+        <div class="c5-note">Nota: C5 detecta patrones residuales (ventas estancadas, anomalias recurrentes). No modifica ventas, solo marca sabores para revision.</div>
     </div>
     {% else %}
     <div style="margin:8px 0;">
