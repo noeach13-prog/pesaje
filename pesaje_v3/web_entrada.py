@@ -303,11 +303,27 @@ def historial():
         return redirect(url_for('entrada.index'))
 
     db = get_db()
+
+    # Meses disponibles con conteo
+    meses_rows = db.execute(
+        """SELECT substr(fecha,1,7) as mes, COUNT(*) as n,
+           SUM(CASE WHEN estado='confirmado' THEN 1 ELSE 0 END) as conf,
+           SUM(CASE WHEN estado='borrador' THEN 1 ELSE 0 END) as borr
+           FROM turnos WHERE sucursal_id=? GROUP BY mes ORDER BY mes DESC""",
+        (sid,),
+    ).fetchall()
+    meses = [dict(r) for r in meses_rows]
+
+    # Mes seleccionado: el del query param, o el mas reciente
     mes = request.args.get('mes')
-    turnos = listar_turnos(db, sucursal_id=sid, mes=mes)
+    if not mes and meses:
+        mes = meses[0]['mes']
+
+    turnos = listar_turnos(db, sucursal_id=sid, mes=mes) if mes else []
     db.close()
     return render_template('entrada/historial.html',
-                           turnos=turnos, sucursal_nombre=nombre, mes=mes)
+                           turnos=turnos, sucursal_nombre=nombre,
+                           mes=mes, meses=meses)
 
 
 # ─── APIs: VDP, Consumos, Notas, Agregar sabor ──────────────────────
