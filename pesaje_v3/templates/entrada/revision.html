@@ -162,7 +162,11 @@ tr.row-neg { background: #fce4ec; }
                             {% if s.correccion %}{{ s.correccion }}{% else %}Ver detalle{% endif %}
                             <span class="exp-toggle">&#9660;</span>
                         </div>
-                        <pre class="exp-detail">{{ s.explicacion }}</pre>
+                        <pre class="exp-detail">{{ s.explicacion }}{% if s.historial %}
+
+HISTORIAL:
+{% for h in s.historial %}  {{ h }}
+{% endfor %}{% endif %}</pre>
                     </div>
                 </td></tr>
                 {% elif s.correccion %}

@@ -15,6 +15,7 @@ import sqlite3
 
 from .db_to_pipeline import armar_datos_dia
 from .db import get_db
+from .capa5_residual import _timeline_sabor
 
 
 def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False) -> Dict:
@@ -197,6 +198,8 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                     nombre, sc, d, n, proto, c4_corr, False,
                     0, vf, status,
                 )
+                # Historial para H0 y CORREGIDOS
+                sabor_info['historial'] = _timeline_sabor(nombre, datos_dia)
 
             # Alerta si hay problema
             if vf < -200:
@@ -374,6 +377,7 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                         nombre, sc, d, n, proto, c4_corr, False,
                         0, vf, status,
                     )
+                    sabor_info['historial'] = _timeline_sabor(nombre, datos)
 
                 if vf < -200:
                     resultado['alertas'].append({
