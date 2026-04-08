@@ -444,12 +444,12 @@ CREATE TABLE IF NOT EXISTS stock_insumos (
     id INTEGER PRIMARY KEY,
     sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
     fecha TEXT NOT NULL,
+    snapshot_id TEXT NOT NULL,
     seccion TEXT NOT NULL,
     item TEXT NOT NULL,
     cantidad TEXT,
     registrado_por TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(sucursal_id, fecha, item)
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS postres_turno (
@@ -958,9 +958,9 @@ CATALOGO_STOCK = {
 
 def guardar_stock(db, sucursal_id: int, fecha: str, items: List[dict],
                    registrado_por: str = ''):
-    """Guarda inventario de insumos. items: [{seccion, item, cantidad}]"""
-    db.execute("DELETE FROM stock_insumos WHERE sucursal_id = ? AND fecha = ?",
-               (sucursal_id, fecha))
+    """Guarda snapshot de inventario. Cada guardado es un registro nuevo, no sobreescribe."""
+    import uuid
+    snapshot_id = str(uuid.uuid4())[:8]  # ID corto unico por snapshot
     for row in items:
         item = (row.get('item') or '').strip()
         if not item:
@@ -970,27 +970,42 @@ def guardar_stock(db, sucursal_id: int, fecha: str, items: List[dict],
             continue
         seccion = (row.get('seccion') or '').strip()
         db.execute(
-            "INSERT INTO stock_insumos (sucursal_id, fecha, seccion, item, cantidad, registrado_por) VALUES (?, ?, ?, ?, ?, ?)",
-            (sucursal_id, fecha, seccion, item, cantidad, registrado_por),
+            "INSERT INTO stock_insumos (sucursal_id, fecha, snapshot_id, seccion, item, cantidad, registrado_por) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (sucursal_id, fecha, snapshot_id, seccion, item, cantidad, registrado_por),
         )
     db.commit()
+    return snapshot_id
 
 
-def obtener_stock(db, sucursal_id: int, fecha: str) -> List[dict]:
-    """Retorna inventario de insumos de una fecha."""
+def obtener_stock(db, sucursal_id: int, snapshot_id: str) -> List[dict]:
+    """Retorna items de un snapshot especifico."""
     rows = db.execute(
-        "SELECT * FROM stock_insumos WHERE sucursal_id = ? AND fecha = ? ORDER BY seccion, item",
-        (sucursal_id, fecha),
+        "SELECT * FROM stock_insumos WHERE sucursal_id = ? AND snapshot_id = ? ORDER BY seccion, item",
+        (sucursal_id, snapshot_id),
     ).fetchall()
     return [_to_dict(r) for r in rows]
 
 
+def obtener_ultimo_stock(db, sucursal_id: int, fecha: str) -> List[dict]:
+    """Retorna el snapshot mas reciente de una fecha (para precargar)."""
+    row = db.execute(
+        """SELECT snapshot_id FROM stock_insumos
+           WHERE sucursal_id = ? AND fecha = ?
+           ORDER BY created_at DESC LIMIT 1""",
+        (sucursal_id, fecha),
+    ).fetchone()
+    if not row:
+        return []
+    return obtener_stock(db, sucursal_id, row['snapshot_id'])
+
+
 def listar_stocks(db, sucursal_id: int) -> List[dict]:
-    """Lista fechas con inventario de stock cargado."""
+    """Lista todos los snapshots de stock."""
     rows = db.execute(
-        """SELECT fecha, COUNT(*) as n_items, MAX(registrado_por) as registrado_por, MAX(created_at) as ultima
+        """SELECT snapshot_id, fecha, COUNT(*) as n_items,
+                  MAX(registrado_por) as registrado_por, MAX(created_at) as ultima
            FROM stock_insumos WHERE sucursal_id = ?
-           GROUP BY fecha ORDER BY fecha DESC""",
+           GROUP BY snapshot_id, fecha ORDER BY MAX(created_at) DESC""",
         (sucursal_id,),
     ).fetchall()
     return [_to_dict(r) for r in rows]

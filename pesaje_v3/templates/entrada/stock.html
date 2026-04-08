@@ -62,10 +62,10 @@ body {
     <div class="card">
         <div class="card-label">Inventarios anteriores</div>
         <div class="prev-list">
-            {% for s in stocks_list[:6] %}
-            <a href="/entrada/stock?fecha={{ s.fecha }}">
+            {% for s in stocks_list[:10] %}
+            <a href="/entrada/stock?snapshot={{ s.snapshot_id }}&fecha={{ s.fecha }}">
                 <span><strong>{{ s.fecha }}</strong> — {{ s.n_items }} items</span>
-                <span style="color:var(--muted);font-size:0.78rem;">{{ s.registrado_por or '' }}</span>
+                <span style="color:var(--muted);font-size:0.78rem;">{{ s.registrado_por or '' }} {{ s.ultima[11:16] if s.ultima and s.ultima|length > 16 else '' }}</span>
             </a>
             {% endfor %}
         </div>

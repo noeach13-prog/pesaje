@@ -20,7 +20,7 @@ from .db import (
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
     guardar_postres, CATALOGO_POSTRES,
-    guardar_stock, obtener_stock, listar_stocks, CATALOGO_STOCK,
+    guardar_stock, obtener_stock, obtener_ultimo_stock, listar_stocks, CATALOGO_STOCK,
     registrar_inicio_carga, confirmar_turno, registrar_actividad,
     desbloquear_turno, borrar_turno, obtener_turno,
 )
@@ -446,8 +446,12 @@ def stock():
 
     # GET
     fecha = request.args.get('fecha', hoy)
+    snapshot_id = request.args.get('snapshot')
     try:
-        stock_data = obtener_stock(db, sid, fecha)
+        if snapshot_id:
+            stock_data = obtener_stock(db, sid, snapshot_id)
+        else:
+            stock_data = obtener_ultimo_stock(db, sid, fecha)
         stock_map = {s['item']: s['cantidad'] for s in stock_data}
         stocks_list = listar_stocks(db, sid)
     except Exception:
