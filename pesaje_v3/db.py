@@ -101,6 +101,8 @@ def _translate_sql(sql):
         sql = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE)
         # Append ON CONFLICT DO NOTHING after the last )
         sql = sql.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+    # datetime('now') → CURRENT_TIMESTAMP (con o sin paréntesis envolventes)
+    sql = re.sub(r"\(datetime\s*\(\s*'now'\s*\)\)", "CURRENT_TIMESTAMP", sql, flags=re.IGNORECASE)
     sql = re.sub(r"datetime\s*\(\s*'now'\s*\)", "CURRENT_TIMESTAMP", sql, flags=re.IGNORECASE)
 
     # Placeholders: ? → %s (respetando strings)
@@ -147,13 +149,16 @@ def _get_schema():
     """Retorna schema SQL adaptado al dialecto actual."""
     if _is_postgres():
         # Postgres: SERIAL, CURRENT_TIMESTAMP, ON CONFLICT
-        return _SCHEMA.replace(
+        schema = _SCHEMA.replace(
             'INTEGER PRIMARY KEY,', 'SERIAL PRIMARY KEY,'
+        ).replace(
+            "(datetime('now'))", 'CURRENT_TIMESTAMP'
         ).replace(
             "datetime('now')", 'CURRENT_TIMESTAMP'
         ).replace(
-            'INSERT OR IGNORE', 'INSERT INTO'  # se reescribe abajo con ON CONFLICT
+            'INSERT OR IGNORE', 'INSERT INTO'
         )
+        return schema
     return _SCHEMA
 
 
