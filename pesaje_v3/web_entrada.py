@@ -19,6 +19,7 @@ from .db import (
     guardar_sabores, obtener_turno, listar_turnos,
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
+    guardar_postres, CATALOGO_POSTRES,
     registrar_inicio_carga, confirmar_turno, registrar_actividad,
     desbloquear_turno, borrar_turno, obtener_turno,
 )
@@ -252,9 +253,14 @@ def editar_turno(turno_id):
     # Sabores ya cargados en este turno (por nombre_norm)
     cargados_dict = {s['nombre_norm']: s for s in data['sabores']}
 
+    # Postres cargados
+    postres_cargados = {p['producto']: p['cantidad'] for p in data.get('postres', [])}
+
     return render_template('entrada/turno_form.html',
                            data=data, catalogo=catalogo,
-                           cargados=cargados_dict, ref=ref_turno)
+                           cargados=cargados_dict, ref=ref_turno,
+                           catalogo_postres=CATALOGO_POSTRES,
+                           postres_cargados=postres_cargados)
 
 
 @entrada_bp.route('/entrada/api/guardar', methods=['POST'])
@@ -375,17 +381,29 @@ def reportes():
             (sid, fecha_desde, fecha_hasta),
         ).fetchall()
 
+        # Postres
+        postres = db.execute(
+            """SELECT p.*, t.fecha, t.tipo_turno FROM postres_turno p
+               JOIN turnos t ON p.turno_id = t.id
+               WHERE t.sucursal_id = ? AND t.fecha >= ? AND t.fecha <= ?
+               ORDER BY t.fecha, t.tipo_turno, p.producto""",
+            (sid, fecha_desde, fecha_hasta),
+        ).fetchall()
+
         db.close()
 
         # Totales
         total_consumos_g = sum(c.get('gramos', 0) or 0 for c in consumos)
         total_vdp_g = sum(v.get('gramos', 0) or 0 for v in vdp)
+        total_postres = sum(p.get('cantidad', 0) or 0 for p in postres)
 
         return render_template('entrada/reportes.html',
                                sucursal_nombre=nombre, autenticado=True,
                                fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
                                consumos=[dict(c) for c in consumos],
                                notas=[dict(n) for n in notas],
+                               postres=[dict(p) for p in postres],
+                               total_postres=total_postres,
                                vdp=[dict(v) for v in vdp],
                                total_consumos_g=total_consumos_g,
                                total_vdp_g=total_vdp_g)
@@ -481,11 +499,13 @@ def api_guardar_extras():
     vdp = payload.get('vdp', [])
     consumos = payload.get('consumos', [])
     notas = payload.get('notas', [])
+    postres = payload.get('postres', [])
 
     try:
         guardar_vdp(db, turno_id, vdp)
         guardar_consumos(db, turno_id, consumos)
         guardar_notas(db, turno_id, notas)
+        guardar_postres(db, turno_id, postres)
         db.commit()
         db.close()
     except Exception as e:
@@ -501,6 +521,7 @@ def api_guardar_extras():
         'n_vdp': len([v for v in vdp if (v.get('texto') or '').strip()]),
         'n_consumos': len([c for c in consumos if (c.get('texto') or '').strip()]),
         'n_notas': len([n for n in notas if (n.get('detalle') or '').strip()]),
+        'n_postres': len([p for p in postres if p.get('cantidad')]),
     })
 
 

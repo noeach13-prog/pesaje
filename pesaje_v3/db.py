@@ -288,7 +288,7 @@ def init_db():
     conn.commit()
     flag = conn.execute("SELECT 1 FROM _flags WHERE key=?", ('LIMPIEZA_2026_04',)).fetchone()
     if not flag:
-        for tbl in ['ajustes_manuales', 'log_actividad', 'notas_turno',
+        for tbl in ['ajustes_manuales', 'log_actividad', 'postres_turno', 'notas_turno',
                      'consumo_turno', 'vdp_turno', 'sabores_turno', 'turnos']:
             conn.execute(f"DELETE FROM {tbl}")
         if conn.is_pg:
@@ -438,6 +438,14 @@ CREATE TABLE IF NOT EXISTS ajustes_manuales (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(turno_id, nombre_norm)
+);
+
+CREATE TABLE IF NOT EXISTS postres_turno (
+    id INTEGER PRIMARY KEY,
+    turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
+    producto TEXT NOT NULL,
+    cantidad INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(turno_id, producto)
 );
 
 CREATE TABLE IF NOT EXISTS log_actividad (
@@ -757,6 +765,10 @@ def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:
         "SELECT * FROM notas_turno WHERE turno_id = ? ORDER BY id", (turno_id,)
     ).fetchall()
 
+    postres = db.execute(
+        "SELECT * FROM postres_turno WHERE turno_id = ? ORDER BY producto", (turno_id,)
+    ).fetchall()
+
     return {
         'turno': _to_dict(turno),
         'sabores': [_to_dict(s) for s in sabores],
@@ -767,6 +779,7 @@ def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:
         'vdp': [dict(v) for v in vdp],
         'consumos': [dict(c) for c in consumos],
         'notas': [dict(n) for n in notas],
+        'postres': [dict(p) for p in postres],
         'log': obtener_log_actividad(db, turno_id),
     }
 
@@ -895,6 +908,49 @@ def obtener_log_actividad(db: sqlite3.Connection, turno_id: int) -> List[dict]:
     """Retorna log de actividad ordenado cronologicamente."""
     rows = db.execute(
         "SELECT * FROM log_actividad WHERE turno_id = ? ORDER BY id",
+        (turno_id,),
+    ).fetchall()
+    return [_to_dict(r) for r in rows]
+
+
+# ─── Postres ──────────────────────────────────────────────────────
+
+CATALOGO_POSTRES = [
+    'BALDE 2 LITROS', 'BALDE 4 LITROS', 'ALMENDRADO 1400CC', 'MIXTO 1400CC',
+    'BOMBON ESCOCES X 6 UN', 'SEMIFRIO CHOCO AMOR', 'SEMIFRIO AMOR TIRANO',
+    'TORTA FRUTILLA', 'TORTA PRIMAVERA', 'TORTA COOKIES', 'TORTA CHOCOTORTA',
+    'TORTA BOSQUE', 'ALMENDRADO X 20 PORC.', 'MIXTO X 20 PORC.',
+    'BOMBON X 18 UNI', 'GIO FRUTILLA', 'GIO FRAMBUEZA', 'GIO MORA',
+    'GIO PISTACHO', 'ALFAJOR HELADO', 'PALETAS',
+]
+
+
+def guardar_postres(db, turno_id: int, postres: List[dict]):
+    """Guarda postres de un turno. postres: [{producto, cantidad}]"""
+    db.execute("DELETE FROM postres_turno WHERE turno_id = ?", (turno_id,))
+    for p in postres:
+        producto = (p.get('producto') or '').strip()
+        if not producto:
+            continue
+        cantidad = p.get('cantidad', 0)
+        try:
+            cantidad = int(cantidad)
+        except (ValueError, TypeError):
+            cantidad = 0
+        if cantidad <= 0:
+            continue
+        db.execute(
+            "INSERT INTO postres_turno (turno_id, producto, cantidad) VALUES (?, ?, ?)",
+            (turno_id, producto, cantidad),
+        )
+    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
+    db.commit()
+
+
+def obtener_postres(db, turno_id: int) -> List[dict]:
+    """Retorna postres de un turno."""
+    rows = db.execute(
+        "SELECT * FROM postres_turno WHERE turno_id = ? ORDER BY producto",
         (turno_id,),
     ).fetchall()
     return [_to_dict(r) for r in rows]

@@ -522,6 +522,25 @@ body {
     <!-- Notas -->
     <div class="sec{{ ' open' if data.notas else '' }}"><div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Notas de caja <span class="sec-badge">{{ data.notas|length }}</span></div>
         <div class="sec-b" id="nB">{% for n in data.notas %}<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad"{{ ' selected' if n.categoria=='novedad' }}>Novedad</option><option value="reclamo"{{ ' selected' if n.categoria=='reclamo' }}>Reclamo</option><option value="faltante"{{ ' selected' if n.categoria=='faltante' }}>Faltante</option><option value="otro"{{ ' selected' if n.categoria=='otro' }}>Otro</option></select><input type="text" class="nd" value="{{ n.detalle }}" style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>{% endfor %}<button class="btn-s" onclick="addN()">+ Agregar</button></div></div>
+
+    <!-- POSTRES -->
+    <div class="sec">
+        <div class="sec-h" onclick="this.parentElement.classList.toggle('open')">Postres <span class="sec-badge" id="postresBadge">{{ postres_cargados|length if postres_cargados else 0 }}</span></div>
+        <div class="sec-b" id="postresBody">
+            <div style="display:grid;grid-template-columns:1fr 80px;gap:4px;padding:4px 0;">
+                <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;padding:4px 8px;">Producto</div>
+                <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;padding:4px 8px;text-align:center;">Cant.</div>
+            </div>
+            {% for p in catalogo_postres %}
+            <div class="xrow" style="display:grid;grid-template-columns:1fr 80px;gap:4px;align-items:center;">
+                <div style="font-size:0.85rem;padding:6px 8px;">{{ p }}</div>
+                <input type="number" class="postre-qty" data-producto="{{ p }}" min="0" inputmode="numeric"
+                       value="{{ postres_cargados.get(p, '') }}" placeholder="0"
+                       style="text-align:center;padding:8px;border:1px solid rgba(128,93,67,0.14);border-radius:10px;font-size:0.9rem;font-weight:700;">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 
 {% if data.turno.estado != 'confirmado' %}
@@ -896,7 +915,13 @@ function collectX() {
     });
     // Notas: sin cambio
     document.querySelectorAll('#nB .xrow').forEach(r=>{const c=(r.querySelector('.nc')||{}).value||'otro',d=(r.querySelector('.nd')||{}).value||'';if(d.trim())notas.push({categoria:c,detalle:d});});
-    return{vdp,consumos:con,notas};
+    // Postres
+    const postres=[];
+    document.querySelectorAll('.postre-qty').forEach(inp=>{
+        const qty=parseInt(inp.value);
+        if(qty>0) postres.push({producto:inp.dataset.producto, cantidad:qty});
+    });
+    return{vdp,consumos:con,notas,postres};
 }
 
 function toast(msg,t){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show toast-'+t;setTimeout(()=>el.className='toast',3500);}

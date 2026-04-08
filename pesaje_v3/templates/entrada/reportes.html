@@ -265,6 +265,38 @@ tr:hover td { background: rgba(155,99,57,0.04); }
         {% endif %}
     </div>
 
+    {# ── POSTRES ── #}
+    {% if postres is defined %}
+    <div class="card">
+        <div class="section-title">Postres vendidos — {{ fecha_desde }} a {{ fecha_hasta }}</div>
+        {% if postres %}
+        <table>
+            <thead>
+                <tr><th>Fecha</th><th>Turno</th><th>Producto</th><th style="text-align:right;">Cantidad</th></tr>
+            </thead>
+            <tbody>
+                {% for p in postres %}
+                <tr>
+                    <td>{{ p.fecha }}</td>
+                    <td>{{ p.tipo_turno }}</td>
+                    <td>{{ p.producto }}</td>
+                    <td style="text-align:right;font-weight:700;">{{ p.cantidad }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="tfoot">
+                    <td colspan="3">Total postres ({{ postres|length }} registros)</td>
+                    <td style="text-align:right;">{{ total_postres }} unidades</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="section-empty">Sin postres en este periodo</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     {% endif %}
     {% endif %}
 </div>
