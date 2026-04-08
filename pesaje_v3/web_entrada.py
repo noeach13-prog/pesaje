@@ -474,6 +474,42 @@ def stock():
                            guardado=guardado, stock_error=stock_error)
 
 
+@entrada_bp.route('/entrada/api/borrar-stock', methods=['POST'])
+def api_borrar_stock():
+    """Borra un snapshot de stock con PIN supervisor."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+
+    payload = request.get_json() or {}
+    snapshot_id = payload.get('snapshot_id', '')
+    pin = payload.get('pin_supervisor', '')
+
+    if not snapshot_id or not pin:
+        return jsonify({'ok': False, 'error': 'Faltan datos'}), 400
+
+    db = get_db()
+    suc = db.execute("SELECT pin_supervisor FROM sucursales WHERE id = ?", (sid,)).fetchone()
+    if not suc or str(pin) != str(suc['pin_supervisor']):
+        db.close()
+        return jsonify({'ok': False, 'error': 'PIN incorrecto'}), 403
+
+    try:
+        db.execute("DELETE FROM stock_insumos WHERE sucursal_id = ? AND snapshot_id = ?",
+                   (sid, snapshot_id))
+        db.commit()
+    except Exception as e:
+        try:
+            db._conn.rollback()
+        except Exception:
+            pass
+        db.close()
+        return jsonify({'ok': False, 'error': str(e)[:200]}), 500
+
+    db.close()
+    return jsonify({'ok': True})
+
+
 @entrada_bp.route('/entrada/historial')
 def historial():
     """Lista de turnos cargados para la sucursal activa."""

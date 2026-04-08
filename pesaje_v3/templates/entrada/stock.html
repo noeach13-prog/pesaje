@@ -66,10 +66,13 @@ body {
         <div class="card-label">Inventarios anteriores</div>
         <div class="prev-list">
             {% for s in stocks_list[:10] %}
-            <a href="/entrada/stock?snapshot={{ s.snapshot_id }}&fecha={{ s.fecha }}">
-                <span><strong>{{ s.fecha }}</strong> — {{ s.n_items }} items</span>
-                <span style="color:var(--muted);font-size:0.78rem;">{{ s.registrado_por or '' }} {{ s.ultima[11:16] if s.ultima and s.ultima|length > 16 else '' }}</span>
-            </a>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                <a href="/entrada/stock?snapshot={{ s.snapshot_id }}&fecha={{ s.fecha }}" style="flex:1;">
+                    <span><strong>{{ s.fecha }}</strong> — {{ s.n_items }} items</span>
+                    <span style="color:var(--muted);font-size:0.78rem;">{{ s.registrado_por or '' }} {{ s.ultima[11:16] if s.ultima and s.ultima|length > 16 else '' }}</span>
+                </a>
+                <button onclick="borrarStock('{{ s.snapshot_id }}')" style="background:none;border:1px solid rgba(143,59,56,0.2);color:#8f3b38;padding:4px 8px;border-radius:8px;font-size:0.68rem;font-weight:700;cursor:pointer;">Borrar</button>
+            </div>
             {% endfor %}
         </div>
     </div>
@@ -107,5 +110,22 @@ body {
         </form>
     </div>
 </div>
+<script>
+function borrarStock(snapshotId) {
+    var pin = prompt('PIN de supervisor para borrar:');
+    if (!pin) return;
+    fetch('/entrada/api/borrar-stock', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({snapshot_id: snapshotId, pin_supervisor: pin})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) { location.reload(); }
+        else { alert(d.error || 'Error'); }
+    })
+    .catch(() => alert('Error de conexion'));
+}
+</script>
 </body>
 </html>
