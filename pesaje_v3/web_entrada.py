@@ -81,6 +81,14 @@ def index():
     return render_template('entrada/login.html', sucursales=sucursales, error=None)
 
 
+@entrada_bp.route('/entrada/logout')
+def logout():
+    """Cierra sesion y vuelve al login."""
+    session.pop('sucursal_id', None)
+    session.pop('sucursal_nombre', None)
+    return redirect(url_for('entrada.index'))
+
+
 @entrada_bp.route('/entrada/login', methods=['POST'])
 def login():
     """Verifica PIN y crea sesion."""
