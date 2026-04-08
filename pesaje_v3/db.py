@@ -29,6 +29,16 @@ _DATABASE_URL = os.environ.get('DATABASE_URL', '')
 _DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 
+def _to_dict(row):
+    """Convierte una fila de DB a dict con valores serializables.
+    Postgres retorna datetime objects; los convertimos a string."""
+    d = dict(row)
+    for k, v in d.items():
+        if hasattr(v, 'isoformat'):
+            d[k] = v.isoformat()
+    return d
+
+
 def _is_postgres():
     return bool(_DATABASE_URL)
 
@@ -706,9 +716,9 @@ def obtener_turno(db: sqlite3.Connection, turno_id: int) -> Optional[dict]:
     ).fetchall()
 
     return {
-        'turno': dict(turno),
-        'sabores': [dict(s) for s in sabores],
-        'sucursal': dict(sucursal),
+        'turno': _to_dict(turno),
+        'sabores': [_to_dict(s) for s in sabores],
+        'sucursal': _to_dict(sucursal),
         'nombre_hoja': derivar_nombre_hoja(
             turno['fecha'], turno['tipo_turno'], sucursal['modo']
         ),
@@ -732,7 +742,7 @@ def listar_turnos(db: sqlite3.Connection, sucursal_id: int = None,
         params.append(f'{mes}%')  # 'YYYY-MM'
     query += " ORDER BY t.fecha DESC, t.tipo_turno"
     rows = db.execute(query, params).fetchall()
-    return [dict(r) for r in rows]
+    return [_to_dict(r) for r in rows]
 
 
 def verificar_pin(db: sqlite3.Connection, sucursal_id: int, pin: str) -> Optional[dict]:
@@ -747,7 +757,7 @@ def verificar_pin(db: sqlite3.Connection, sucursal_id: int, pin: str) -> Optiona
 def obtener_sucursales(db: sqlite3.Connection) -> List[dict]:
     """Lista todas las sucursales (sin exponer el PIN)."""
     rows = db.execute("SELECT id, nombre, modo FROM sucursales ORDER BY nombre").fetchall()
-    return [dict(r) for r in rows]
+    return [_to_dict(r) for r in rows]
 
 
 def catalogo_sabores(db: sqlite3.Connection, sucursal_id: int) -> List[str]:
@@ -845,7 +855,7 @@ def obtener_log_actividad(db: sqlite3.Connection, turno_id: int) -> List[dict]:
         "SELECT * FROM log_actividad WHERE turno_id = ? ORDER BY id",
         (turno_id,),
     ).fetchall()
-    return [dict(r) for r in rows]
+    return [_to_dict(r) for r in rows]
 
 
 def guardar_vdp(db: sqlite3.Connection, turno_id: int, items: List[dict]):

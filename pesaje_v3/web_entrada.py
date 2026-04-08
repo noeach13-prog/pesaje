@@ -57,7 +57,15 @@ def _datos_turno_anterior(db, sucursal_id, fecha):
     sabores = db.execute(
         "SELECT * FROM sabores_turno WHERE turno_id = ?", (row['id'],)
     ).fetchall()
-    return {s['nombre_norm']: dict(s) for s in sabores}
+    result = {}
+    for s in sabores:
+        d = dict(s)
+        # Postgres puede retornar datetime objects; convertir a string para tojson
+        for k, v in d.items():
+            if hasattr(v, 'isoformat'):
+                d[k] = v.isoformat()
+        result[d['nombre_norm']] = d
+    return result
 
 
 def _sucursal_activa():
