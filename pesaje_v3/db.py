@@ -253,9 +253,10 @@ def init_db():
     if _col_exists(conn, 'consumo_turno', 'texto') and not _col_exists(conn, 'consumo_turno', 'empleado'):
         conn.execute("ALTER TABLE consumo_turno ADD COLUMN empleado TEXT")
 
-    # Migración: stock_inventario (vieja) → stock_insumos (nueva)
+    # Migración: recrear stock_insumos con snapshot_id
     try:
         conn.execute("DROP TABLE IF EXISTS stock_inventario")
+        conn.execute("DROP TABLE IF EXISTS stock_insumos")
         conn.commit()
     except Exception:
         try:
@@ -263,7 +264,6 @@ def init_db():
         except Exception:
             pass
 
-    # Crear stock_insumos si no existe (puede fallar si ya existe, ok)
     try:
         conn.execute("""CREATE TABLE IF NOT EXISTS stock_insumos (
             id %s,
