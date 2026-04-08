@@ -45,6 +45,46 @@ def _is_postgres():
 
 # ─── Conexión dual ────────────────────────────────────────────────
 
+def _pg_row_to_dict(row):
+    """Convierte un row de RealDictCursor a dict con datetime→string."""
+    if row is None:
+        return None
+    d = dict(row)
+    for k, v in d.items():
+        if isinstance(v, datetime):
+            d[k] = v.isoformat()
+        elif hasattr(v, 'isoformat'):  # date objects
+            d[k] = v.isoformat()
+    return d
+
+
+class _PgCursorWrapper:
+    """Wrapper de cursor Postgres que convierte datetime a string en resultados."""
+
+    def __init__(self, cur):
+        self._cur = cur
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return _pg_row_to_dict(row)
+
+    def fetchall(self):
+        rows = self._cur.fetchall()
+        return [_pg_row_to_dict(r) for r in rows]
+
+    @property
+    def lastrowid(self):
+        return getattr(self._cur, 'lastrowid', None)
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def description(self):
+        return self._cur.description
+
+
 class DBConn:
     """Wrapper que expone la misma interfaz para SQLite y PostgreSQL.
 
@@ -58,13 +98,11 @@ class DBConn:
 
     def execute(self, sql, params=None):
         if self.is_pg:
-            # Postgres usa %s para parámetros. El código usa ? (SQLite).
-            # Traducción segura: solo reemplaza ? que NO estén dentro de strings.
             sql_pg = _translate_sql(sql)
             import psycopg2.extras
             cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur.execute(sql_pg, params or ())
-            return cur
+            return _PgCursorWrapper(cur)
         else:
             return self._conn.execute(sql, params or ())
 
@@ -606,9 +644,10 @@ def confirmar_turno(db: sqlite3.Connection, turno_id: int,
         return {'ok': False, 'error': 'Turno ya confirmado'}
 
     # Verificar que tenga al menos 1 sabor con datos
-    n_sabores = db.execute(
-        "SELECT COUNT(*) FROM sabores_turno WHERE turno_id = ?", (turno_id,)
-    ).fetchone()[0]
+    row = db.execute(
+        "SELECT COUNT(*) as n FROM sabores_turno WHERE turno_id = ?", (turno_id,)
+    ).fetchone()
+    n_sabores = row['n'] if isinstance(row, dict) else row[0]
     if n_sabores == 0:
         return {'ok': False, 'error': 'No hay sabores cargados'}
 
@@ -621,18 +660,21 @@ def confirmar_turno(db: sqlite3.Connection, turno_id: int,
     db.commit()
 
     # Resumen
-    total_peso = db.execute(
+    row_peso = db.execute(
         """SELECT COALESCE(SUM(
             COALESCE(abierta,0)+COALESCE(celiaca,0)+
             COALESCE(cerrada_1,0)+COALESCE(cerrada_2,0)+COALESCE(cerrada_3,0)+
             COALESCE(cerrada_4,0)+COALESCE(cerrada_5,0)+COALESCE(cerrada_6,0)+
             COALESCE(entrante_1,0)+COALESCE(entrante_2,0)
-        ), 0) FROM sabores_turno WHERE turno_id = ?""",
+        ), 0) as total FROM sabores_turno WHERE turno_id = ?""",
         (turno_id,),
-    ).fetchone()[0]
+    ).fetchone()
+    total_peso = row_peso['total'] if isinstance(row_peso, dict) else row_peso[0]
 
-    n_vdp = db.execute("SELECT COUNT(*) FROM vdp_turno WHERE turno_id=?", (turno_id,)).fetchone()[0]
-    total_vdp = db.execute("SELECT COALESCE(SUM(gramos),0) FROM vdp_turno WHERE turno_id=?", (turno_id,)).fetchone()[0]
+    row_nvdp = db.execute("SELECT COUNT(*) as n FROM vdp_turno WHERE turno_id=?", (turno_id,)).fetchone()
+    n_vdp = row_nvdp['n'] if isinstance(row_nvdp, dict) else row_nvdp[0]
+    row_tvdp = db.execute("SELECT COALESCE(SUM(gramos),0) as total FROM vdp_turno WHERE turno_id=?", (turno_id,)).fetchone()
+    total_vdp = row_tvdp['total'] if isinstance(row_tvdp, dict) else row_tvdp[0]
 
     return {
         'ok': True,
