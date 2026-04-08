@@ -50,7 +50,7 @@ class DBConn:
         if self.is_pg:
             # Postgres usa %s para parámetros. El código usa ? (SQLite).
             # Traducción segura: solo reemplaza ? que NO estén dentro de strings.
-            sql_pg = _translate_placeholders(sql)
+            sql_pg = _translate_sql(sql)
             import psycopg2.extras
             cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             cur.execute(sql_pg, params or ())
