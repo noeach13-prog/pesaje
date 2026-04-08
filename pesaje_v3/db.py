@@ -1,13 +1,18 @@
 """
-db.py — SQLite schema + CRUD para el sistema de carga de pesaje.
+db.py — Capa de persistencia dual SQLite/PostgreSQL.
 
 Tres reglas de diseño:
 1. nombre_hoja es DERIVADO de (fecha, tipo_turno, modo), no dato soberano.
 2. updated_at desde el primer día — sin rastro temporal no hay auditoría.
 3. Las validaciones de campo se repiten server-side aunque el client las haga.
+
+Dual dialect:
+- Sin DATABASE_URL → SQLite local (dev)
+- Con DATABASE_URL → PostgreSQL (Railway prod)
 """
 import os
 import sqlite3
+import re
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 
@@ -19,77 +24,207 @@ from parser import normalize_name
 _DB_PATH = os.environ.get('PESAJE_DB', os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'pesaje.db'
 ))
+_DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 _DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 
-# ─── Conexión ───────────────────────────────────────────────────────
+def _is_postgres():
+    return bool(_DATABASE_URL)
 
-def get_db() -> sqlite3.Connection:
-    """Retorna conexión con row_factory=sqlite3.Row."""
-    os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
-    return conn
+
+# ─── Conexión dual ────────────────────────────────────────────────
+
+class DBConn:
+    """Wrapper que expone la misma interfaz para SQLite y PostgreSQL.
+
+    No usa replace mágico de '?' a '%s'. Cada dialecto tiene su propio
+    formato de parametrización, manejado por el wrapper.
+    """
+
+    def __init__(self, conn, is_pg=False):
+        self._conn = conn
+        self.is_pg = is_pg
+
+    def execute(self, sql, params=None):
+        if self.is_pg:
+            # Postgres usa %s para parámetros. El código usa ? (SQLite).
+            # Traducción segura: solo reemplaza ? que NO estén dentro de strings.
+            sql_pg = _translate_placeholders(sql)
+            import psycopg2.extras
+            cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute(sql_pg, params or ())
+            return cur
+        else:
+            return self._conn.execute(sql, params or ())
+
+    def executescript(self, sql):
+        if self.is_pg:
+            self._conn.cursor().execute(sql)
+            self._conn.commit()
+        else:
+            self._conn.executescript(sql)
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+    @property
+    def row_factory(self):
+        if not self.is_pg:
+            return self._conn.row_factory
+        return None
+
+    @row_factory.setter
+    def row_factory(self, val):
+        if not self.is_pg:
+            self._conn.row_factory = val
+
+
+def _translate_placeholders(sql):
+    """Traduce ? a %s de forma segura (ignora ? dentro de strings)."""
+    result = []
+    in_string = False
+    quote_char = None
+    for ch in sql:
+        if in_string:
+            result.append(ch)
+            if ch == quote_char:
+                in_string = False
+        elif ch in ("'", '"'):
+            in_string = True
+            quote_char = ch
+            result.append(ch)
+        elif ch == '?':
+            result.append('%s')
+        else:
+            result.append(ch)
+    return ''.join(result)
+
+
+def get_db() -> DBConn:
+    """Retorna conexión wrapeada. SQLite local o PostgreSQL según entorno."""
+    if _is_postgres():
+        import psycopg2
+        url = _DATABASE_URL
+        # Railway a veces da postgres:// en vez de postgresql://
+        if url.startswith('postgres://'):
+            url = url.replace('postgres://', 'postgresql://', 1)
+        conn = psycopg2.connect(url, sslmode='require')
+        conn.autocommit = False
+        return DBConn(conn, is_pg=True)
+    else:
+        os.makedirs(os.path.dirname(_DB_PATH), exist_ok=True)
+        conn = sqlite3.connect(_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        return DBConn(conn, is_pg=False)
+
+
+def _get_schema():
+    """Retorna schema SQL adaptado al dialecto actual."""
+    if _is_postgres():
+        # Postgres: SERIAL, CURRENT_TIMESTAMP, ON CONFLICT
+        return _SCHEMA.replace(
+            'INTEGER PRIMARY KEY,', 'SERIAL PRIMARY KEY,'
+        ).replace(
+            "datetime('now')", 'CURRENT_TIMESTAMP'
+        ).replace(
+            'INSERT OR IGNORE', 'INSERT INTO'  # se reescribe abajo con ON CONFLICT
+        )
+    return _SCHEMA
+
+
+def _col_exists(conn, table, column):
+    """Verifica si una columna existe en una tabla (dual dialect)."""
+    if conn.is_pg:
+        row = conn.execute(
+            "SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name=?",
+            (table, column)
+        ).fetchone()
+        return row is not None
+    else:
+        cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        return column in cols
 
 
 def init_db():
     """Crea tablas si no existen. Idempotente. Migra schema si faltan columnas."""
     conn = get_db()
-    conn.executescript(_SCHEMA)
+
+    if conn.is_pg:
+        # Postgres: ejecutar cada CREATE TABLE por separado
+        schema = _get_schema()
+        for stmt in schema.split(';'):
+            stmt = stmt.strip()
+            if stmt and stmt.upper().startswith('CREATE'):
+                try:
+                    conn.execute(stmt)
+                except Exception:
+                    conn._conn.rollback()  # tabla ya existe, seguir
+        conn.commit()
+    else:
+        conn.executescript(_SCHEMA)
 
     # Migrations
-    cols_suc = [r[1] for r in conn.execute("PRAGMA table_info(sucursales)").fetchall()]
-    if 'pin' not in cols_suc:
+    if not _col_exists(conn, 'sucursales', 'pin'):
         conn.execute("ALTER TABLE sucursales ADD COLUMN pin TEXT NOT NULL DEFAULT '0000'")
-    if 'pin_supervisor' not in cols_suc:
+    if not _col_exists(conn, 'sucursales', 'pin_supervisor'):
         conn.execute("ALTER TABLE sucursales ADD COLUMN pin_supervisor TEXT NOT NULL DEFAULT '0000'")
-
-    cols_turno = [r[1] for r in conn.execute("PRAGMA table_info(turnos)").fetchall()]
-    if 'inicio_carga' not in cols_turno:
+    if not _col_exists(conn, 'turnos', 'inicio_carga'):
         conn.execute("ALTER TABLE turnos ADD COLUMN inicio_carga TEXT")
-    if 'fin_carga' not in cols_turno:
+    if not _col_exists(conn, 'turnos', 'fin_carga'):
         conn.execute("ALTER TABLE turnos ADD COLUMN fin_carga TEXT")
-
-    cols_consumo = [r[1] for r in conn.execute("PRAGMA table_info(consumo_turno)").fetchall()]
-    if cols_consumo and 'empleado' not in cols_consumo:
+    if _col_exists(conn, 'consumo_turno', 'texto') and not _col_exists(conn, 'consumo_turno', 'empleado'):
         conn.execute("ALTER TABLE consumo_turno ADD COLUMN empleado TEXT")
+    conn.commit()
 
     # Semilla: sucursales con PIN empleado + PIN supervisor
-    for nombre, modo, pin, pin_sup in [
+    _SUCURSALES = [
         ('San Martín', 'DIA_NOCHE', '1234', '2512'),
         ('Triunvirato', 'TURNO_UNICO', '5678', '2512'),
         ('Unión', 'TURNO_UNICO', '9012', '2512'),
         ('San Miguel', 'DIA_NOCHE', '3456', '2512'),
         ('Florida', 'DIA_NOCHE', '7890', '2512'),
-    ]:
-        conn.execute(
-            "INSERT OR IGNORE INTO sucursales (nombre, modo, pin, pin_supervisor) VALUES (?, ?, ?, ?)",
-            (nombre, modo, pin, pin_sup),
-        )
-        # Siempre actualizar PINs al valor configurado
-        conn.execute(
-            "UPDATE sucursales SET pin = ?, pin_supervisor = ? WHERE nombre = ?",
-            (pin, pin_sup, nombre),
-        )
+    ]
+    for nombre, modo, pin, pin_sup in _SUCURSALES:
+        if conn.is_pg:
+            conn.execute(
+                """INSERT INTO sucursales (nombre, modo, pin, pin_supervisor)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT (nombre) DO UPDATE SET pin = EXCLUDED.pin, pin_supervisor = EXCLUDED.pin_supervisor""",
+                (nombre, modo, pin, pin_sup),
+            )
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO sucursales (nombre, modo, pin, pin_supervisor) VALUES (?, ?, ?, ?)",
+                (nombre, modo, pin, pin_sup),
+            )
+            conn.execute(
+                "UPDATE sucursales SET pin = ?, pin_supervisor = ? WHERE nombre = ?",
+                (pin, pin_sup, nombre),
+            )
 
     # Limpieza unica: borrar turnos viejos
-    # Usa tabla propia para el flag (no depende de FK a turnos)
-    conn.execute("CREATE TABLE IF NOT EXISTS _flags (key TEXT PRIMARY KEY, val TEXT)")
-    flag = conn.execute("SELECT 1 FROM _flags WHERE key='LIMPIEZA_2026_04'").fetchone()
+    if conn.is_pg:
+        conn.execute("CREATE TABLE IF NOT EXISTS _flags (key TEXT PRIMARY KEY, val TEXT)")
+    else:
+        conn.execute("CREATE TABLE IF NOT EXISTS _flags (key TEXT PRIMARY KEY, val TEXT)")
+    conn.commit()
+    flag = conn.execute("SELECT 1 FROM _flags WHERE key=?", ('LIMPIEZA_2026_04',)).fetchone()
     if not flag:
-        conn.execute("DELETE FROM ajustes_manuales")
-        conn.execute("DELETE FROM log_actividad")
-        conn.execute("DELETE FROM notas_turno")
-        conn.execute("DELETE FROM consumo_turno")
-        conn.execute("DELETE FROM vdp_turno")
-        conn.execute("DELETE FROM sabores_turno")
-        conn.execute("DELETE FROM turnos")
-        conn.execute("INSERT INTO _flags (key, val) VALUES ('LIMPIEZA_2026_04', datetime('now'))")
+        for tbl in ['ajustes_manuales', 'log_actividad', 'notas_turno',
+                     'consumo_turno', 'vdp_turno', 'sabores_turno', 'turnos']:
+            conn.execute(f"DELETE FROM {tbl}")
+        if conn.is_pg:
+            conn.execute("INSERT INTO _flags (key, val) VALUES (?, CURRENT_TIMESTAMP)", ('LIMPIEZA_2026_04',))
+        else:
+            conn.execute("INSERT INTO _flags (key, val) VALUES (?, datetime('now'))", ('LIMPIEZA_2026_04',))
 
-    # Semilla: catálogo de sabores por sucursal (extraídos de workbooks reales)
+    # Semilla: catálogo de sabores por sucursal
     _sembrar_catalogo(conn)
     conn.commit()
     conn.close()
@@ -123,19 +258,27 @@ _SABORES_EXTRA = {
 
 def _sembrar_catalogo(conn):
     """Inserta catálogo de sabores si la tabla está vacía."""
-    count = conn.execute("SELECT COUNT(*) FROM catalogo_sabores").fetchone()[0]
+    row = conn.execute("SELECT COUNT(*) as n FROM catalogo_sabores").fetchone()
+    count = row['n'] if conn.is_pg else row[0]
     if count > 0:
         return  # ya sembrado
 
-    sucursales = {r[1]: r[0] for r in conn.execute("SELECT id, nombre FROM sucursales").fetchall()}
+    rows = conn.execute("SELECT id, nombre FROM sucursales").fetchall()
+    sucursales = {r['nombre']: r['id'] for r in rows} if conn.is_pg else {r[1]: r[0] for r in rows}
     for suc_nombre, suc_id in sucursales.items():
         sabores = list(_SABORES_BASE)
         sabores.extend(_SABORES_EXTRA.get(suc_nombre, []))
         for s in sorted(set(sabores)):
-            conn.execute(
-                "INSERT OR IGNORE INTO catalogo_sabores (sucursal_id, nombre_norm) VALUES (?, ?)",
-                (suc_id, s),
-            )
+            if conn.is_pg:
+                conn.execute(
+                    "INSERT INTO catalogo_sabores (sucursal_id, nombre_norm) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                    (suc_id, s),
+                )
+            else:
+                conn.execute(
+                    "INSERT OR IGNORE INTO catalogo_sabores (sucursal_id, nombre_norm) VALUES (?, ?)",
+                    (suc_id, s),
+                )
 
 
 _SCHEMA = """
@@ -321,16 +464,26 @@ def validar_sabor_server(row: dict) -> List[str]:
 
 # ─── CRUD ────────────────────────────────────────────────────────────
 
-def crear_turno(db: sqlite3.Connection, sucursal_id: int, fecha: str,
+def crear_turno(db, sucursal_id: int, fecha: str,
                 tipo_turno: str, ingresado_por: str = None) -> int:
     """Crea un turno vacío en estado borrador. Retorna turno.id."""
-    cur = db.execute(
-        """INSERT INTO turnos (sucursal_id, fecha, tipo_turno, ingresado_por)
-           VALUES (?, ?, ?, ?)""",
-        (sucursal_id, fecha, tipo_turno, ingresado_por),
-    )
-    db.commit()
-    return cur.lastrowid
+    if hasattr(db, 'is_pg') and db.is_pg:
+        cur = db.execute(
+            """INSERT INTO turnos (sucursal_id, fecha, tipo_turno, ingresado_por)
+               VALUES (?, ?, ?, ?) RETURNING id""",
+            (sucursal_id, fecha, tipo_turno, ingresado_por),
+        )
+        row = cur.fetchone()
+        db.commit()
+        return row['id']
+    else:
+        cur = db.execute(
+            """INSERT INTO turnos (sucursal_id, fecha, tipo_turno, ingresado_por)
+               VALUES (?, ?, ?, ?)""",
+            (sucursal_id, fecha, tipo_turno, ingresado_por),
+        )
+        db.commit()
+        return cur.lastrowid
 
 
 def guardar_sabores(db: sqlite3.Connection, turno_id: int,

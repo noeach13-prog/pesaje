@@ -31,6 +31,12 @@ app.register_blueprint(entrada_bp)
 init_db()
 
 
+@app.teardown_appcontext
+def _close_db(exc):
+    """Cierra conexiones DB abiertas durante el request."""
+    pass  # get_db() crea conexiones locales que se cierran en cada endpoint
+
+
 def _procesar(path_in: str, filename: str):
     """Corre el pipeline v3 sobre el archivo y retorna stats + path de salida."""
     from pesaje_v3.capa1_parser import cargar_todos_los_dias
