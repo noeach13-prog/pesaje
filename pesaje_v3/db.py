@@ -252,6 +252,54 @@ def init_db():
         conn.execute("ALTER TABLE turnos ADD COLUMN fin_carga TEXT")
     if _col_exists(conn, 'consumo_turno', 'texto') and not _col_exists(conn, 'consumo_turno', 'empleado'):
         conn.execute("ALTER TABLE consumo_turno ADD COLUMN empleado TEXT")
+
+    # Migración: stock_inventario (vieja) → stock_insumos (nueva)
+    try:
+        conn.execute("DROP TABLE IF EXISTS stock_inventario")
+        conn.commit()
+    except Exception:
+        try:
+            conn._conn.rollback()
+        except Exception:
+            pass
+
+    # Crear stock_insumos si no existe (puede fallar si ya existe, ok)
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS stock_insumos (
+            id %s,
+            sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
+            fecha TEXT NOT NULL,
+            snapshot_id TEXT NOT NULL,
+            seccion TEXT NOT NULL,
+            item TEXT NOT NULL,
+            cantidad TEXT,
+            registrado_por TEXT,
+            created_at TEXT NOT NULL DEFAULT %s
+        )""" % ('SERIAL PRIMARY KEY' if conn.is_pg else 'INTEGER PRIMARY KEY',
+                'CURRENT_TIMESTAMP' if conn.is_pg else "(datetime('now'))"))
+        conn.commit()
+    except Exception:
+        try:
+            conn._conn.rollback()
+        except Exception:
+            pass
+
+    # Crear postres_turno si no existe
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS postres_turno (
+            id %s,
+            turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
+            producto TEXT NOT NULL,
+            cantidad INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(turno_id, producto)
+        )""" % ('SERIAL PRIMARY KEY' if conn.is_pg else 'INTEGER PRIMARY KEY'))
+        conn.commit()
+    except Exception:
+        try:
+            conn._conn.rollback()
+        except Exception:
+            pass
+
     conn.commit()
 
     # Semilla: sucursales con PIN empleado + PIN supervisor
