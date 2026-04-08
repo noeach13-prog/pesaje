@@ -989,7 +989,7 @@ def obtener_stock(db, sucursal_id: int, fecha: str) -> List[dict]:
 def listar_stocks(db, sucursal_id: int) -> List[dict]:
     """Lista fechas con inventario de stock cargado."""
     rows = db.execute(
-        """SELECT fecha, COUNT(*) as n_sabores, registrado_por, MAX(created_at) as ultima
+        """SELECT fecha, COUNT(*) as n_sabores, MAX(registrado_por) as registrado_por, MAX(created_at) as ultima
            FROM stock_inventario WHERE sucursal_id = ?
            GROUP BY fecha ORDER BY fecha DESC""",
         (sucursal_id,),

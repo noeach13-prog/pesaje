@@ -450,9 +450,18 @@ def stock():
 
     # GET
     fecha = request.args.get('fecha', hoy)
-    stock_data = obtener_stock(db, sid, fecha)
-    stock_map = {s['nombre_norm']: s for s in stock_data}
-    stocks_list = listar_stocks(db, sid)
+    try:
+        stock_data = obtener_stock(db, sid, fecha)
+        stock_map = {s['nombre_norm']: s for s in stock_data}
+        stocks_list = listar_stocks(db, sid)
+    except Exception:
+        # Tabla puede no existir aún en Postgres
+        try:
+            db._conn.rollback()
+        except Exception:
+            pass
+        stock_map = {}
+        stocks_list = []
     guardado = request.args.get('guardado')
     db.close()
 
