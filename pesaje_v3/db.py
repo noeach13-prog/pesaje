@@ -83,8 +83,27 @@ class DBConn:
             self._conn.row_factory = val
 
 
-def _translate_placeholders(sql):
-    """Traduce ? a %s de forma segura (ignora ? dentro de strings)."""
+def _translate_sql(sql):
+    """Traduce SQL de SQLite a PostgreSQL.
+
+    Solo traduce lo traducible de forma segura:
+    - ? → %s (placeholders)
+    - INSERT OR IGNORE INTO → INSERT INTO (caller debe manejar ON CONFLICT)
+    - datetime('now') → CURRENT_TIMESTAMP
+
+    NO traduce INSERT OR REPLACE — eso requiere intención explícita
+    (ON CONFLICT con target y columnas). Cada query OR REPLACE debe
+    resolverse manualmente en db.py.
+    """
+    import re
+    # INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+    if re.search(r"INSERT\s+OR\s+IGNORE\s+INTO", sql, flags=re.IGNORECASE):
+        sql = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE)
+        # Append ON CONFLICT DO NOTHING after the last )
+        sql = sql.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+    sql = re.sub(r"datetime\s*\(\s*'now'\s*\)", "CURRENT_TIMESTAMP", sql, flags=re.IGNORECASE)
+
+    # Placeholders: ? → %s (respetando strings)
     result = []
     in_string = False
     quote_char = None
@@ -522,7 +541,7 @@ def guardar_sabores(db: sqlite3.Connection, turno_id: int,
                 return None
 
         db.execute(
-            """INSERT OR REPLACE INTO sabores_turno
+            """INSERT INTO sabores_turno
                (turno_id, nombre, nombre_norm, abierta, celiaca,
                 cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6,
                 entrante_1, entrante_2)
