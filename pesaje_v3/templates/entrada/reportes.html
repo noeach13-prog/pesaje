@@ -15,7 +15,6 @@
     --accent-soft: #f2e4d7;
     --line: rgba(111,81,58,0.14);
     --focus: rgba(155,99,57,0.12);
-    --success: #3a7d44;
     --purple: #6a4b7d;
     --purple-soft: #f5eef9;
 }
@@ -27,18 +26,13 @@ body {
     min-height: 100vh;
     padding: 16px;
 }
-.shell { max-width: 700px; margin: 0 auto; }
+.shell { max-width: 800px; margin: 0 auto; }
 .header {
     background: linear-gradient(145deg, rgba(66,42,27,0.96), rgba(46,30,20,0.96));
-    color: #fffaf4;
-    padding: 20px 24px;
-    border-radius: 20px;
-    margin-bottom: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    color: #fffaf4; padding: 20px 24px; border-radius: 20px; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: center;
 }
-.header h1 { font-size: 1.2rem; font-weight: 700; }
+.header h1 { font-size: 1.2rem; }
 .header .sub { font-size: 0.78rem; color: rgba(255,240,225,0.6); margin-top: 2px; }
 .header a {
     color: rgba(255,240,225,0.7); font-size: 0.75rem; text-decoration: none;
@@ -46,12 +40,8 @@ body {
     border: 1px solid rgba(255,255,255,0.1);
 }
 .card {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 22px;
-    box-shadow: 0 12px 36px rgba(74,48,31,0.08);
-    padding: 24px;
-    margin-bottom: 12px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 22px;
+    box-shadow: 0 12px 36px rgba(74,48,31,0.08); padding: 24px; margin-bottom: 12px;
 }
 .card-label {
     font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
@@ -62,7 +52,7 @@ body {
     display: block; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
     letter-spacing: 0.1em; color: #8d7262; margin-bottom: 6px;
 }
-.field input, .field select {
+.field input {
     width: 100%; padding: 12px 14px; border: 1px solid rgba(128,93,67,0.14);
     border-radius: 14px; font-size: 0.96rem; color: var(--ink);
     background: linear-gradient(180deg, #fffdf9, #f8f1e8);
@@ -74,36 +64,45 @@ body {
     width: 100%; padding: 14px; border: none; border-radius: 14px; cursor: pointer;
     font-size: 0.95rem; font-weight: 700;
     background: linear-gradient(135deg, var(--accent), var(--accent-deep));
-    color: #fffaf4; box-shadow: 0 8px 20px rgba(126,79,47,0.2);
+    color: #fffaf4;
 }
-.btn:hover { transform: translateY(-1px); }
 .error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
          padding: 10px 14px; border-radius: 14px; font-size: 0.82rem; margin-bottom: 14px; }
 
 /* Tables */
-.section { margin-bottom: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th {
+    background: #3a281f; color: #fff8f1; padding: 10px 12px; text-align: left;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+}
+td { padding: 9px 12px; border-bottom: 1px solid rgba(111,81,58,0.08); }
+tr:hover td { background: rgba(155,99,57,0.04); }
+.tfoot td { font-weight: 800; border-top: 2px solid var(--accent-soft); background: rgba(155,99,57,0.04); }
 .section-title {
-    font-size: 0.88rem; font-weight: 800; margin-bottom: 10px;
-    padding-bottom: 6px; border-bottom: 2px solid var(--accent-soft);
+    font-size: 1rem; font-weight: 800; margin-bottom: 12px; padding-bottom: 6px;
+    border-bottom: 2px solid var(--accent-soft);
 }
-.section-empty { color: var(--muted); font-style: italic; font-size: 0.85rem; padding: 8px 0; }
-.item {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    padding: 8px 0; border-bottom: 1px solid rgba(111,81,58,0.08); font-size: 0.88rem;
-}
-.item:last-child { border-bottom: none; }
-.item-fecha { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
-.item-text { flex: 1; }
-.item-meta { font-size: 0.78rem; color: var(--muted); }
-.item-val { font-weight: 800; white-space: nowrap; margin-left: 12px; }
-.total-row {
-    display: flex; justify-content: space-between; padding: 12px 0; margin-top: 4px;
-    border-top: 2px solid var(--accent-soft); font-weight: 800; font-size: 0.95rem;
+.section-empty { color: var(--muted); font-style: italic; font-size: 0.85rem; padding: 12px 0; }
+.emp-group { margin-top: 16px; }
+.emp-name {
+    font-size: 0.82rem; font-weight: 800; color: var(--accent-deep);
+    background: var(--accent-soft); padding: 6px 12px; border-radius: 10px;
+    margin-bottom: 6px; display: inline-block;
 }
 .nota-cat {
     display: inline-block; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
     letter-spacing: 0.06em; color: var(--purple); background: var(--purple-soft);
-    padding: 2px 8px; border-radius: 999px; margin-right: 6px;
+    padding: 2px 8px; border-radius: 999px;
+}
+.print-btn {
+    padding: 10px 20px; border: 1px solid var(--line); border-radius: 14px;
+    background: var(--card); font-weight: 700; font-size: 0.85rem; cursor: pointer;
+    color: var(--accent-deep);
+}
+@media print {
+    body { background: #fff; padding: 0; }
+    .header, .card:first-of-type, .print-btn { display: none; }
+    .card { box-shadow: none; border: none; padding: 12px 0; }
 }
 </style>
 </head>
@@ -155,68 +154,118 @@ body {
     </div>
 
     {% if consumos is defined %}
+
+    {# ── CONSUMOS INTERNOS POR EMPLEADO ── #}
     <div class="card">
-        <div class="section">
-            <div class="section-title">Consumos internos</div>
-            {% if consumos %}
-            {% for c in consumos %}
-            <div class="item">
-                <div class="item-text">
-                    <div class="item-fecha">{{ c.fecha }} {{ c.tipo_turno }}</div>
-                    {{ c.texto }}
-                    {% if c.empleado %}<div class="item-meta">{{ c.empleado }}</div>{% endif %}
-                </div>
-                {% if c.gramos %}<div class="item-val">{{ c.gramos }}g</div>{% endif %}
-            </div>
-            {% endfor %}
-            <div class="total-row">
-                <span>Total consumos</span>
-                <span>{{ total_consumos_g }}g</span>
-            </div>
-            {% else %}
-            <div class="section-empty">Sin consumos en este periodo</div>
-            {% endif %}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div class="section-title" style="margin:0;border:none;padding:0;">Consumos internos — {{ fecha_desde }} a {{ fecha_hasta }}</div>
+            <button class="print-btn" onclick="window.print()">Imprimir</button>
         </div>
 
-        <div class="section">
-            <div class="section-title">Ventas despues del peso (VDP)</div>
-            {% if vdp %}
-            {% for v in vdp %}
-            <div class="item">
-                <div class="item-text">
-                    <div class="item-fecha">{{ v.fecha }} {{ v.tipo_turno }}</div>
-                    {{ v.texto }}
-                </div>
-                {% if v.gramos %}<div class="item-val">{{ v.gramos }}g</div>{% endif %}
-            </div>
-            {% endfor %}
-            <div class="total-row">
-                <span>Total VDP</span>
-                <span>{{ total_vdp_g }}g</span>
-            </div>
-            {% else %}
-            <div class="section-empty">Sin VDP en este periodo</div>
+        {% if consumos %}
+        {# Agrupar por empleado #}
+        {% set ns = namespace(empleados={}) %}
+        {% for c in consumos %}
+            {% set emp = c.empleado or 'Sin especificar' %}
+            {% if emp not in ns.empleados %}
+                {% set _ = ns.empleados.update({emp: []}) %}
             {% endif %}
-        </div>
+            {% set _ = ns.empleados[emp].append(c) %}
+        {% endfor %}
 
-        <div class="section">
-            <div class="section-title">Notas y observaciones</div>
-            {% if notas %}
-            {% for n in notas %}
-            <div class="item">
-                <div class="item-text">
-                    <div class="item-fecha">{{ n.fecha }} {{ n.tipo_turno }}</div>
-                    <span class="nota-cat">{{ n.categoria }}</span>{{ n.detalle }}
-                </div>
-            </div>
-            {% endfor %}
-            {% else %}
-            <div class="section-empty">Sin notas en este periodo</div>
-            {% endif %}
+        {% for emp, items in ns.empleados.items() %}
+        <div class="emp-group">
+            <div class="emp-name">{{ emp }}</div>
+            <table>
+                <thead>
+                    <tr><th>Fecha</th><th>Turno</th><th>Producto</th><th style="text-align:right;">Gramos</th></tr>
+                </thead>
+                <tbody>
+                    {% set ns_total = namespace(g=0) %}
+                    {% for c in items %}
+                    <tr>
+                        <td>{{ c.fecha }}</td>
+                        <td>{{ c.tipo_turno }}</td>
+                        <td>{{ c.texto }}</td>
+                        <td style="text-align:right;font-weight:700;">{{ c.gramos or 0 }}g</td>
+                    </tr>
+                    {% set ns_total.g = ns_total.g + (c.gramos or 0) %}
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="tfoot">
+                        <td colspan="3">Total {{ emp }} ({{ items|length }} consumos)</td>
+                        <td style="text-align:right;">{{ ns_total.g }}g</td>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
+        {% endfor %}
+
+        <div style="margin-top:16px;padding:12px;background:var(--accent-soft);border-radius:14px;font-weight:800;display:flex;justify-content:space-between;">
+            <span>TOTAL CONSUMOS ({{ consumos|length }} registros)</span>
+            <span>{{ total_consumos_g }}g</span>
+        </div>
+        {% else %}
+        <div class="section-empty">Sin consumos internos en este periodo</div>
+        {% endif %}
     </div>
-    {% endif %}
 
+    {# ── NOTAS Y OBSERVACIONES ── #}
+    <div class="card">
+        <div class="section-title">Notas y observaciones — {{ fecha_desde }} a {{ fecha_hasta }}</div>
+        {% if notas %}
+        <table>
+            <thead>
+                <tr><th>Fecha</th><th>Turno</th><th>Categoria</th><th>Detalle</th></tr>
+            </thead>
+            <tbody>
+                {% for n in notas %}
+                <tr>
+                    <td>{{ n.fecha }}</td>
+                    <td>{{ n.tipo_turno }}</td>
+                    <td><span class="nota-cat">{{ n.categoria }}</span></td>
+                    <td>{{ n.detalle }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="section-empty">Sin notas en este periodo</div>
+        {% endif %}
+    </div>
+
+    {# ── VDP ── #}
+    <div class="card">
+        <div class="section-title">Ventas despues del peso (VDP) — {{ fecha_desde }} a {{ fecha_hasta }}</div>
+        {% if vdp %}
+        <table>
+            <thead>
+                <tr><th>Fecha</th><th>Turno</th><th>Detalle</th><th style="text-align:right;">Gramos</th></tr>
+            </thead>
+            <tbody>
+                {% for v in vdp %}
+                <tr>
+                    <td>{{ v.fecha }}</td>
+                    <td>{{ v.tipo_turno }}</td>
+                    <td>{{ v.texto }}</td>
+                    <td style="text-align:right;font-weight:700;">{{ v.gramos or 0 }}g</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="tfoot">
+                    <td colspan="3">Total VDP ({{ vdp|length }} registros)</td>
+                    <td style="text-align:right;">{{ total_vdp_g }}g</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <div class="section-empty">Sin VDP en este periodo</div>
+        {% endif %}
+    </div>
+
+    {% endif %}
     {% endif %}
 </div>
 </body>
