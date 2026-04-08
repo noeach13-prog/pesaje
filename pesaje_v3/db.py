@@ -75,6 +75,20 @@ def init_db():
             (pin, pin_sup, nombre),
         )
 
+    # Limpieza unica: borrar turnos viejos (flag en DB para no repetir)
+    flag = conn.execute("SELECT 1 FROM log_actividad WHERE accion='LIMPIEZA_2026_04' LIMIT 1").fetchone()
+    if not flag:
+        conn.execute("DELETE FROM ajustes_manuales")
+        conn.execute("DELETE FROM log_actividad")
+        conn.execute("DELETE FROM notas_turno")
+        conn.execute("DELETE FROM consumo_turno")
+        conn.execute("DELETE FROM vdp_turno")
+        conn.execute("DELETE FROM sabores_turno")
+        conn.execute("DELETE FROM turnos")
+        conn.execute("""INSERT INTO log_actividad
+            (turno_id, timestamp_cliente, accion, detalle)
+            VALUES (0, datetime('now'), 'LIMPIEZA_2026_04', 'Borrado total de turnos por migracion')""")
+
     # Semilla: catálogo de sabores por sucursal (extraídos de workbooks reales)
     _sembrar_catalogo(conn)
     conn.commit()
