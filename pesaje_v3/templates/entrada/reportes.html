@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ sucursal_nombre }} - Reportes</title>
+<style>
+:root {
+    --bg: #f7f1e8;
+    --card: rgba(255,252,247,0.95);
+    --ink: #2f241d;
+    --muted: #7d695d;
+    --accent: #9b6339;
+    --accent-deep: #7e4f2f;
+    --accent-soft: #f2e4d7;
+    --line: rgba(111,81,58,0.14);
+    --focus: rgba(155,99,57,0.12);
+    --success: #3a7d44;
+    --purple: #6a4b7d;
+    --purple-soft: #f5eef9;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: linear-gradient(180deg, #fbf6ef 0%, #f0e8de 100%);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 16px;
+}
+.shell { max-width: 700px; margin: 0 auto; }
+.header {
+    background: linear-gradient(145deg, rgba(66,42,27,0.96), rgba(46,30,20,0.96));
+    color: #fffaf4;
+    padding: 20px 24px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.header h1 { font-size: 1.2rem; font-weight: 700; }
+.header .sub { font-size: 0.78rem; color: rgba(255,240,225,0.6); margin-top: 2px; }
+.header a {
+    color: rgba(255,240,225,0.7); font-size: 0.75rem; text-decoration: none;
+    font-weight: 600; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: 0 12px 36px rgba(74,48,31,0.08);
+    padding: 24px;
+    margin-bottom: 12px;
+}
+.card-label {
+    font-size: 0.7rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--muted); margin-bottom: 14px;
+}
+.field { margin-bottom: 14px; }
+.field label {
+    display: block; font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #8d7262; margin-bottom: 6px;
+}
+.field input, .field select {
+    width: 100%; padding: 12px 14px; border: 1px solid rgba(128,93,67,0.14);
+    border-radius: 14px; font-size: 0.96rem; color: var(--ink);
+    background: linear-gradient(180deg, #fffdf9, #f8f1e8);
+}
+.field input:focus { outline: none; border-color: rgba(155,99,57,0.4); box-shadow: 0 0 0 3px var(--focus); }
+.row-fields { display: flex; gap: 10px; }
+.row-fields .field { flex: 1; }
+.btn {
+    width: 100%; padding: 14px; border: none; border-radius: 14px; cursor: pointer;
+    font-size: 0.95rem; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+    color: #fffaf4; box-shadow: 0 8px 20px rgba(126,79,47,0.2);
+}
+.btn:hover { transform: translateY(-1px); }
+.error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+         padding: 10px 14px; border-radius: 14px; font-size: 0.82rem; margin-bottom: 14px; }
+
+/* Tables */
+.section { margin-bottom: 16px; }
+.section-title {
+    font-size: 0.88rem; font-weight: 800; margin-bottom: 10px;
+    padding-bottom: 6px; border-bottom: 2px solid var(--accent-soft);
+}
+.section-empty { color: var(--muted); font-style: italic; font-size: 0.85rem; padding: 8px 0; }
+.item {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 8px 0; border-bottom: 1px solid rgba(111,81,58,0.08); font-size: 0.88rem;
+}
+.item:last-child { border-bottom: none; }
+.item-fecha { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+.item-text { flex: 1; }
+.item-meta { font-size: 0.78rem; color: var(--muted); }
+.item-val { font-weight: 800; white-space: nowrap; margin-left: 12px; }
+.total-row {
+    display: flex; justify-content: space-between; padding: 12px 0; margin-top: 4px;
+    border-top: 2px solid var(--accent-soft); font-weight: 800; font-size: 0.95rem;
+}
+.nota-cat {
+    display: inline-block; font-size: 0.68rem; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--purple); background: var(--purple-soft);
+    padding: 2px 8px; border-radius: 999px; margin-right: 6px;
+}
+</style>
+</head>
+<body>
+<div class="shell">
+    <div class="header">
+        <div>
+            <h1>{{ sucursal_nombre }}</h1>
+            <div class="sub">Reportes de consumos y notas</div>
+        </div>
+        <a href="/entrada/seleccion">Volver</a>
+    </div>
+
+    {% if not autenticado %}
+    <div class="card">
+        <div class="card-label">Acceso supervisor</div>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="POST">
+            <div class="field">
+                <label>PIN supervisor</label>
+                <input type="password" name="pin_supervisor" maxlength="6" inputmode="numeric"
+                       placeholder="****" required autocomplete="off"
+                       style="text-align:center;letter-spacing:0.3em;font-size:1.2rem;font-weight:700;">
+            </div>
+            <button type="submit" class="btn">Acceder a reportes</button>
+        </form>
+    </div>
+
+    {% else %}
+
+    <div class="card">
+        <div class="card-label">Seleccionar periodo</div>
+        <form method="POST">
+            <input type="hidden" name="pin_supervisor" value="2512">
+            <div class="row-fields">
+                <div class="field">
+                    <label>Desde</label>
+                    <input type="date" name="fecha_desde" value="{{ fecha_desde or '' }}" required>
+                </div>
+                <div class="field">
+                    <label>Hasta</label>
+                    <input type="date" name="fecha_hasta" value="{{ fecha_hasta or '' }}" required>
+                </div>
+            </div>
+            <button type="submit" class="btn">Generar reporte</button>
+        </form>
+    </div>
+
+    {% if consumos is defined %}
+    <div class="card">
+        <div class="section">
+            <div class="section-title">Consumos internos</div>
+            {% if consumos %}
+            {% for c in consumos %}
+            <div class="item">
+                <div class="item-text">
+                    <div class="item-fecha">{{ c.fecha }} {{ c.tipo_turno }}</div>
+                    {{ c.texto }}
+                    {% if c.empleado %}<div class="item-meta">{{ c.empleado }}</div>{% endif %}
+                </div>
+                {% if c.gramos %}<div class="item-val">{{ c.gramos }}g</div>{% endif %}
+            </div>
+            {% endfor %}
+            <div class="total-row">
+                <span>Total consumos</span>
+                <span>{{ total_consumos_g }}g</span>
+            </div>
+            {% else %}
+            <div class="section-empty">Sin consumos en este periodo</div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <div class="section-title">Ventas despues del peso (VDP)</div>
+            {% if vdp %}
+            {% for v in vdp %}
+            <div class="item">
+                <div class="item-text">
+                    <div class="item-fecha">{{ v.fecha }} {{ v.tipo_turno }}</div>
+                    {{ v.texto }}
+                </div>
+                {% if v.gramos %}<div class="item-val">{{ v.gramos }}g</div>{% endif %}
+            </div>
+            {% endfor %}
+            <div class="total-row">
+                <span>Total VDP</span>
+                <span>{{ total_vdp_g }}g</span>
+            </div>
+            {% else %}
+            <div class="section-empty">Sin VDP en este periodo</div>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <div class="section-title">Notas y observaciones</div>
+            {% if notas %}
+            {% for n in notas %}
+            <div class="item">
+                <div class="item-text">
+                    <div class="item-fecha">{{ n.fecha }} {{ n.tipo_turno }}</div>
+                    <span class="nota-cat">{{ n.categoria }}</span>{{ n.detalle }}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="section-empty">Sin notas en este periodo</div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+</body>
+</html>

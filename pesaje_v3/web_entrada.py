@@ -321,6 +321,80 @@ def api_sabores_previos(fecha):
     return jsonify({'sabores': nombres})
 
 
+@entrada_bp.route('/entrada/reportes', methods=['GET', 'POST'])
+def reportes():
+    """Reportes de consumos internos y notas. Requiere PIN supervisor."""
+    sid, nombre = _sucursal_activa()
+    if not sid:
+        return redirect(url_for('entrada.index'))
+
+    db = get_db()
+
+    if request.method == 'POST':
+        pin = request.form.get('pin_supervisor', '')
+        suc = db.execute("SELECT pin_supervisor FROM sucursales WHERE id = ?", (sid,)).fetchone()
+        if not suc or str(pin) != str(suc['pin_supervisor']):
+            db.close()
+            return render_template('entrada/reportes.html',
+                                   sucursal_nombre=nombre, error='PIN incorrecto',
+                                   autenticado=False)
+
+        fecha_desde = request.form.get('fecha_desde', '')
+        fecha_hasta = request.form.get('fecha_hasta', '')
+
+        if not fecha_desde or not fecha_hasta:
+            db.close()
+            return render_template('entrada/reportes.html',
+                                   sucursal_nombre=nombre, error='Seleccionar ambas fechas',
+                                   autenticado=True)
+
+        # Consumos internos
+        consumos = db.execute(
+            """SELECT c.*, t.fecha, t.tipo_turno FROM consumo_turno c
+               JOIN turnos t ON c.turno_id = t.id
+               WHERE t.sucursal_id = ? AND t.fecha >= ? AND t.fecha <= ?
+               ORDER BY t.fecha, t.tipo_turno, c.id""",
+            (sid, fecha_desde, fecha_hasta),
+        ).fetchall()
+
+        # Notas
+        notas = db.execute(
+            """SELECT n.*, t.fecha, t.tipo_turno FROM notas_turno n
+               JOIN turnos t ON n.turno_id = t.id
+               WHERE t.sucursal_id = ? AND t.fecha >= ? AND t.fecha <= ?
+               ORDER BY t.fecha, t.tipo_turno, n.id""",
+            (sid, fecha_desde, fecha_hasta),
+        ).fetchall()
+
+        # VDP
+        vdp = db.execute(
+            """SELECT v.*, t.fecha, t.tipo_turno FROM vdp_turno v
+               JOIN turnos t ON v.turno_id = t.id
+               WHERE t.sucursal_id = ? AND t.fecha >= ? AND t.fecha <= ?
+               ORDER BY t.fecha, t.tipo_turno, v.id""",
+            (sid, fecha_desde, fecha_hasta),
+        ).fetchall()
+
+        db.close()
+
+        # Totales
+        total_consumos_g = sum(c.get('gramos', 0) or 0 for c in consumos)
+        total_vdp_g = sum(v.get('gramos', 0) or 0 for v in vdp)
+
+        return render_template('entrada/reportes.html',
+                               sucursal_nombre=nombre, autenticado=True,
+                               fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
+                               consumos=[dict(c) for c in consumos],
+                               notas=[dict(n) for n in notas],
+                               vdp=[dict(v) for v in vdp],
+                               total_consumos_g=total_consumos_g,
+                               total_vdp_g=total_vdp_g)
+
+    db.close()
+    return render_template('entrada/reportes.html',
+                           sucursal_nombre=nombre, autenticado=False)
+
+
 @entrada_bp.route('/entrada/historial')
 def historial():
     """Lista de turnos cargados para la sucursal activa."""
