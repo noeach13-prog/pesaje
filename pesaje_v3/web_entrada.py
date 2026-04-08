@@ -276,21 +276,29 @@ def api_guardar():
         db.close()
         return jsonify({'ok': False, 'error': 'Turno ya confirmado'}), 400
 
-    warnings = guardar_sabores(db, turno_id, sabores)
+    try:
+        warnings = guardar_sabores(db, turno_id, sabores)
 
-    # Registrar actividad con timestamp del dispositivo
-    ts = payload.get('timestamp', '')
-    if ts:
-        registrar_actividad(db, turno_id, ts, 'guardar', f'{len(sabores)} sabores')
+        # Registrar actividad con timestamp del dispositivo
+        ts = payload.get('timestamp', '')
+        if ts:
+            registrar_actividad(db, turno_id, ts, 'guardar', f'{len(sabores)} sabores')
 
-    db.close()
-    invalidar_cache_mes(sid)
+        db.close()
+        invalidar_cache_mes(sid)
 
-    return jsonify({
-        'ok': True,
-        'warnings': warnings,
-        'n_sabores': len(sabores),
-    })
+        return jsonify({
+            'ok': True,
+            'warnings': warnings,
+            'n_sabores': len(sabores),
+        })
+    except Exception as e:
+        try:
+            db._conn.rollback()
+        except Exception:
+            pass
+        db.close()
+        return jsonify({'ok': False, 'error': f'Error al guardar: {str(e)[:200]}'}), 500
 
 
 @entrada_bp.route('/entrada/api/sabores-previos/<fecha>')
