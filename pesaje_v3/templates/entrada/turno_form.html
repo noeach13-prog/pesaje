@@ -617,12 +617,14 @@ function compararConAnterior(fl) {
     const refData = REF[nombre];
     if(!refData) return;
 
-    // Recoger todos los campos actuales y compararlos
+    // Recoger campos de cerradas/entrantes y compararlos (NO abierta ni celiaca, que cambian normalmente)
     const diffs = [];
     fl.querySelectorAll('input[type=number]').forEach(inp => {
         const field = inp.dataset.f;
         const val = inp.value.trim();
         if(!val || !field) return;
+        // Excluir abierta y celiaca — cambian naturalmente con las ventas
+        if(field === 'abierta' || field === 'celiaca') return;
         const n = parseInt(val);
         if(isNaN(n)) return;
 
@@ -639,8 +641,9 @@ function compararConAnterior(fl) {
         }
     });
 
-    // Campos del turno anterior que desaparecieron
+    // Campos del turno anterior que desaparecieron (solo cerradas/entrantes)
     for(const field of Object.keys(_FIELD_NAMES)) {
+        if(field === 'abierta' || field === 'celiaca') continue;
         if(refData[field] != null && refData[field] > 0) {
             const inp = fl.querySelector('[data-f="'+field+'"]');
             const val = inp ? inp.value.trim() : '';
@@ -716,6 +719,18 @@ function v(inp) {
             const sugerido5 = Math.round(n / 5) * 5;
             showAlert('Peso no termina en 0 o 5',
                 n+'g termina en '+ultimo+'. La balanza pesa de a 5g. Quisiste poner '+sugerido5+'g?',
+                'warning', inp);
+            upd(inp); return;
+        }
+    }
+
+    // Cerradas y entrantes: alertar si peso fuera de rango normal (5500-7500g)
+    if(n > 0 && field && (field.startsWith('cerrada_') || field.startsWith('entrante_'))) {
+        if(n < 5500) {
+            inp.classList.add('warn');
+            showAlert('Peso muy bajo para lata cerrada',
+                n+'g es muy bajo para una lata cerrada (normalmente pesan entre 6000 y 7000g).\n\n' +
+                'Si es correcto, confirmar. Si es un error de tipeo, corregir.',
                 'warning', inp);
             upd(inp); return;
         }
