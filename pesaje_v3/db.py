@@ -440,19 +440,16 @@ CREATE TABLE IF NOT EXISTS ajustes_manuales (
     UNIQUE(turno_id, nombre_norm)
 );
 
-CREATE TABLE IF NOT EXISTS stock_inventario (
+CREATE TABLE IF NOT EXISTS stock_insumos (
     id INTEGER PRIMARY KEY,
     sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
     fecha TEXT NOT NULL,
-    nombre_norm TEXT NOT NULL,
-    abierta INTEGER,
-    celiaca INTEGER,
-    cerrada_1 INTEGER, cerrada_2 INTEGER, cerrada_3 INTEGER,
-    cerrada_4 INTEGER, cerrada_5 INTEGER, cerrada_6 INTEGER,
-    notas TEXT,
+    seccion TEXT NOT NULL,
+    item TEXT NOT NULL,
+    cantidad TEXT,
     registrado_por TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(sucursal_id, fecha, nombre_norm)
+    UNIQUE(sucursal_id, fecha, item)
 );
 
 CREATE TABLE IF NOT EXISTS postres_turno (
@@ -940,47 +937,49 @@ CATALOGO_POSTRES = [
 ]
 
 
-# ─── Stock / Inventario (solo anotación, no afecta análisis) ─────
+# ─── Stock / Inventario de insumos (solo anotación, no afecta análisis) ─────
 
-def guardar_stock(db, sucursal_id: int, fecha: str, sabores: List[dict],
+CATALOGO_STOCK = {
+    'TERMICOS': ['1/4', '1/2', 'KG', '1/4 CON LOGO', '1/8 CON LOGO'],
+    'SALSAS': ['CHOCOLATE', 'CARAMELO', 'DULCE DE LECHE', 'FRUTILLA', 'FRUTOS DEL BOSQUE'],
+    'VASOS Y CUCURUCHOS': ['CONO 70', 'MINI CUCURUCHON', 'VASO 65', 'BLISTER CUCURUCHO X3',
+                            'BLISTER VASITOS X5', 'VASO MILKSHAKE', 'TAPA MILKSHAKE', 'SORBETES MILKSHAKE'],
+    'BEBIDAS E INSUMOS': ['CREMA DE LECHE', 'LECHE (LITROS)'],
+    'BOLSAS': ['CAMISETA CHICA', 'CAMISETA MEDIANA', 'CAMISETA GRANDE'],
+    'CUCHARITAS Y SERVILLETAS': ['SERVILLETAS ZIGZAG', 'CUCHARITAS TE', 'SUNDAE',
+                                  'CINTA LOGO', 'FOLEX', 'ROLLO COMUN', 'ROLLO POSNET',
+                                  'CARTUCHO IMPRESORA', 'ROLLO IMPRESORA DE PEDIDOS'],
+    'LIMPIEZA': ['LIMPIAVIDRIOS', 'JABON EN BARRA', 'DESODORANTE PARA PISO CONCENTRADO',
+                  'ALCOHOL EN GEL', 'REJILLAS', 'JABON LIQUIDO PARA MANOS',
+                  'CIF CREMA', 'LAVANDINA', 'DETERGENTE', 'PAPEL HIGIENICO',
+                  'TRAPO DE PISOS', 'ESPONJAS/VIRULANAS'],
+}
+
+
+def guardar_stock(db, sucursal_id: int, fecha: str, items: List[dict],
                    registrado_por: str = ''):
-    """Guarda inventario de stock. sabores: [{nombre_norm, abierta, celiaca, cerrada_1..6, notas}]"""
-    db.execute("DELETE FROM stock_inventario WHERE sucursal_id = ? AND fecha = ?",
+    """Guarda inventario de insumos. items: [{seccion, item, cantidad}]"""
+    db.execute("DELETE FROM stock_insumos WHERE sucursal_id = ? AND fecha = ?",
                (sucursal_id, fecha))
-    for row in sabores:
-        nn = (row.get('nombre_norm') or '').strip()
-        if not nn:
+    for row in items:
+        item = (row.get('item') or '').strip()
+        if not item:
             continue
-
-        def _int(v):
-            if v is None or v == '':
-                return None
-            try:
-                return int(v)
-            except (ValueError, TypeError):
-                return None
-
+        cantidad = (row.get('cantidad') or '').strip()
+        if not cantidad:
+            continue
+        seccion = (row.get('seccion') or '').strip()
         db.execute(
-            """INSERT INTO stock_inventario
-               (sucursal_id, fecha, nombre_norm, abierta, celiaca,
-                cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6,
-                notas, registrado_por)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (sucursal_id, fecha, nn,
-             _int(row.get('abierta')), _int(row.get('celiaca')),
-             _int(row.get('cerrada_1')), _int(row.get('cerrada_2')),
-             _int(row.get('cerrada_3')), _int(row.get('cerrada_4')),
-             _int(row.get('cerrada_5')), _int(row.get('cerrada_6')),
-             (row.get('notas') or '').strip() or None,
-             registrado_por),
+            "INSERT INTO stock_insumos (sucursal_id, fecha, seccion, item, cantidad, registrado_por) VALUES (?, ?, ?, ?, ?, ?)",
+            (sucursal_id, fecha, seccion, item, cantidad, registrado_por),
         )
     db.commit()
 
 
 def obtener_stock(db, sucursal_id: int, fecha: str) -> List[dict]:
-    """Retorna inventario de stock de una fecha."""
+    """Retorna inventario de insumos de una fecha."""
     rows = db.execute(
-        "SELECT * FROM stock_inventario WHERE sucursal_id = ? AND fecha = ? ORDER BY nombre_norm",
+        "SELECT * FROM stock_insumos WHERE sucursal_id = ? AND fecha = ? ORDER BY seccion, item",
         (sucursal_id, fecha),
     ).fetchall()
     return [_to_dict(r) for r in rows]
@@ -989,8 +988,8 @@ def obtener_stock(db, sucursal_id: int, fecha: str) -> List[dict]:
 def listar_stocks(db, sucursal_id: int) -> List[dict]:
     """Lista fechas con inventario de stock cargado."""
     rows = db.execute(
-        """SELECT fecha, COUNT(*) as n_sabores, MAX(registrado_por) as registrado_por, MAX(created_at) as ultima
-           FROM stock_inventario WHERE sucursal_id = ?
+        """SELECT fecha, COUNT(*) as n_items, MAX(registrado_por) as registrado_por, MAX(created_at) as ultima
+           FROM stock_insumos WHERE sucursal_id = ?
            GROUP BY fecha ORDER BY fecha DESC""",
         (sucursal_id,),
     ).fetchall()

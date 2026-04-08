@@ -20,7 +20,7 @@ from .db import (
     sabores_turno_anterior, derivar_nombre_hoja, catalogo_sabores,
     agregar_sabor_catalogo, guardar_vdp, guardar_consumos, guardar_notas,
     guardar_postres, CATALOGO_POSTRES,
-    guardar_stock, obtener_stock, listar_stocks,
+    guardar_stock, obtener_stock, listar_stocks, CATALOGO_STOCK,
     registrar_inicio_carga, confirmar_turno, registrar_actividad,
     desbloquear_turno, borrar_turno, obtener_turno,
 )
@@ -416,35 +416,31 @@ def reportes():
 
 @entrada_bp.route('/entrada/stock', methods=['GET', 'POST'])
 def stock():
-    """Inventario de stock (anotación, no afecta análisis)."""
+    """Inventario de insumos (anotación, no afecta análisis)."""
     sid, nombre = _sucursal_activa()
     if not sid:
         return redirect(url_for('entrada.index'))
 
     db = get_db()
-    catalogo = catalogo_sabores(db, sid)
-
     _AR = timezone(timedelta(hours=-3))
     hoy = datetime.now(_AR).date().isoformat()
 
     if request.method == 'POST':
         fecha = request.form.get('fecha', hoy)
-        sabores = []
-        for s in catalogo:
-            nn = s['nombre_norm']
-            ab = request.form.get(f'ab_{nn}', '')
-            cel = request.form.get(f'cel_{nn}', '')
-            cerr = [request.form.get(f'c{i}_{nn}', '') for i in range(1, 7)]
-            nota = request.form.get(f'nota_{nn}', '')
-            if ab or cel or any(cerr) or nota:
-                sabores.append({
-                    'nombre_norm': nn,
-                    'abierta': ab, 'celiaca': cel,
-                    'cerrada_1': cerr[0], 'cerrada_2': cerr[1], 'cerrada_3': cerr[2],
-                    'cerrada_4': cerr[3], 'cerrada_5': cerr[4], 'cerrada_6': cerr[5],
-                    'notas': nota,
-                })
-        guardar_stock(db, sid, fecha, sabores, request.form.get('registrado_por', ''))
+        items = []
+        for seccion, productos in CATALOGO_STOCK.items():
+            for item in productos:
+                key = f'qty_{seccion}_{item}'.replace(' ', '_')
+                cantidad = request.form.get(key, '').strip()
+                if cantidad:
+                    items.append({'seccion': seccion, 'item': item, 'cantidad': cantidad})
+        try:
+            guardar_stock(db, sid, fecha, items, request.form.get('registrado_por', ''))
+        except Exception:
+            try:
+                db._conn.rollback()
+            except Exception:
+                pass
         db.close()
         return redirect(url_for('entrada.stock', fecha=fecha, guardado=1))
 
@@ -452,10 +448,9 @@ def stock():
     fecha = request.args.get('fecha', hoy)
     try:
         stock_data = obtener_stock(db, sid, fecha)
-        stock_map = {s['nombre_norm']: s for s in stock_data}
+        stock_map = {s['item']: s['cantidad'] for s in stock_data}
         stocks_list = listar_stocks(db, sid)
     except Exception:
-        # Tabla puede no existir aún en Postgres
         try:
             db._conn.rollback()
         except Exception:
@@ -466,7 +461,8 @@ def stock():
     db.close()
 
     return render_template('entrada/stock.html',
-                           sucursal_nombre=nombre, catalogo=catalogo,
+                           sucursal_nombre=nombre,
+                           catalogo_stock=CATALOGO_STOCK,
                            fecha=fecha, hoy=hoy,
                            stock_map=stock_map, stocks_list=stocks_list,
                            guardado=guardado)
