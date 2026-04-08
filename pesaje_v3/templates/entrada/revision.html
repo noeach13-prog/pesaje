@@ -312,15 +312,20 @@ tr.row-neg { background: #fff3f1; }
                                 {% if s.correccion %}{{ s.correccion }}{% else %}Ver detalle{% endif %}
                                 <span class="exp-toggle">&#9660;</span>
                             </div>
-                            <pre class="exp-detail">{{ s.explicacion }}{% if s.historial %}
-
-HISTORIAL:
-{% for h in s.historial %}  {{ h }}
-{% endfor %}{% endif %}</pre>
+                            <pre class="exp-detail">{{ s.explicacion }}</pre>
                         </div>
                     </td></tr>
                     {% elif s.correccion %}
                     <tr><td colspan="5" style="font-size:0.76rem;color:var(--muted);padding:4px 16px 12px 24px;">{{ s.correccion }}</td></tr>
+                    {% elif s.historial and s.status == 'OK' %}
+                    <tr class="exp-row"><td colspan="5" style="padding:0;">
+                        <div class="exp-box" onclick="this.classList.toggle('open')">
+                            <div class="exp-header">Ver historial<span class="exp-toggle">&#9660;</span></div>
+                            <pre class="exp-detail">HISTORIAL:
+{% for h in s.historial %}  {{ h }}
+{% endfor %}</pre>
+                        </div>
+                    </td></tr>
                     {% endif %}
                     {% endfor %}
                 </tbody>

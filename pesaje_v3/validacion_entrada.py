@@ -230,8 +230,8 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                     nombre, sc, d, n, proto, c4_corr, False,
                     0, vf, status,
                 )
-                # Historial para H0 y CORREGIDOS
-                sabor_info['historial'] = _timeline_sabor(nombre, datos_dia)
+            # Historial para TODOS (OK lo muestra expandible, no-OK lo tiene en explicacion)
+            sabor_info['historial'] = _timeline_sabor(nombre, datos_dia)
 
             # Agregar motivo del clamp a 0 si aplica
             if motivo_cero:
@@ -496,7 +496,7 @@ def analizar_mes(db: sqlite3.Connection, sucursal_id: int, mes: str) -> Dict:
                         nombre, sc, d, n, proto, c4_corr, False,
                         0, vf, status,
                     )
-                    sabor_info['historial'] = _timeline_sabor(nombre, datos)
+                sabor_info['historial'] = _timeline_sabor(nombre, datos)
 
                 if motivo_cero:
                     exp_base = sabor_info.get('explicacion', '')
