@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ sucursal_nombre }} - Inventario Stock</title>
+<style>
+:root {
+    --bg: #f7f1e8; --card: rgba(255,252,247,0.95); --ink: #2f241d;
+    --muted: #7d695d; --accent: #9b6339; --accent-deep: #7e4f2f;
+    --accent-soft: #f2e4d7; --line: rgba(111,81,58,0.14);
+    --focus: rgba(155,99,57,0.12); --success: #3a7d44;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: linear-gradient(180deg, #fbf6ef 0%, #f0e8de 100%);
+    color: var(--ink); min-height: 100vh; padding: 16px;
+}
+.shell { max-width: 800px; margin: 0 auto; }
+.header {
+    background: linear-gradient(145deg, rgba(66,42,27,0.96), rgba(46,30,20,0.96));
+    color: #fffaf4; padding: 20px 24px; border-radius: 20px; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.header h1 { font-size: 1.2rem; }
+.header .sub { font-size: 0.78rem; color: rgba(255,240,225,0.6); margin-top: 2px; }
+.header a {
+    color: rgba(255,240,225,0.7); font-size: 0.75rem; text-decoration: none;
+    font-weight: 600; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 22px;
+    box-shadow: 0 12px 36px rgba(74,48,31,0.08); padding: 20px; margin-bottom: 12px;
+}
+.card-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; }
+.field { margin-bottom: 12px; }
+.field label { display: block; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #8d7262; margin-bottom: 5px; }
+.field input, .field select { width: 100%; padding: 10px 12px; border: 1px solid rgba(128,93,67,0.14); border-radius: 12px; font-size: 0.92rem; }
+.field input:focus { outline: none; border-color: rgba(155,99,57,0.4); box-shadow: 0 0 0 3px var(--focus); }
+.btn { width: 100%; padding: 14px; border: none; border-radius: 14px; cursor: pointer; font-size: 0.95rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: #fffaf4; }
+.success-msg { background: rgba(58,125,68,0.1); color: var(--success); padding: 10px 14px; border-radius: 14px; font-size: 0.85rem; font-weight: 700; margin-bottom: 12px; text-align: center; }
+
+/* Table */
+.stock-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.stock-table th { background: #3a281f; color: #fff8f1; padding: 8px 6px; text-align: center; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; position: sticky; top: 0; }
+.stock-table th:first-child { text-align: left; padding-left: 10px; }
+.stock-table td { padding: 4px 3px; border-bottom: 1px solid rgba(111,81,58,0.06); }
+.stock-table td:first-child { font-weight: 700; font-size: 0.8rem; padding-left: 10px; white-space: nowrap; }
+.stock-table input { width: 100%; padding: 6px 4px; border: 1px solid rgba(128,93,67,0.1); border-radius: 8px; text-align: center; font-size: 0.82rem; }
+.stock-table input:focus { outline: none; border-color: var(--accent); }
+.stock-table .nota-input { text-align: left; font-size: 0.78rem; }
+.scroll { overflow-x: auto; }
+
+.prev-list a {
+    display: flex; justify-content: space-between; padding: 8px 12px; margin-bottom: 4px;
+    border-radius: 10px; background: rgba(155,99,57,0.05); text-decoration: none; color: var(--ink);
+    font-size: 0.85rem;
+}
+.prev-list a:hover { background: var(--accent-soft); }
+</style>
+</head>
+<body>
+<div class="shell">
+    <div class="header">
+        <div>
+            <h1>{{ sucursal_nombre }}</h1>
+            <div class="sub">Inventario de stock (anotacion)</div>
+        </div>
+        <a href="/entrada/seleccion">Volver</a>
+    </div>
+
+    {% if guardado %}
+    <div class="success-msg">Inventario guardado correctamente</div>
+    {% endif %}
+
+    {% if stocks_list %}
+    <div class="card">
+        <div class="card-label">Inventarios anteriores</div>
+        <div class="prev-list">
+            {% for s in stocks_list[:8] %}
+            <a href="/entrada/stock?fecha={{ s.fecha }}">
+                <span><strong>{{ s.fecha }}</strong> — {{ s.n_sabores }} sabores</span>
+                <span style="color:var(--muted);font-size:0.78rem;">{{ s.registrado_por or '' }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-label">Cargar inventario</div>
+        <form method="POST">
+            <div style="display:flex;gap:10px;margin-bottom:14px;">
+                <div class="field" style="flex:1;margin:0;">
+                    <label>Fecha</label>
+                    <input type="date" name="fecha" value="{{ fecha }}" required>
+                </div>
+                <div class="field" style="flex:1;margin:0;">
+                    <label>Registrado por</label>
+                    <input type="text" name="registrado_por" placeholder="Nombre" value="">
+                </div>
+            </div>
+
+            <div class="scroll">
+                <table class="stock-table">
+                    <thead>
+                        <tr>
+                            <th>Sabor</th>
+                            <th>Ab.</th>
+                            <th>Cel.</th>
+                            <th>C1</th><th>C2</th><th>C3</th><th>C4</th><th>C5</th><th>C6</th>
+                            <th>Nota</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in catalogo %}
+                        {% set d = stock_map.get(s.nombre_norm, {}) %}
+                        <tr>
+                            <td>{{ s.nombre_norm }}</td>
+                            <td><input type="number" name="ab_{{ s.nombre_norm }}" value="{{ d.abierta if d.abierta is not none else '' }}" inputmode="numeric"></td>
+                            <td><input type="number" name="cel_{{ s.nombre_norm }}" value="{{ d.celiaca if d.celiaca is not none else '' }}" inputmode="numeric"></td>
+                            {% for i in range(1, 7) %}
+                            <td><input type="number" name="c{{ i }}_{{ s.nombre_norm }}" value="{{ d['cerrada_' ~ i] if d.get('cerrada_' ~ i) is not none else '' }}" inputmode="numeric"></td>
+                            {% endfor %}
+                            <td><input type="text" name="nota_{{ s.nombre_norm }}" class="nota-input" value="{{ d.notas or '' }}" placeholder="—"></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:14px;">
+                <button type="submit" class="btn">Guardar inventario</button>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>

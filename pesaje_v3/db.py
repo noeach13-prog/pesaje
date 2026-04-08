@@ -440,6 +440,21 @@ CREATE TABLE IF NOT EXISTS ajustes_manuales (
     UNIQUE(turno_id, nombre_norm)
 );
 
+CREATE TABLE IF NOT EXISTS stock_inventario (
+    id INTEGER PRIMARY KEY,
+    sucursal_id INTEGER NOT NULL REFERENCES sucursales(id),
+    fecha TEXT NOT NULL,
+    nombre_norm TEXT NOT NULL,
+    abierta INTEGER,
+    celiaca INTEGER,
+    cerrada_1 INTEGER, cerrada_2 INTEGER, cerrada_3 INTEGER,
+    cerrada_4 INTEGER, cerrada_5 INTEGER, cerrada_6 INTEGER,
+    notas TEXT,
+    registrado_por TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(sucursal_id, fecha, nombre_norm)
+);
+
 CREATE TABLE IF NOT EXISTS postres_turno (
     id INTEGER PRIMARY KEY,
     turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
@@ -923,6 +938,63 @@ CATALOGO_POSTRES = [
     'BOMBON X 18 UNI', 'GIO FRUTILLA', 'GIO FRAMBUEZA', 'GIO MORA',
     'GIO PISTACHO', 'ALFAJOR HELADO', 'PALETAS',
 ]
+
+
+# ─── Stock / Inventario (solo anotación, no afecta análisis) ─────
+
+def guardar_stock(db, sucursal_id: int, fecha: str, sabores: List[dict],
+                   registrado_por: str = ''):
+    """Guarda inventario de stock. sabores: [{nombre_norm, abierta, celiaca, cerrada_1..6, notas}]"""
+    db.execute("DELETE FROM stock_inventario WHERE sucursal_id = ? AND fecha = ?",
+               (sucursal_id, fecha))
+    for row in sabores:
+        nn = (row.get('nombre_norm') or '').strip()
+        if not nn:
+            continue
+
+        def _int(v):
+            if v is None or v == '':
+                return None
+            try:
+                return int(v)
+            except (ValueError, TypeError):
+                return None
+
+        db.execute(
+            """INSERT INTO stock_inventario
+               (sucursal_id, fecha, nombre_norm, abierta, celiaca,
+                cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6,
+                notas, registrado_por)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (sucursal_id, fecha, nn,
+             _int(row.get('abierta')), _int(row.get('celiaca')),
+             _int(row.get('cerrada_1')), _int(row.get('cerrada_2')),
+             _int(row.get('cerrada_3')), _int(row.get('cerrada_4')),
+             _int(row.get('cerrada_5')), _int(row.get('cerrada_6')),
+             (row.get('notas') or '').strip() or None,
+             registrado_por),
+        )
+    db.commit()
+
+
+def obtener_stock(db, sucursal_id: int, fecha: str) -> List[dict]:
+    """Retorna inventario de stock de una fecha."""
+    rows = db.execute(
+        "SELECT * FROM stock_inventario WHERE sucursal_id = ? AND fecha = ? ORDER BY nombre_norm",
+        (sucursal_id, fecha),
+    ).fetchall()
+    return [_to_dict(r) for r in rows]
+
+
+def listar_stocks(db, sucursal_id: int) -> List[dict]:
+    """Lista fechas con inventario de stock cargado."""
+    rows = db.execute(
+        """SELECT fecha, COUNT(*) as n_sabores, registrado_por, MAX(created_at) as ultima
+           FROM stock_inventario WHERE sucursal_id = ?
+           GROUP BY fecha ORDER BY fecha DESC""",
+        (sucursal_id,),
+    ).fetchall()
+    return [_to_dict(r) for r in rows]
 
 
 def guardar_postres(db, turno_id: int, postres: List[dict]):
