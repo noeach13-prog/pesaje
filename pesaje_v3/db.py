@@ -194,6 +194,23 @@ CREATE TABLE IF NOT EXISTS catalogo_sabores (
     UNIQUE(sucursal_id, nombre_norm)
 );
 
+CREATE TABLE IF NOT EXISTS ajustes_manuales (
+    id INTEGER PRIMARY KEY,
+    turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,
+    nombre_norm TEXT NOT NULL,
+    venta_pipeline INTEGER NOT NULL,
+    status_pipeline TEXT NOT NULL,
+    venta_manual INTEGER NOT NULL,
+    motivo TEXT NOT NULL,
+    categoria TEXT NOT NULL DEFAULT 'otro'
+        CHECK(categoria IN ('omision_cerrada','entrante_no_registrado','error_pesaje',
+                            'apertura_no_detectada','duplicado_no_detectado','otro')),
+    supervisor TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(turno_id, nombre_norm)
+);
+
 CREATE TABLE IF NOT EXISTS log_actividad (
     id INTEGER PRIMARY KEY,
     turno_id INTEGER NOT NULL REFERENCES turnos(id) ON DELETE CASCADE,

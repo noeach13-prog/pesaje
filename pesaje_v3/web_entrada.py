@@ -715,6 +715,102 @@ def revision(turno_id):
                            data=data, analisis=analisis)
 
 
+CATEGORIAS_AJUSTE = (
+    'omision_cerrada', 'entrante_no_registrado', 'error_pesaje',
+    'apertura_no_detectada', 'duplicado_no_detectado', 'otro',
+)
+
+
+@entrada_bp.route('/entrada/api/ajuste-manual', methods=['POST'])
+def api_ajuste_manual():
+    """Ajuste manual de venta por sabor. Requiere PIN supervisor."""
+    sid, _ = _sucursal_activa()
+    if not sid:
+        return jsonify({'ok': False, 'error': 'No autenticado'}), 401
+
+    payload = request.get_json() or {}
+    turno_id = payload.get('turno_id')
+    nombre_norm = payload.get('nombre_norm', '').strip()
+    venta_manual = payload.get('venta_manual')
+    motivo = payload.get('motivo', '').strip()
+    categoria = payload.get('categoria', '').strip()
+    pin = payload.get('pin_supervisor', '')
+
+    # Validaciones
+    if not turno_id or not nombre_norm:
+        return jsonify({'ok': False, 'error': 'Faltan datos obligatorios'}), 400
+    if venta_manual is None or not isinstance(venta_manual, (int, float)):
+        return jsonify({'ok': False, 'error': 'Valor de venta invalido'}), 400
+    venta_manual = int(venta_manual)
+    if venta_manual < 0:
+        return jsonify({'ok': False, 'error': 'La venta no puede ser negativa'}), 400
+    if len(motivo) < 10:
+        return jsonify({'ok': False, 'error': 'El motivo debe tener al menos 10 caracteres'}), 400
+    if categoria not in CATEGORIAS_AJUSTE:
+        return jsonify({'ok': False, 'error': f'Categoria invalida. Opciones: {", ".join(CATEGORIAS_AJUSTE)}'}), 400
+
+    db = get_db()
+
+    # Verificar PIN supervisor
+    suc = db.execute("SELECT pin_supervisor FROM sucursales WHERE id = ?", (sid,)).fetchone()
+    if not suc or str(pin) != str(suc['pin_supervisor']):
+        db.close()
+        return jsonify({'ok': False, 'error': 'PIN de supervisor incorrecto'}), 403
+
+    # Verificar turno
+    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+    if not turno or turno['sucursal_id'] != sid:
+        db.close()
+        return jsonify({'ok': False, 'error': 'Turno no encontrado'}), 404
+    if turno['estado'] != 'confirmado':
+        db.close()
+        return jsonify({'ok': False, 'error': 'Solo se pueden ajustar turnos confirmados'}), 400
+
+    # Obtener valor pipeline actual para preservar
+    from .validacion_entrada import analizar_turno
+    analisis = analizar_turno(db, turno_id)
+    sabor_pipe = next((s for s in analisis.get('sabores', []) if s['nombre'] == nombre_norm), None)
+    if not sabor_pipe:
+        db.close()
+        return jsonify({'ok': False, 'error': f'Sabor {nombre_norm} no encontrado en el analisis'}), 404
+
+    venta_pipeline = sabor_pipe.get('final_pipeline', sabor_pipe['final'])
+    status_pipeline = sabor_pipe['status']
+
+    # UPSERT
+    db.execute("""
+        INSERT INTO ajustes_manuales
+            (turno_id, nombre_norm, venta_pipeline, status_pipeline,
+             venta_manual, motivo, categoria, supervisor, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        ON CONFLICT(turno_id, nombre_norm) DO UPDATE SET
+            venta_pipeline = excluded.venta_pipeline,
+            status_pipeline = excluded.status_pipeline,
+            venta_manual = excluded.venta_manual,
+            motivo = excluded.motivo,
+            categoria = excluded.categoria,
+            supervisor = excluded.supervisor,
+            updated_at = datetime('now')
+    """, (turno_id, nombre_norm, venta_pipeline, status_pipeline,
+          venta_manual, motivo, categoria, payload.get('supervisor_nombre', '')))
+    db.commit()
+
+    # Log
+    ts = payload.get('timestamp', '')
+    registrar_actividad(db, turno_id, ts or 'server', 'ajuste_manual',
+                        f'{nombre_norm}: pipeline={venta_pipeline} -> manual={venta_manual} [{categoria}] {motivo[:60]}')
+
+    db.close()
+    invalidar_cache_mes(sid)
+
+    return jsonify({
+        'ok': True,
+        'nombre': nombre_norm,
+        'pipeline': venta_pipeline,
+        'manual': venta_manual,
+    })
+
+
 @entrada_bp.route('/entrada/api/borrar-turno', methods=['POST'])
 def api_borrar_turno():
     """Borra turno completo con PIN de supervisor."""

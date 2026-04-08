@@ -112,6 +112,18 @@ tr.row-neg { background: #fff3f1; }
 .badge-ok { background: var(--success-soft); color: var(--success); }
 .badge-corr { background: var(--accent-soft); color: var(--accent-strong); }
 .badge-h0 { background: var(--warning-soft); color: var(--warning); }
+.badge-manual { background: var(--purple-soft); color: var(--purple); }
+.ajuste-panel { display:none; padding:12px 16px; background:var(--purple-soft); border-top:1px solid rgba(106,75,125,0.15); }
+.ajuste-panel.open { display:block; }
+.ajuste-panel label { display:block; font-size:0.72rem; font-weight:700; color:var(--purple); text-transform:uppercase; letter-spacing:0.08em; margin:8px 0 4px; }
+.ajuste-panel input, .ajuste-panel select, .ajuste-panel textarea { width:100%; padding:8px 10px; border:1px solid rgba(106,75,125,0.2); border-radius:10px; font-size:0.88rem; background:#fff; }
+.ajuste-panel textarea { min-height:50px; resize:vertical; }
+.ajuste-panel .aj-btns { display:flex; gap:8px; margin-top:10px; }
+.ajuste-panel .aj-btn { padding:8px 14px; border:none; border-radius:10px; font-weight:700; font-size:0.82rem; cursor:pointer; }
+.aj-save { background:var(--purple); color:#fff; }
+.aj-cancel { background:rgba(106,75,125,0.1); color:var(--purple); }
+.manual-info { font-size:0.78rem; color:var(--purple); padding:6px 16px 10px; line-height:1.5; background:var(--purple-soft); border-top:1px solid rgba(106,75,125,0.1); }
+.btn-ajustar { background:none; border:1px solid rgba(106,75,125,0.2); color:var(--purple); padding:3px 8px; border-radius:8px; font-size:0.68rem; cursor:pointer; font-weight:700; }
 .sec { overflow: hidden; margin-bottom: 14px; }
 .sec-h {
     padding: 16px 18px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: flex; justify-content: space-between;
@@ -249,12 +261,50 @@ tr.row-neg { background: #fff3f1; }
                             {% else %}-{% endif %}
                         </td>
                         <td>
-                            {% if s.status == 'OK' %}<span class="badge badge-ok">OK</span>
+                            {% if s.status == 'MANUAL' %}<span class="badge badge-manual">Manual</span>
+                            {% elif s.status == 'OK' %}<span class="badge badge-ok">OK</span>
                             {% elif s.status == 'CORREGIDO' %}<span class="badge badge-corr">Corr</span>
                             {% elif s.status == 'H0' %}<span class="badge badge-h0">H0</span>
                             {% endif %}
+                            {% if data.turno.estado == 'confirmado' %}
+                            <button class="btn-ajustar" onclick="toggleAjuste('{{ s.nombre }}', event)">Ajustar</button>
+                            {% endif %}
                         </td>
                     </tr>
+                    {% if s.ajuste %}
+                    <tr><td colspan="5" style="padding:0;">
+                        <div class="manual-info">
+                            <strong>MANUAL sobre {{ s.ajuste.status_original }}</strong> | Pipeline: {{ s.ajuste.pipeline }}g | Manual: {{ s.ajuste.manual }}g<br>
+                            Motivo: {{ s.ajuste.motivo }}<br>
+                            <span style="font-size:0.7rem;opacity:0.7;">{{ s.ajuste.supervisor }} — {{ s.ajuste.fecha }}</span>
+                        </div>
+                    </td></tr>
+                    {% endif %}
+                    <tr class="ajuste-row" id="aj-{{ s.nombre }}" style="display:none;"><td colspan="5" style="padding:0;">
+                        <div class="ajuste-panel open">
+                            <div style="font-size:0.82rem;margin-bottom:6px;"><strong>{{ s.nombre }}</strong> — Pipeline: {{ s.final_pipeline if s.final_pipeline is defined else s.final }}g ({{ s.status_pipeline if s.status_pipeline is defined else s.status }})</div>
+                            <label>Valor manual (gramos)</label>
+                            <input type="number" id="ajval-{{ s.nombre }}" min="0" inputmode="numeric" value="{{ s.ajuste.manual if s.ajuste else '' }}" placeholder="Ej: 600">
+                            <label>Categoria del error</label>
+                            <select id="ajcat-{{ s.nombre }}">
+                                <option value="">Seleccionar...</option>
+                                <option value="omision_cerrada">Omision de cerrada</option>
+                                <option value="entrante_no_registrado">Entrante no registrado</option>
+                                <option value="error_pesaje">Error de pesaje</option>
+                                <option value="apertura_no_detectada">Apertura no detectada</option>
+                                <option value="duplicado_no_detectado">Duplicado no detectado</option>
+                                <option value="otro">Otro</option>
+                            </select>
+                            <label>Motivo (minimo 10 caracteres)</label>
+                            <textarea id="ajmot-{{ s.nombre }}" placeholder="Describir que encontro y por que el valor correcto es otro...">{{ s.ajuste.motivo if s.ajuste else '' }}</textarea>
+                            <label>PIN supervisor</label>
+                            <input type="password" id="ajpin-{{ s.nombre }}" maxlength="6" inputmode="numeric" placeholder="****">
+                            <div class="aj-btns">
+                                <button class="aj-btn aj-cancel" onclick="toggleAjuste('{{ s.nombre }}', event)">Cancelar</button>
+                                <button class="aj-btn aj-save" onclick="guardarAjuste('{{ s.nombre }}', {{ data.turno.id }})">Guardar ajuste</button>
+                            </div>
+                        </div>
+                    </td></tr>
                     {% if s.explicacion %}
                     <tr class="exp-row"><td colspan="5" style="padding:0;">
                         <div class="exp-box" onclick="this.classList.toggle('open')">
@@ -369,5 +419,47 @@ HISTORIAL:
         </div>
     </div>
 </div>
+<script>
+function toggleAjuste(nombre, e) {
+    e && e.stopPropagation();
+    var row = document.getElementById('aj-' + nombre);
+    row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+function guardarAjuste(nombre, turnoId) {
+    var val = document.getElementById('ajval-' + nombre).value;
+    var cat = document.getElementById('ajcat-' + nombre).value;
+    var mot = document.getElementById('ajmot-' + nombre).value;
+    var pin = document.getElementById('ajpin-' + nombre).value;
+
+    if (!val || isNaN(parseInt(val))) { alert('Valor invalido'); return; }
+    if (!cat) { alert('Seleccionar categoria'); return; }
+    if (mot.length < 10) { alert('El motivo debe tener al menos 10 caracteres'); return; }
+    if (!pin) { alert('Ingresar PIN de supervisor'); return; }
+
+    fetch('/entrada/api/ajuste-manual', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            turno_id: turnoId,
+            nombre_norm: nombre,
+            venta_manual: parseInt(val),
+            categoria: cat,
+            motivo: mot,
+            pin_supervisor: pin,
+            timestamp: new Date().toISOString()
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            location.reload();
+        } else {
+            alert(data.error || 'Error al guardar');
+        }
+    })
+    .catch(() => alert('Error de conexion'));
+}
+</script>
 </body>
 </html>

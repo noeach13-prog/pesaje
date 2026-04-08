@@ -69,6 +69,9 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
                 res_dia['n_errores'] = sum(1 for a in res_dia['alertas'] if a['severidad'] == 'error')
                 res_dia['n_warnings'] = sum(1 for a in res_dia['alertas'] if a['severidad'] == 'warning')
 
+                # Ajustes manuales del supervisor
+                _aplicar_ajustes_manuales(db, turno_id, res_dia)
+
                 # C5 profundo si se pidió
                 if profundo and turno['estado'] == 'confirmado':
                     res_dia = _agregar_c5_profundo(db, turno, res_dia)
@@ -275,11 +278,61 @@ def analizar_turno(db: sqlite3.Connection, turno_id: int, profundo: bool = False
             'codigo': 'PIPELINE_ERROR', 'detalle': f'Error en analisis: {str(e)[:120]}',
         })
 
+    # Ajustes manuales del supervisor
+    _aplicar_ajustes_manuales(db, turno_id, resultado)
+
     # Conteo de alertas
     resultado['n_errores'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'error')
     resultado['n_warnings'] = sum(1 for a in resultado['alertas'] if a['severidad'] == 'warning')
 
     return resultado
+
+
+def _aplicar_ajustes_manuales(db, turno_id, resultado):
+    """Aplica ajustes manuales del supervisor sobre el resultado del pipeline.
+
+    No destruye el pipeline: preserva final_pipeline y agrega datos del ajuste.
+    Recalcula totales con los valores manuales.
+    """
+    ajustes = db.execute(
+        "SELECT * FROM ajustes_manuales WHERE turno_id = ?", (turno_id,)
+    ).fetchall()
+
+    if not ajustes:
+        return
+
+    ajustes_map = {a['nombre_norm']: a for a in ajustes}
+    delta_total = 0
+
+    for sabor_info in resultado.get('sabores', []):
+        nombre = sabor_info['nombre']
+        if nombre not in ajustes_map:
+            continue
+
+        ajuste = ajustes_map[nombre]
+
+        # Preservar valor pipeline
+        sabor_info['final_pipeline'] = sabor_info['final']
+        sabor_info['status_pipeline'] = sabor_info['status']
+
+        # Aplicar override
+        delta_total += ajuste['venta_manual'] - sabor_info['final']
+        sabor_info['final'] = ajuste['venta_manual']
+        sabor_info['status'] = 'MANUAL'
+        sabor_info['ajuste'] = {
+            'pipeline': ajuste['venta_pipeline'],
+            'status_original': ajuste['status_pipeline'],
+            'manual': ajuste['venta_manual'],
+            'motivo': ajuste['motivo'],
+            'categoria': ajuste['categoria'],
+            'supervisor': ajuste['supervisor'] or '',
+            'fecha': ajuste['updated_at'],
+        }
+
+    # Recalcular totales
+    if delta_total != 0 and 'totales' in resultado:
+        resultado['totales']['venta'] += delta_total
+        resultado['totales']['neto'] += delta_total
 
 
 # Cache de analizar_mes: evita correr el pipeline completo multiples veces
