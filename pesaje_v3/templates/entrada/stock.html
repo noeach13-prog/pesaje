@@ -91,7 +91,7 @@ body {
             {% for item in items %}
             <div class="item-row">
                 <div class="item-name">{{ item }}</div>
-                <input type="text" class="item-qty" name="qty_{{ seccion }}_{{ item }}"
+                <input type="text" class="item-qty" name="qty_{{ seccion|replace(' ', '_') }}_{{ item|replace(' ', '_')|replace('/', '-') }}"
                        value="{{ stock_map.get(item, '') }}" placeholder="—"
                        inputmode="numeric">
             </div>

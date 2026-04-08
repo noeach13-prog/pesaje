@@ -430,7 +430,7 @@ def stock():
         items = []
         for seccion, productos in CATALOGO_STOCK.items():
             for item in productos:
-                key = f'qty_{seccion}_{item}'.replace(' ', '_')
+                key = f'qty_{seccion}_{item}'.replace(' ', '_').replace('/', '-')
                 cantidad = request.form.get(key, '').strip()
                 if cantidad:
                     items.append({'seccion': seccion, 'item': item, 'cantidad': cantidad})
