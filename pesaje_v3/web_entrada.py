@@ -400,10 +400,19 @@ def api_guardar_extras():
     consumos = payload.get('consumos', [])
     notas = payload.get('notas', [])
 
-    guardar_vdp(db, turno_id, vdp)
-    guardar_consumos(db, turno_id, consumos)
-    guardar_notas(db, turno_id, notas)
-    db.close()
+    try:
+        guardar_vdp(db, turno_id, vdp)
+        guardar_consumos(db, turno_id, consumos)
+        guardar_notas(db, turno_id, notas)
+        db.commit()
+        db.close()
+    except Exception as e:
+        try:
+            db._conn.rollback()
+        except Exception:
+            pass
+        db.close()
+        return jsonify({'ok': False, 'error': f'Error al guardar extras: {str(e)[:200]}'}), 500
 
     return jsonify({
         'ok': True,
