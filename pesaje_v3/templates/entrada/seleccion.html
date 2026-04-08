@@ -215,6 +215,25 @@ body {
         </form>
     </div>
 
+    {% if recientes %}
+    <div class="card" style="padding:18px 20px;">
+        <div class="card-label">Turnos recientes</div>
+        {% for t in recientes[:6] %}
+        <a href="/entrada/turno/{{ t.id }}" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-bottom:6px;border-radius:12px;background:{% if t.estado == 'borrador' %}rgba(180,106,31,0.08){% else %}rgba(47,106,65,0.06){% endif %};text-decoration:none;color:var(--ink);">
+            <div>
+                <strong style="font-size:0.88rem;">{{ t.fecha }} {{ t.tipo_turno }}</strong>
+                {% if t.estado == 'borrador' %}
+                <span style="font-size:0.68rem;font-weight:700;color:var(--accent);background:rgba(180,106,31,0.12);padding:2px 7px;border-radius:999px;margin-left:6px;">Borrador</span>
+                {% else %}
+                <span style="font-size:0.68rem;font-weight:700;color:var(--success);background:rgba(47,106,65,0.1);padding:2px 7px;border-radius:999px;margin-left:6px;">Confirmado</span>
+                {% endif %}
+            </div>
+            <span style="font-size:0.75rem;color:var(--muted);">{{ t.fecha }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="links">
         <a href="/entrada/historial" class="link-card">Historial</a>
         <a href="/entrada/logout" class="link-card">Cambiar sucursal</a>
