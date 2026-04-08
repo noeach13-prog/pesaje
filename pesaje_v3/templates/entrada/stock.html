@@ -57,6 +57,9 @@ body {
     {% if guardado %}
     <div class="success-msg">Stock guardado correctamente</div>
     {% endif %}
+    {% if stock_error %}
+    <div style="background:#fef2f2;color:#991b1b;padding:10px 14px;border-radius:14px;font-size:0.82rem;margin-bottom:12px;">DB Error: {{ stock_error }}</div>
+    {% endif %}
 
     {% if stocks_list %}
     <div class="card">

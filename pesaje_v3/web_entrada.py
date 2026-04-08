@@ -447,6 +447,7 @@ def stock():
     # GET
     fecha = request.args.get('fecha', hoy)
     snapshot_id = request.args.get('snapshot')
+    stock_error = None
     try:
         if snapshot_id:
             stock_data = obtener_stock(db, sid, snapshot_id)
@@ -454,7 +455,8 @@ def stock():
             stock_data = obtener_ultimo_stock(db, sid, fecha)
         stock_map = {s['item']: s['cantidad'] for s in stock_data}
         stocks_list = listar_stocks(db, sid)
-    except Exception:
+    except Exception as e:
+        stock_error = str(e)[:200]
         try:
             db._conn.rollback()
         except Exception:
@@ -469,7 +471,7 @@ def stock():
                            catalogo_stock=CATALOGO_STOCK,
                            fecha=fecha, hoy=hoy,
                            stock_map=stock_map, stocks_list=stocks_list,
-                           guardado=guardado)
+                           guardado=guardado, stock_error=stock_error)
 
 
 @entrada_bp.route('/entrada/historial')
