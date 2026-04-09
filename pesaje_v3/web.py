@@ -28,21 +28,17 @@ _outputs: dict = {}
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
-def _auto_backup():
-    """Backup automático: guarda un dump SQL en la DB como registro.
-    Se ejecuta al arrancar si no se hizo hoy. Sin intervención humana."""
+def _backup_once():
+    """Registra snapshot de conteo en _backups si no se hizo hoy."""
     from pesaje_v3.db import get_db, _is_postgres
-    import logging
     if not _is_postgres():
         return
-
     try:
         db = get_db()
-        # Tabla de backups
         try:
             db.execute("""CREATE TABLE IF NOT EXISTS _backups (
                 id %s, fecha TEXT NOT NULL UNIQUE, n_turnos INTEGER, n_sabores INTEGER,
-                created_at TEXT NOT NULL DEFAULT %s
+                status TEXT, created_at TEXT NOT NULL DEFAULT %s
             )""" % ('SERIAL PRIMARY KEY' if db.is_pg else 'INTEGER PRIMARY KEY',
                     'CURRENT_TIMESTAMP' if db.is_pg else "(datetime('now'))"))
             db.commit()
@@ -50,28 +46,54 @@ def _auto_backup():
             try: db._conn.rollback()
             except: pass
 
-        # Verificar si ya se hizo hoy
         from datetime import date
         hoy = date.today().isoformat()
         row = db.execute("SELECT 1 FROM _backups WHERE fecha = ?", (hoy,)).fetchone()
         if row:
             db.close()
-            return  # Ya se hizo hoy
+            return
 
-        # Contar datos
         r1 = db.execute("SELECT COUNT(*) as n FROM turnos").fetchone()
         n_turnos = r1['n'] if isinstance(r1, dict) else r1[0]
         r2 = db.execute("SELECT COUNT(*) as n FROM sabores_turno").fetchone()
         n_sabores = r2['n'] if isinstance(r2, dict) else r2[0]
 
-        # Registrar backup
-        db.execute("INSERT INTO _backups (fecha, n_turnos, n_sabores) VALUES (?, ?, ?)",
-                   (hoy, n_turnos, n_sabores))
+        # Health self-check
+        status = 'ok'
+        try:
+            r3 = db.execute("SELECT COUNT(DISTINCT sucursal_id) as n FROM turnos").fetchone()
+            n_sucs = r3['n'] if isinstance(r3, dict) else r3[0]
+            if n_sucs == 0:
+                status = 'warn:no_turnos'
+        except Exception:
+            status = 'error:health_check_failed'
+
+        db.execute("INSERT INTO _backups (fecha, n_turnos, n_sabores, status) VALUES (?, ?, ?, ?)",
+                   (hoy, n_turnos, n_sabores, status))
         db.commit()
         db.close()
-        logging.info(f'Auto-backup registered: {hoy}, {n_turnos} turnos, {n_sabores} sabores')
+        logging.info(f'[BACKUP] {hoy}: {n_turnos} turnos, {n_sabores} sabores, status={status}')
     except Exception as e:
-        logging.error(f'Auto-backup failed: {e}')
+        logging.error(f'[BACKUP] FAILED: {e}')
+
+
+def _start_daily_tasks():
+    """Inicia thread daemon que ejecuta backup + self-check cada 12 horas.
+    No depende de restarts: corre mientras el proceso viva."""
+    import threading
+
+    def _loop():
+        import time
+        while True:
+            try:
+                _backup_once()
+            except Exception as e:
+                logging.error(f'[DAILY] Error: {e}')
+            time.sleep(43200)  # 12 horas
+
+    t = threading.Thread(target=_loop, daemon=True)
+    t.start()
+    logging.info('[DAILY] Background backup/health thread started (every 12h)')
 
 
 # --- Blueprint de carga manual ---
@@ -81,8 +103,9 @@ app.register_blueprint(entrada_bp)
 init_db()
 logging.info('Pesaje app initialized')
 
-# Backup automático al arrancar (una vez por día)
-_auto_backup()
+# Backup + self-check: una vez al arrancar + thread cada 12h
+_backup_once()
+_start_daily_tasks()
 
 
 
@@ -128,6 +151,20 @@ def health():
 
         # Postgres o SQLite
         status['checks']['engine'] = 'postgres' if db.is_pg else 'sqlite'
+
+        # Ultimo backup
+        try:
+            bk = db.execute("SELECT fecha, n_turnos, n_sabores, status, created_at FROM _backups ORDER BY fecha DESC LIMIT 1").fetchone()
+            if bk:
+                status['checks']['ultimo_backup'] = dict(bk)
+                # Alertar si el backup tiene mas de 2 dias
+                from datetime import date, timedelta
+                bk_date = date.fromisoformat(bk['fecha'])
+                if (date.today() - bk_date).days > 2:
+                    status['status'] = 'warn'
+                    status['checks']['backup_alerta'] = f'Ultimo backup hace {(date.today() - bk_date).days} dias'
+        except Exception:
+            pass  # tabla puede no existir
 
         db.close()
     except Exception as e:
