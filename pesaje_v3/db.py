@@ -688,6 +688,16 @@ def guardar_sabores(db: sqlite3.Connection, turno_id: int,
         (turno_id,),
     )
     db.commit()
+
+    # Verificar que los datos se guardaron (debug Postgres)
+    row = db.execute(
+        "SELECT COUNT(*) as n FROM sabores_turno WHERE turno_id = ? AND abierta IS NOT NULL",
+        (turno_id,)
+    ).fetchone()
+    n_con_datos = row['n'] if isinstance(row, dict) else row[0]
+    import sys
+    print(f'[guardar_sabores] turno_id={turno_id}, insertados={len(sabores)}, con_datos_post_commit={n_con_datos}', file=sys.stderr)
+
     return warnings
 
 
@@ -711,13 +721,19 @@ def confirmar_turno(db: sqlite3.Connection, turno_id: int,
     if turno['estado'] == 'confirmado':
         return {'ok': False, 'error': 'Turno ya confirmado'}
 
-    # Verificar que tenga al menos 1 sabor con datos
+    # Verificar que tenga al menos 1 sabor con datos REALES (no solo filas vacias)
     row = db.execute(
-        "SELECT COUNT(*) as n FROM sabores_turno WHERE turno_id = ?", (turno_id,)
+        """SELECT COUNT(*) as n FROM sabores_turno WHERE turno_id = ?
+           AND (abierta IS NOT NULL OR celiaca IS NOT NULL
+                OR cerrada_1 IS NOT NULL OR cerrada_2 IS NOT NULL
+                OR cerrada_3 IS NOT NULL OR cerrada_4 IS NOT NULL
+                OR cerrada_5 IS NOT NULL OR cerrada_6 IS NOT NULL
+                OR entrante_1 IS NOT NULL OR entrante_2 IS NOT NULL)""",
+        (turno_id,)
     ).fetchone()
     n_sabores = row['n'] if isinstance(row, dict) else row[0]
     if n_sabores == 0:
-        return {'ok': False, 'error': 'No hay sabores cargados'}
+        return {'ok': False, 'error': 'No hay sabores con pesos cargados. Cargar al menos un sabor antes de confirmar.'}
 
     db.execute(
         """UPDATE turnos SET estado = 'confirmado', fin_carga = ?,
