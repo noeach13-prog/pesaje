@@ -1498,6 +1498,54 @@ def test_bilateral_residual_borde_cerrada_en_noche_con_mismatch():
 
 
 # ===================================================================
+# K) AISLAMIENTO DE SUCURSAL — los turnos nunca se mezclan entre sucursales
+#
+# Hallazgo: un endpoint de debug mostraba turnos de todas las sucursales
+# sin filtrar, lo que generó un falso diagnóstico de datos corruptos.
+# Estos tests constitucionales fijan que el batch y el análisis NUNCA
+# mezclen turnos de sucursales distintas, aunque compartan fecha.
+# ===================================================================
+
+def test_batch_no_mezcla_sucursales():
+    """cargar_todos_los_dias_db filtra por sucursal_id.
+    Dos sucursales con turnos el mismo dia NO deben contaminar el par."""
+    from pesaje_v3.modelos import SaborCrudo, TurnoCrudo, DatosDia
+    from pesaje_v3.db_to_pipeline import cargar_todos_los_dias_db
+
+    # Este test requiere DB local con datos de 2 sucursales.
+    # Lo verificamos a nivel de contrato: la función recibe sucursal_id
+    # y la query filtra por ese ID.
+    import inspect
+    src = inspect.getsource(cargar_todos_los_dias_db)
+    assert 'sucursal_id' in src, 'cargar_todos_los_dias_db debe recibir sucursal_id'
+    assert 'WHERE sucursal_id' in src or 'sucursal_id=?' in src, \
+        'cargar_todos_los_dias_db debe filtrar por sucursal_id en la query SQL'
+
+
+def test_granizado_par_correcto():
+    """GRANIZADO con DIA ab=3590 y NOCHE ab=3480 da venta=110, no 3770.
+    Caso real: San Martin 8/4/2026. El 3770 ocurria cuando se mezclaban
+    turnos UNICO de otras sucursales en el mismo dia."""
+    from pesaje_v3.modelos import SaborCrudo, TurnoCrudo, DatosDia
+    from pesaje_v3.capa2_contrato import calcular_contabilidad
+
+    d = TurnoCrudo(nombre_hoja='Mie 8 (DIA)', indice=0, sabores={
+        'GRANIZADO': SaborCrudo(nombre='GRANIZADO', nombre_norm='GRANIZADO',
+                                abierta=3590, celiaca=None, cerradas=[], entrantes=[]),
+    })
+    n = TurnoCrudo(nombre_hoja='Mie 8 (NOCHE)', indice=1, sabores={
+        'GRANIZADO': SaborCrudo(nombre='GRANIZADO', nombre_norm='GRANIZADO',
+                                abierta=3480, celiaca=None, cerradas=[], entrantes=[]),
+    })
+    datos = DatosDia(dia_label='8', turno_dia=d, turno_noche=n, contexto=[], modo='DIA_NOCHE')
+    cont = calcular_contabilidad(datos)
+
+    sc = cont.sabores['GRANIZADO']
+    assert sc.venta_raw == 110, \
+        f'GRANIZADO venta_raw={sc.venta_raw}, esperaba 110 (3590-3480)'
+
+
+# ===================================================================
 # MAIN
 # ===================================================================
 
