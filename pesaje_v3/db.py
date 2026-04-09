@@ -688,16 +688,6 @@ def guardar_sabores(db: sqlite3.Connection, turno_id: int,
         (turno_id,),
     )
     db.commit()
-
-    # Verificar que los datos se guardaron (debug Postgres)
-    row = db.execute(
-        "SELECT COUNT(*) as n FROM sabores_turno WHERE turno_id = ? AND abierta IS NOT NULL",
-        (turno_id,)
-    ).fetchone()
-    n_con_datos = row['n'] if isinstance(row, dict) else row[0]
-    import sys
-    print(f'[guardar_sabores] turno_id={turno_id}, insertados={len(sabores)}, con_datos_post_commit={n_con_datos}', file=sys.stderr)
-
     return warnings
 
 
