@@ -934,10 +934,18 @@ def revision(turno_id):
     from .validacion_entrada import analizar_turno
     profundo = request.args.get('profundo') == '1'
     analisis = analizar_turno(db, turno_id, profundo=profundo)
+
+    # Contar turnos confirmados de la sucursal para banner preliminar
+    row = db.execute(
+        "SELECT COUNT(*) as n FROM turnos WHERE sucursal_id = ? AND estado = 'confirmado'",
+        (sid,)
+    ).fetchone()
+    n_confirmados = row['n'] if isinstance(row, dict) else row[0]
     db.close()
 
     return render_template('entrada/revision.html',
-                           data=data, analisis=analisis)
+                           data=data, analisis=analisis,
+                           n_confirmados=n_confirmados)
 
 
 CATEGORIAS_AJUSTE = (

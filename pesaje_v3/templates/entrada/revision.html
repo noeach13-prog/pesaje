@@ -207,6 +207,16 @@ tr.row-neg { background: #fff3f1; }
     </div>
 
     {% if analisis.tiene_analisis %}
+    {% if n_confirmados is defined and n_confirmados < 6 %}
+    <div style="background:rgba(180,130,50,0.1);border:1px solid rgba(180,130,50,0.2);border-radius:16px;padding:14px 18px;margin-bottom:12px;">
+        <div style="font-weight:800;font-size:0.88rem;color:#8b6520;margin-bottom:4px;">Analisis preliminar</div>
+        <div style="font-size:0.82rem;color:#7d695d;line-height:1.5;">
+            Esta sucursal tiene {{ n_confirmados }} turno{{ 's' if n_confirmados != 1 else '' }} confirmado{{ 's' if n_confirmados != 1 else '' }}.
+            Se necesitan al menos 5-6 turnos para que el sistema tenga contexto suficiente y las correcciones sean confiables.
+            Los primeros analisis pueden tener mas casos sin resolver (H0) de lo normal.
+        </div>
+    </div>
+    {% endif %}
     <div class="totals">
         <div class="tot tot-green">
             <div class="tot-num">{{ "{:,.0f}".format(analisis.totales.venta) }}g</div>
