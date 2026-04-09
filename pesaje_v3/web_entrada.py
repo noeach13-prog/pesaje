@@ -856,7 +856,7 @@ def _calcular_sugerencia_pedido(db, data):
         ab = s['abierta'] or 0
         cel = s.get('celiaca') or 0
         cerradas = [s[f'cerrada_{i}'] for i in range(1, 7) if s.get(f'cerrada_{i}') is not None]
-        entrantes = [s[f'entrante_{i}'] for i in range(1, 3) if s.get(f'entrante_{i}') is not None]
+        entrantes = [s[f'entrante_{i}'] for i in range(1, 7) if s.get(f'entrante_{i}') is not None]
         stock_actual = ab + cel + sum(cerradas) + sum(entrantes)
 
         ventas_raw = ventas_diarias_por_sabor.get(nn, [])
@@ -1144,7 +1144,7 @@ def api_debug_turnos():
     turnos = db.execute(query, params).fetchall()
     result = []
     for t in turnos:
-        sabs = db.execute('SELECT nombre_norm, abierta, celiaca, cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6, entrante_1, entrante_2 FROM sabores_turno WHERE turno_id=? ORDER BY nombre_norm', (t['id'],)).fetchall()
+        sabs = db.execute('SELECT nombre_norm, abierta, celiaca, cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6, entrante_1, entrante_2, entrante_3, entrante_4, entrante_5, entrante_6 FROM sabores_turno WHERE turno_id=? ORDER BY nombre_norm', (t['id'],)).fetchall()
         sabores = [dict(s) for s in sabs]
         result.append({
             'id': t['id'], 'fecha': t['fecha'], 'tipo': t['tipo_turno'],

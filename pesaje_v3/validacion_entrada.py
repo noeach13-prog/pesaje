@@ -1125,7 +1125,7 @@ def _validar_nivel3_turno(db, turno_id, turno, suc) -> List[Dict]:
     n_intradup = 0
     for s in sabores:
         cerradas = [s[f'cerrada_{i}'] for i in range(1, 7) if s[f'cerrada_{i}'] is not None]
-        entrantes = [s[f'entrante_{i}'] for i in range(1, 3) if s[f'entrante_{i}'] is not None]
+        entrantes = [s[f'entrante_{i}'] for i in range(1, 7) if s[f'entrante_{i}'] is not None]
         for e in entrantes:
             for c in cerradas:
                 if abs(e - c) <= PFIT_TOL_INTRA:

@@ -29,7 +29,7 @@ def _row_to_sabor_crudo(row: dict) -> SaborCrudo:
             cerradas.append(int(v))
 
     entrantes = []
-    for i in range(1, 3):
+    for i in range(1, 7):
         v = row.get(f'entrante_{i}')
         if v is not None:
             entrantes.append(int(v))

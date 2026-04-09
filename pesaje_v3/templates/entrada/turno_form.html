@@ -382,7 +382,7 @@ body {
             <div class="chip-group" style="margin-top:6px;">
                 <div class="chip-label">Entrantes</div>
                 <div class="chip-row" data-ent>
-                    {% for i in range(1, 3) %}
+                    {% for i in range(1, 7) %}
                     {% set ev = s['entrante_' ~ i] if s and s['entrante_' ~ i] is not none else none %}
                     {% set erv = r['entrante_' ~ i] if r and r['entrante_' ~ i] is not none else none %}
                     {% if ev is not none %}
@@ -592,7 +592,7 @@ const _FIELD_NAMES = {
     'abierta':'Abierta', 'celiaca':'Celiaca',
     'cerrada_1':'Cerrada 1','cerrada_2':'Cerrada 2','cerrada_3':'Cerrada 3',
     'cerrada_4':'Cerrada 4','cerrada_5':'Cerrada 5','cerrada_6':'Cerrada 6',
-    'entrante_1':'Entrante 1','entrante_2':'Entrante 2',
+    'entrante_1':'Entrante 1','entrante_2':'Entrante 2','entrante_3':'Entrante 3','entrante_4':'Entrante 4','entrante_5':'Entrante 5','entrante_6':'Entrante 6',
 };
 
 function toggle(fl, e) {
@@ -878,7 +878,7 @@ function addEnt(btn, e) {
     e.stopPropagation();
     const row=btn.closest('[data-ent]');
     const existing=row.querySelectorAll('.chip');
-    if(existing.length>=2){toast('Maximo 2 entrantes','warn');return;}
+    if(existing.length>=6){toast('Maximo 6 entrantes','warn');return;}
     const idx=existing.length+1;
     const chip=document.createElement('div'); chip.className='chip'; chip.dataset.slot='entrante_'+idx;
     chip.innerHTML='<input type="number" inputmode="numeric" data-f="entrante_'+idx+'" placeholder="0" onfocus="this.select()" onblur="v(this)" onclick="event.stopPropagation()"><span class="unit">g</span><button class="chip-rm" onclick="rmChip(this,event)">&times;</button>';
@@ -904,7 +904,7 @@ function collect() {
     const out=[];
     document.querySelectorAll('.fl').forEach(fl=>{
         const n=fl.dataset.n; let has=false;
-        const row={nombre:n,abierta:null,celiaca:null,cerrada_1:null,cerrada_2:null,cerrada_3:null,cerrada_4:null,cerrada_5:null,cerrada_6:null,entrante_1:null,entrante_2:null};
+        const row={nombre:n,abierta:null,celiaca:null,cerrada_1:null,cerrada_2:null,cerrada_3:null,cerrada_4:null,cerrada_5:null,cerrada_6:null,entrante_1:null,entrante_2:null,entrante_3:null,entrante_4:null,entrante_5:null,entrante_6:null};
         fl.querySelectorAll('input[type=number]').forEach(inp=>{
             const val=inp.value.trim(); if(!val)return;
             has=true; row[inp.dataset.f]=parseInt(val);

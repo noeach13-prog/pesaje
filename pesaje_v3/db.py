@@ -302,6 +302,17 @@ def init_db():
 
     conn.commit()
 
+    # Migración: agregar columnas entrante_3..6 si no existen
+    for i in range(3, 7):
+        col = f'entrante_{i}'
+        if not _col_exists(conn, 'sabores_turno', col):
+            try:
+                conn.execute(f"ALTER TABLE sabores_turno ADD COLUMN {col} INTEGER")
+                conn.commit()
+            except Exception:
+                try: conn._conn.rollback()
+                except: pass
+
     # Semilla: sucursales con PIN empleado + PIN supervisor
     _SUCURSALES = [
         ('San Martín', 'DIA_NOCHE', '1234', '2512'),
@@ -435,7 +446,8 @@ CREATE TABLE IF NOT EXISTS sabores_turno (
     celiaca INTEGER,
     cerrada_1 INTEGER, cerrada_2 INTEGER, cerrada_3 INTEGER,
     cerrada_4 INTEGER, cerrada_5 INTEGER, cerrada_6 INTEGER,
-    entrante_1 INTEGER, entrante_2 INTEGER,
+    entrante_1 INTEGER, entrante_2 INTEGER, entrante_3 INTEGER,
+    entrante_4 INTEGER, entrante_5 INTEGER, entrante_6 INTEGER,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(turno_id, nombre_norm)
 );
@@ -584,7 +596,7 @@ def validar_sabor_server(row: dict) -> List[str]:
         if err:
             errores.append(f'cerrada_{i}: {err}')
 
-    for i in range(1, 3):
+    for i in range(1, 7):
         err = validar_peso(row.get(f'entrante_{i}'))
         if err:
             errores.append(f'entrante_{i}: {err}')
@@ -594,7 +606,7 @@ def validar_sabor_server(row: dict) -> List[str]:
         row.get(c) is not None and row.get(c) != ''
         for c in ['abierta', 'celiaca'] +
                  [f'cerrada_{i}' for i in range(1, 7)] +
-                 [f'entrante_{i}' for i in range(1, 3)]
+                 [f'entrante_{i}' for i in range(1, 7)]
     )
     if not tiene_dato:
         errores.append('Sabor sin ningun peso registrado')
@@ -665,20 +677,14 @@ def guardar_sabores(db: sqlite3.Connection, turno_id: int,
             """INSERT INTO sabores_turno
                (turno_id, nombre, nombre_norm, abierta, celiaca,
                 cerrada_1, cerrada_2, cerrada_3, cerrada_4, cerrada_5, cerrada_6,
-                entrante_1, entrante_2)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                entrante_1, entrante_2, entrante_3, entrante_4, entrante_5, entrante_6)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 turno_id, nombre, nombre_norm,
                 _int_or_none(row.get('abierta')),
                 _int_or_none(row.get('celiaca')),
-                _int_or_none(row.get('cerrada_1')),
-                _int_or_none(row.get('cerrada_2')),
-                _int_or_none(row.get('cerrada_3')),
-                _int_or_none(row.get('cerrada_4')),
-                _int_or_none(row.get('cerrada_5')),
-                _int_or_none(row.get('cerrada_6')),
-                _int_or_none(row.get('entrante_1')),
-                _int_or_none(row.get('entrante_2')),
+                *[_int_or_none(row.get(f'cerrada_{i}')) for i in range(1, 7)],
+                *[_int_or_none(row.get(f'entrante_{i}')) for i in range(1, 7)],
             ),
         )
 
@@ -718,7 +724,9 @@ def confirmar_turno(db: sqlite3.Connection, turno_id: int,
                 OR cerrada_1 IS NOT NULL OR cerrada_2 IS NOT NULL
                 OR cerrada_3 IS NOT NULL OR cerrada_4 IS NOT NULL
                 OR cerrada_5 IS NOT NULL OR cerrada_6 IS NOT NULL
-                OR entrante_1 IS NOT NULL OR entrante_2 IS NOT NULL)""",
+                OR entrante_1 IS NOT NULL OR entrante_2 IS NOT NULL
+                OR entrante_3 IS NOT NULL OR entrante_4 IS NOT NULL
+                OR entrante_5 IS NOT NULL OR entrante_6 IS NOT NULL)""",
         (turno_id,)
     ).fetchone()
     n_sabores = row['n'] if isinstance(row, dict) else row[0]
@@ -739,7 +747,9 @@ def confirmar_turno(db: sqlite3.Connection, turno_id: int,
             COALESCE(abierta,0)+COALESCE(celiaca,0)+
             COALESCE(cerrada_1,0)+COALESCE(cerrada_2,0)+COALESCE(cerrada_3,0)+
             COALESCE(cerrada_4,0)+COALESCE(cerrada_5,0)+COALESCE(cerrada_6,0)+
-            COALESCE(entrante_1,0)+COALESCE(entrante_2,0)
+            COALESCE(entrante_1,0)+COALESCE(entrante_2,0)+
+            COALESCE(entrante_3,0)+COALESCE(entrante_4,0)+
+            COALESCE(entrante_5,0)+COALESCE(entrante_6,0)
         ), 0) as total FROM sabores_turno WHERE turno_id = ?""",
         (turno_id,),
     ).fetchone()

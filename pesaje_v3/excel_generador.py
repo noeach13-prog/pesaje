@@ -125,7 +125,7 @@ def _escribir_hoja(db: sqlite3.Connection, ws, turno_id: int):
             v = s[f'cerrada_{i}']
             if v is not None:
                 ws.cell(row=row, column=3 + i, value=v)
-        for i in range(1, 3):
+        for i in range(1, 7):
             v = s[f'entrante_{i}']
             if v is not None:
                 ws.cell(row=row, column=9 + i, value=v)
