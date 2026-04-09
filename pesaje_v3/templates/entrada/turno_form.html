@@ -560,6 +560,7 @@ body {
 
 <script>
 const TID={{data.turno.id}}, MX=7900;
+let TURNO_UPDATED_AT = '{{ data.turno.updated_at or "" }}';
 const CONFIRMADO = {{ 'true' if data.turno.estado == 'confirmado' else 'false' }};
 let active=null;
 
@@ -947,11 +948,19 @@ async function save() {
     let ok=false;
     try{
         // Secuencial: primero sabores, despues extras
-        const r1=await fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect(),timestamp:clientTS()})});
+        const r1=await fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect(),timestamp:clientTS(),updated_at:TURNO_UPDATED_AT})});
         let d1;
         try{ d1=await r1.json(); }catch(e){ toast('Error del servidor al guardar sabores ('+r1.status+')','err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
 
-        if(!d1.ok){ toast('Error sabores: '+d1.error,'err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
+        if(!d1.ok){
+            if(d1.conflict) {
+                toast('Otro usuario modifico este turno. Recarga la pagina.','err');
+                if(confirm('Este turno fue modificado por otra persona. Recargar ahora?')) location.reload();
+            } else {
+                toast('Error sabores: '+d1.error,'err');
+            }
+            if(btn){btn.disabled=false;btn.textContent='Guardar';} return false;
+        }
 
         const r2=await fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,...collectX()})});
         let d2;
@@ -960,6 +969,7 @@ async function save() {
         if(!d2.ok){ toast('Error extras: '+d2.error,'err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
 
         ok=true;
+        if(d1.updated_at) TURNO_UPDATED_AT = d1.updated_at;
         let p=[d1.n_sabores+' sabores'];
         if(d2.n_vdp)p.push(d2.n_vdp+' VDP');if(d2.n_consumos)p.push(d2.n_consumos+' consumos');if(d2.n_notas)p.push(d2.n_notas+' notas');
         toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');

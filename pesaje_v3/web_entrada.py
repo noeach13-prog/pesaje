@@ -291,6 +291,18 @@ def api_guardar():
         db.close()
         return jsonify({'ok': False, 'error': 'Turno ya confirmado'}), 400
 
+    # Bloqueo optimista: verificar que nadie modificó el turno desde que se abrió
+    client_updated = payload.get('updated_at', '')
+    server_updated = turno.get('updated_at', '')
+    if client_updated and server_updated and client_updated != server_updated:
+        db.close()
+        return jsonify({
+            'ok': False,
+            'error': 'Este turno fue modificado por otra persona. Recarga la pagina antes de guardar.',
+            'conflict': True,
+            'server_updated': server_updated,
+        }), 409
+
     try:
         warnings = guardar_sabores(db, turno_id, sabores)
 
@@ -299,6 +311,10 @@ def api_guardar():
         if ts:
             registrar_actividad(db, turno_id, ts, 'guardar', f'{len(sabores)} sabores')
 
+        # Leer updated_at nuevo para bloqueo optimista del cliente
+        turno_new = db.execute("SELECT updated_at FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+        new_updated = turno_new['updated_at'] if turno_new else ''
+
         db.close()
         invalidar_cache_mes(sid)
 
@@ -306,6 +322,7 @@ def api_guardar():
             'ok': True,
             'warnings': warnings,
             'n_sabores': len(sabores),
+            'updated_at': new_updated,
         })
     except Exception as e:
         try:

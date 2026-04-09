@@ -28,12 +28,62 @@ _outputs: dict = {}
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
+def _auto_backup():
+    """Backup automático: guarda un dump SQL en la DB como registro.
+    Se ejecuta al arrancar si no se hizo hoy. Sin intervención humana."""
+    from pesaje_v3.db import get_db, _is_postgres
+    import logging
+    if not _is_postgres():
+        return
+
+    try:
+        db = get_db()
+        # Tabla de backups
+        try:
+            db.execute("""CREATE TABLE IF NOT EXISTS _backups (
+                id %s, fecha TEXT NOT NULL UNIQUE, n_turnos INTEGER, n_sabores INTEGER,
+                created_at TEXT NOT NULL DEFAULT %s
+            )""" % ('SERIAL PRIMARY KEY' if db.is_pg else 'INTEGER PRIMARY KEY',
+                    'CURRENT_TIMESTAMP' if db.is_pg else "(datetime('now'))"))
+            db.commit()
+        except Exception:
+            try: db._conn.rollback()
+            except: pass
+
+        # Verificar si ya se hizo hoy
+        from datetime import date
+        hoy = date.today().isoformat()
+        row = db.execute("SELECT 1 FROM _backups WHERE fecha = ?", (hoy,)).fetchone()
+        if row:
+            db.close()
+            return  # Ya se hizo hoy
+
+        # Contar datos
+        r1 = db.execute("SELECT COUNT(*) as n FROM turnos").fetchone()
+        n_turnos = r1['n'] if isinstance(r1, dict) else r1[0]
+        r2 = db.execute("SELECT COUNT(*) as n FROM sabores_turno").fetchone()
+        n_sabores = r2['n'] if isinstance(r2, dict) else r2[0]
+
+        # Registrar backup
+        db.execute("INSERT INTO _backups (fecha, n_turnos, n_sabores) VALUES (?, ?, ?)",
+                   (hoy, n_turnos, n_sabores))
+        db.commit()
+        db.close()
+        logging.info(f'Auto-backup registered: {hoy}, {n_turnos} turnos, {n_sabores} sabores')
+    except Exception as e:
+        logging.error(f'Auto-backup failed: {e}')
+
+
 # --- Blueprint de carga manual ---
 from pesaje_v3.web_entrada import entrada_bp
 from pesaje_v3.db import init_db
 app.register_blueprint(entrada_bp)
 init_db()
 logging.info('Pesaje app initialized')
+
+# Backup automático al arrancar (una vez por día)
+_auto_backup()
+
 
 
 @app.teardown_appcontext
