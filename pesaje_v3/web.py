@@ -24,17 +24,129 @@ app.secret_key = os.environ.get('SECRET_KEY', 'pesaje-dev-key-cambiar-en-prod')
 app.permanent_session_lifetime = timedelta(days=30)  # sesion dura 30 dias
 _outputs: dict = {}
 
+# Logging de errores a stderr (visible en Railway logs)
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+
 # --- Blueprint de carga manual ---
 from pesaje_v3.web_entrada import entrada_bp
 from pesaje_v3.db import init_db
 app.register_blueprint(entrada_bp)
 init_db()
+logging.info('Pesaje app initialized')
 
 
 @app.teardown_appcontext
 def _close_db(exc):
     """Cierra conexiones DB abiertas durante el request."""
     pass  # get_db() crea conexiones locales que se cierran en cada endpoint
+
+
+# ─── Health check + backup endpoint ────────────────────────────────
+
+@app.route('/health')
+def health():
+    """Health check para monitoreo. Verifica DB, turnos, errores."""
+    from pesaje_v3.db import get_db
+    import traceback
+    status = {'status': 'ok', 'checks': {}}
+    try:
+        db = get_db()
+        # DB connection
+        row = db.execute("SELECT COUNT(*) as n FROM turnos").fetchone()
+        n = row['n'] if isinstance(row, dict) else row[0]
+        status['checks']['db'] = 'ok'
+        status['checks']['turnos'] = n
+
+        # Sucursales
+        row2 = db.execute("SELECT COUNT(*) as n FROM sucursales").fetchone()
+        status['checks']['sucursales'] = row2['n'] if isinstance(row2, dict) else row2[0]
+
+        # Turnos por sucursal
+        rows = db.execute(
+            """SELECT s.nombre, COUNT(t.id) as n,
+                      SUM(CASE WHEN t.estado='confirmado' THEN 1 ELSE 0 END) as conf
+               FROM sucursales s LEFT JOIN turnos t ON s.id = t.sucursal_id
+               GROUP BY s.nombre ORDER BY s.nombre"""
+        ).fetchall()
+        status['checks']['por_sucursal'] = {r['nombre']: {'total': r['n'], 'confirmados': r['conf']} for r in rows}
+
+        # Ultimo turno
+        ult = db.execute("SELECT fecha, tipo_turno, estado FROM turnos ORDER BY fecha DESC, id DESC LIMIT 1").fetchone()
+        if ult:
+            status['checks']['ultimo_turno'] = dict(ult)
+
+        # Postgres o SQLite
+        status['checks']['engine'] = 'postgres' if db.is_pg else 'sqlite'
+
+        db.close()
+    except Exception as e:
+        status['status'] = 'error'
+        status['checks']['db'] = f'ERROR: {str(e)[:200]}'
+        status['error'] = traceback.format_exc()[-500:]
+
+    from flask import jsonify
+    code = 200 if status['status'] == 'ok' else 500
+    return jsonify(status), code
+
+
+@app.route('/backup')
+def backup():
+    """Descarga un dump SQL de la DB (solo Postgres). Protegido por query param."""
+    from flask import request, jsonify, Response
+    key = request.args.get('key', '')
+    if key != 'tolentinos2512':
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    from pesaje_v3.db import get_db, _is_postgres
+    if not _is_postgres():
+        return jsonify({'error': 'Backup only available on Postgres'}), 400
+
+    db = get_db()
+    try:
+        tables = ['sucursales', 'turnos', 'sabores_turno', 'vdp_turno',
+                  'consumo_turno', 'notas_turno', 'postres_turno',
+                  'ajustes_manuales', 'log_actividad', 'stock_insumos',
+                  'catalogo_sabores']
+
+        lines = ['-- Backup Pesaje Tolentinos']
+        lines.append(f'-- Generated: {__import__("datetime").datetime.utcnow().isoformat()}')
+        lines.append('')
+
+        for table in tables:
+            try:
+                rows = db.execute(f"SELECT * FROM {table}").fetchall()
+                if not rows:
+                    continue
+                cols = list(rows[0].keys())
+                lines.append(f'-- {table}: {len(rows)} rows')
+                for row in rows:
+                    vals = []
+                    for c in cols:
+                        v = row[c]
+                        if v is None:
+                            vals.append('NULL')
+                        elif isinstance(v, (int, float)):
+                            vals.append(str(v))
+                        else:
+                            vals.append("'" + str(v).replace("'", "''") + "'")
+                    lines.append(f"INSERT INTO {table} ({','.join(cols)}) VALUES ({','.join(vals)});")
+                lines.append('')
+            except Exception:
+                lines.append(f'-- ERROR reading {table}')
+                continue
+
+        db.close()
+
+        content = '\n'.join(lines)
+        return Response(
+            content,
+            mimetype='text/sql',
+            headers={'Content-Disposition': f'attachment; filename=backup_pesaje_{__import__("datetime").date.today().isoformat()}.sql'}
+        )
+    except Exception as e:
+        db.close()
+        return jsonify({'error': str(e)[:200]}), 500
 
 
 def _procesar(path_in: str, filename: str):
