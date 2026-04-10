@@ -609,6 +609,20 @@ def api_guardar_extras():
     db, turno_or_err = _verificar_turno_editable(turno_id)
     if db is None:
         return turno_or_err
+    turno = turno_or_err  # cuando db != None, turno_or_err es el turno
+
+    # Bloqueo optimista: mismo check que api_guardar. El cliente debe enviar
+    # el updated_at que recibio en la respuesta de /api/guardar (no el del load).
+    client_updated = payload.get('updated_at', '')
+    server_updated = turno.get('updated_at', '') if hasattr(turno, 'get') else turno['updated_at']
+    if client_updated and server_updated and client_updated != server_updated:
+        db.close()
+        return jsonify({
+            'ok': False,
+            'error': 'Este turno fue modificado por otra persona. Recarga la pagina antes de guardar.',
+            'conflict': True,
+            'server_updated': server_updated,
+        }), 409
 
     vdp = payload.get('vdp', [])
     consumos = payload.get('consumos', [])
@@ -621,6 +635,11 @@ def api_guardar_extras():
         guardar_notas(db, turno_id, notas)
         guardar_postres(db, turno_id, postres)
         db.commit()
+
+        # Leer updated_at final (tras todos los bumps internos) para que
+        # el cliente se mantenga sincronizado con el estado real del servidor.
+        turno_new = db.execute("SELECT updated_at FROM turnos WHERE id = ?", (turno_id,)).fetchone()
+        new_updated = turno_new['updated_at'] if turno_new else ''
         db.close()
     except Exception as e:
         try:
@@ -636,6 +655,7 @@ def api_guardar_extras():
         'n_consumos': len([c for c in consumos if (c.get('texto') or '').strip()]),
         'n_notas': len([n for n in notas if (n.get('detalle') or '').strip()]),
         'n_postres': len([p for p in postres if p.get('cantidad')]),
+        'updated_at': new_updated,
     })
 
 

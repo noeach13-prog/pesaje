@@ -962,14 +962,28 @@ async function save() {
             if(btn){btn.disabled=false;btn.textContent='Guardar';} return false;
         }
 
-        const r2=await fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,...collectX()})});
+        // Sincronizar token de concurrencia con el valor post-sabores ANTES de
+        // pegarle a extras (sabores ya bumpeo updated_at en el server).
+        if(d1.updated_at) TURNO_UPDATED_AT = d1.updated_at;
+
+        const r2=await fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,updated_at:TURNO_UPDATED_AT,...collectX()})});
         let d2;
         try{ d2=await r2.json(); }catch(e){ toast('Error del servidor al guardar extras ('+r2.status+')','err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
 
-        if(!d2.ok){ toast('Error extras: '+d2.error,'err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
+        if(!d2.ok){
+            if(d2.conflict) {
+                toast('Otro usuario modifico este turno. Recarga la pagina.','err');
+                if(confirm('Este turno fue modificado por otra persona. Recargar ahora?')) location.reload();
+            } else {
+                toast('Error extras: '+d2.error,'err');
+            }
+            if(btn){btn.disabled=false;btn.textContent='Guardar';} return false;
+        }
 
         ok=true;
-        if(d1.updated_at) TURNO_UPDATED_AT = d1.updated_at;
+        // Extras bumpea updated_at varias veces (vdp/consumos/notas/postres).
+        // Guardamos el valor final para que el proximo save no dispare un falso 409.
+        if(d2.updated_at) TURNO_UPDATED_AT = d2.updated_at;
         let p=[d1.n_sabores+' sabores'];
         if(d2.n_vdp)p.push(d2.n_vdp+' VDP');if(d2.n_consumos)p.push(d2.n_consumos+' consumos');if(d2.n_notas)p.push(d2.n_notas+' notas');
         toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');
