@@ -22,6 +22,19 @@ Estado esperado al correrse:
     la funcion interna, momento en que pasan a ser tests reales.
 
 Ejecutar: python -m pytest pesaje_v3/test_atomicidad_guardar.py -v
+
+Smoke test de paridad de backend (Postgres):
+  Si la variable de entorno TEST_DATABASE_URL esta seteada, los dos
+  tests del wrapper con sufijo _pg se ejecutan contra Postgres real.
+  Si no esta, esos tests se skippean limpiamente.
+
+    python -m pytest pesaje_v3/test_atomicidad_guardar.py -v
+    TEST_DATABASE_URL=postgresql://... python -m pytest \\
+        pesaje_v3/test_atomicidad_guardar.py -v -k "_pg"
+
+  REGLA DE PRODUCCION: el fixture PG usa exclusivamente la sucursal
+  'San Miguel'. El resto de las sucursales tienen datos reales que NO
+  deben tocarse bajo ninguna circunstancia.
 """
 import os
 import sys
@@ -441,4 +454,200 @@ def test_wrapper_http_conflict_real(flask_client):
     )
     assert body2.get('server_updated'), (
         "body no incluye server_updated para que el cliente pueda sincronizar"
+    )
+
+
+# ───────────────────────────────────────────────────────────────────
+# Smoke test de paridad SQLite ↔ Postgres — solo wrapper HTTP
+# ───────────────────────────────────────────────────────────────────
+#
+# Objetivo: validar que el optimistic lock con comparacion por igualdad
+# estricta de updated_at siga comportandose correctamente cuando el
+# backend devuelve timestamps con precision de microsegundos (Postgres)
+# en lugar de segundos (SQLite).
+#
+# Solo se duplican los dos tests del wrapper HTTP (camino feliz + conflict
+# real). Los tests del core atomico y los de helpers aislados NO se
+# duplican: son backend-agnosticos y su verde en SQLite extrapola
+# razonablemente al backend PG porque la diferencia estructural vive en
+# el borde (formato del token), no en la logica transaccional.
+#
+# REGLA DE PRODUCCION: el fixture usa EXCLUSIVAMENTE la sucursal
+# 'San Miguel'. Las demas sucursales tienen datos reales que no deben
+# tocarse. Si San Miguel no existe en la DB de test, el fixture skippea.
+
+def _limpiar_turno_pg(db, turno_id):
+    """Borra un turno y todas sus filas hijas en orden FK-safe.
+
+    Usado por flask_client_pg en setup defensivo y teardown. Una sola
+    transaccion, un solo commit al final. Si algo falla, rollback.
+    No toca sucursales, catalogos, ni otros turnos.
+    """
+    try:
+        db.execute("DELETE FROM sabores_turno WHERE turno_id = ?", (turno_id,))
+        db.execute("DELETE FROM vdp_turno     WHERE turno_id = ?", (turno_id,))
+        db.execute("DELETE FROM consumo_turno WHERE turno_id = ?", (turno_id,))
+        db.execute("DELETE FROM notas_turno   WHERE turno_id = ?", (turno_id,))
+        db.execute("DELETE FROM postres_turno WHERE turno_id = ?", (turno_id,))
+        db.execute("DELETE FROM log_actividad WHERE turno_id = ?", (turno_id,))
+        db.execute("DELETE FROM turnos        WHERE id = ?",        (turno_id,))
+        db.commit()
+    except Exception:
+        try:
+            db._conn.rollback()
+        except Exception:
+            pass
+        raise
+
+
+@pytest.fixture
+def flask_client_pg(monkeypatch):
+    """Flask test client contra Postgres real. Smoke de paridad de backend.
+
+    Requiere TEST_DATABASE_URL apuntando a una DB de tests. Si no esta,
+    pytest.skip() limpio.
+
+    Aislamiento de datos:
+      - REGLA DE PRODUCCION: usa exclusivamente la sucursal 'San Miguel'.
+        Si no existe, skip. Las demas sucursales tienen datos reales.
+      - Usa fecha reservada '2099-01-01' que no colisiona con datos reales.
+      - Setup defensivo: barre cualquier turno residual que coincida con
+        la triple clave completa (sucursal_id_san_miguel, fecha_reservada,
+        tipo_turno). NO barre por fecha+tipo a secas para no tocar turnos
+        de otras sucursales.
+      - Teardown: borra solo las filas del turno creado por este fixture,
+        en orden FK-safe, sin tocar nada mas.
+    """
+    test_url = os.environ.get('TEST_DATABASE_URL', '')
+    if not test_url:
+        pytest.skip("TEST_DATABASE_URL no configurada; smoke Postgres omitido")
+
+    from pesaje_v3 import db as db_module
+
+    monkeypatch.setattr(db_module, '_DATABASE_URL', test_url)
+    db_module.init_db()
+
+    # Invariantes de test — no cambiar sin revisar la regla de produccion.
+    SUCURSAL_TEST = 'San Miguel'
+    FECHA_TEST = '2099-01-01'
+    TIPO_TEST = 'DIA'
+
+    db = db_module.get_db()
+
+    # Resolver sucursal ANTES de cualquier limpieza defensiva. Si no existe,
+    # abortar sin tocar nada.
+    row_suc = db.execute(
+        "SELECT id, nombre FROM sucursales WHERE nombre = ?",
+        (SUCURSAL_TEST,),
+    ).fetchone()
+    if not row_suc:
+        db.close()
+        pytest.skip(
+            f"Sucursal '{SUCURSAL_TEST}' no existe en la DB de test. "
+            f"Esta es la unica sucursal permitida para pruebas."
+        )
+    sid = row_suc['id']
+    sucursal_nombre = row_suc['nombre']
+
+    # Setup defensivo: barrer cualquier turno residual de corridas anteriores
+    # que haya fallado en teardown. Filtro por la triple clave COMPLETA para
+    # no tocar turnos de otras sucursales ni con fechas distintas.
+    # La unicidad (sucursal_id, fecha, tipo_turno) deberia garantizar que
+    # haya a lo sumo uno, pero iteramos por robustez contra estados raros.
+    residuales = db.execute(
+        "SELECT id FROM turnos WHERE sucursal_id = ? AND fecha = ? AND tipo_turno = ?",
+        (sid, FECHA_TEST, TIPO_TEST),
+    ).fetchall()
+    for r in residuales:
+        _limpiar_turno_pg(db, r['id'])
+
+    turno_id = db_module.crear_turno(db, sid, FECHA_TEST, TIPO_TEST, 'test_pg_user')
+    updated_at_inicial = _leer_updated_at(db, turno_id)
+    db.close()
+
+    # Configurar app Flask con sesion simulada
+    from pesaje_v3.web import app
+    app.config['TESTING'] = True
+    app.config['SECRET_KEY'] = 'test-secret-pg'
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess['sucursal_id'] = sid
+        sess['sucursal_nombre'] = sucursal_nombre
+        sess['sucursal_modo'] = 'DIA_NOCHE'  # San Miguel es DIA_NOCHE en seed
+
+    yield client, sid, turno_id, updated_at_inicial
+
+    # Teardown: borrar solo el turno que este fixture creo.
+    db = db_module.get_db()
+    try:
+        _limpiar_turno_pg(db, turno_id)
+    finally:
+        db.close()
+
+
+def test_wrapper_http_camino_feliz_pg(flask_client_pg):
+    """Camino feliz del wrapper contra Postgres real.
+
+    Contraparte directa de test_wrapper_http_camino_feliz. Verifica que
+    el flujo Flask → _guardar_turno_atomico → Postgres → response JSON
+    se comporte identico al de SQLite cuando el backend devuelve
+    timestamps con microsegundos.
+    """
+    client, sid, turno_id, updated_at_inicial = flask_client_pg
+    time.sleep(1.1)
+
+    payload = _payload_valido(turno_id, updated_at=updated_at_inicial)
+    resp = client.post('/entrada/api/guardar-turno', json=payload)
+
+    assert resp.status_code == 200, (
+        f"[PG] Se esperaba 200, se obtuvo {resp.status_code}: "
+        f"{resp.get_data(as_text=True)}"
+    )
+    body = resp.get_json()
+    assert body['ok'] is True
+    assert 'updated_at' in body
+    assert body['updated_at'] != updated_at_inicial, (
+        "[PG] wrapper devolvio el mismo updated_at del request (no hubo bump)"
+    )
+    assert body['n_sabores'] == 2
+
+
+def test_wrapper_http_conflict_real_pg(flask_client_pg):
+    """Conflict real entre dos tabs contra Postgres real.
+
+    Contraparte directa de test_wrapper_http_conflict_real. Verifica que
+    el optimistic lock con igualdad estricta de updated_at siga detectando
+    el conflict cuando el backend devuelve timestamps con microsegundos.
+    Este es el test mas sensible al formato del token.
+    """
+    client, sid, turno_id, updated_at_inicial = flask_client_pg
+    time.sleep(1.1)
+
+    # Primer save con token valido → 200, bumpea updated_at en PG
+    resp1 = client.post(
+        '/entrada/api/guardar-turno',
+        json=_payload_valido(turno_id, updated_at=updated_at_inicial),
+    )
+    assert resp1.status_code == 200, (
+        f"[PG] primer save fallo: {resp1.status_code} "
+        f"{resp1.get_data(as_text=True)}"
+    )
+
+    # Segundo save con el token VIEJO (simula pestaña desactualizada)
+    resp2 = client.post(
+        '/entrada/api/guardar-turno',
+        json=_payload_valido(turno_id, updated_at=updated_at_inicial),
+    )
+    assert resp2.status_code == 409, (
+        f"[PG] se esperaba 409, se obtuvo {resp2.status_code}: "
+        f"{resp2.get_data(as_text=True)}"
+    )
+    body2 = resp2.get_json()
+    assert body2['ok'] is False
+    assert body2.get('conflict') is True, (
+        f"[PG] body no tiene conflict=True: {body2}"
+    )
+    assert body2.get('server_updated'), (
+        "[PG] body no incluye server_updated para que el cliente pueda sincronizar"
     )
