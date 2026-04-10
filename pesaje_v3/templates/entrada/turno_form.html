@@ -1046,16 +1046,38 @@ async function persistTurno({ silent }) {
         // EXITO — unica ruta que toca estado compartido del cliente.
         if (d.updated_at) TURNO_UPDATED_AT = d.updated_at;
 
-        // Chequeo anti-race: si el operario escribio durante el fetch,
-        // hay trabajo mas nuevo en el DOM y en localStorage que el payload
-        // que acabamos de enviar. En ese caso dejamos _dirty=true para
-        // que el proximo ciclo de autosave lo persista, y NO borramos el
-        // draft local porque sigue siendo la red de seguridad del trabajo
-        // mas reciente.
+        // Clausula anti-borrado del draft local. Dos condiciones conjuntas:
+        //   1) changedDuringSave: el operario escribio durante el fetch,
+        //      hay trabajo mas nuevo que el payload enviado.
+        //   2) !draftIntactamenteRestaurado: habia secciones del draft
+        //      que nunca llegaron al DOM y por lo tanto nunca viajaron
+        //      en el payload.
+        // Si CUALQUIERA es cierta, localStorage tiene datos mas recientes
+        // o mas completos que lo persistido, y borrarlo seria perdida
+        // silenciosa. Solo se borra cuando ambas son falsas.
         const changedDuringSave = (_editVersion !== startVersion);
-        if (!changedDuringSave) {
+        const draftIntactamenteRestaurado = (!_draftRestaurado || _draftRestauracionCompleta);
+        const seguroBorrarDraft = !changedDuringSave && draftIntactamenteRestaurado;
+
+        if (seguroBorrarDraft) {
             _dirty = false;
             localStorage.removeItem(_LS_KEY);
+            _draftRestaurado = false;
+            _draftRestauracionCompleta = true;
+            _draftPendiente = null;
+            _draftBannerVersion = null;
+            ocultarBannerDraft();
+        } else {
+            // No tocar localStorage ni el banner. El draft sigue pendiente.
+            // Si fue por !draftIntactamenteRestaurado sin cambios nuevos,
+            // forzamos _dirty=true explicitamente para que el proximo
+            // autosave (o save manual) lo reintente.
+            if (!draftIntactamenteRestaurado) {
+                _dirty = true;
+            }
+            if (!silent && !draftIntactamenteRestaurado) {
+                toast('Guardado parcial: hay secciones del borrador local que no se pudieron aplicar y siguen pendientes. El borrador sigue preservado.', 'warn');
+            }
         }
 
         if (!silent) {
@@ -1363,6 +1385,35 @@ let _dirty = false;
 let _editVersion = 0;
 const _LS_KEY = 'pesaje_draft_' + TID;
 
+// Estado de restauracion de draft local. Ver aplicarDraftAlDOM() y la
+// clausula anti-borrado en el bloque de exito de persistTurno().
+//
+//   _draftRestaurado: true si este ciclo de vida de la pagina aplico
+//     aplicarDraftAlDOM() sobre el DOM (automaticamente o por decision
+//     humana). Mientras sea true, el proximo save exitoso debe
+//     evaluar si es seguro borrar localStorage.
+//
+//   _draftRestauracionCompleta: false si alguna seccion del draft tenia
+//     contenido que no pudo ser aplicada al DOM (ej: sabor del draft
+//     que ya no existe en el catalogo). Mientras sea false, el save
+//     exitoso NO debe borrar localStorage porque hay datos que solo
+//     viven ahi y nunca viajaron en el payload.
+//
+//   _draftPendiente: cuando la precedencia no autoriza auto-restauracion
+//     (servidor no vacio), guardamos el backup aca para que el boton
+//     "Usar mi borrador local" del banner pueda aplicarlo.
+//
+//   _draftBannerVersion: snapshot de _editVersion en el momento en que
+//     se mostro el banner. Si el operario hace click en "Descartar
+//     borrador local" y _editVersion > _draftBannerVersion, significa
+//     que hubo ediciones humanas despues de que aparecio el aviso. En
+//     ese caso el descarte tambien destruye esas ediciones, y el
+//     confirm debe decirlo explicitamente en vez de con texto generico.
+let _draftRestaurado = false;
+let _draftRestauracionCompleta = true;
+let _draftPendiente = null;
+let _draftBannerVersion = null;
+
 // Marcar dirty ante cualquier cambio en inputs
 document.addEventListener('input', function(e) {
     if (e.target.matches('input[type="number"], input[type="text"], select')) {
@@ -1392,6 +1443,352 @@ function restaurarLocal() {
     } catch(e) { return false; }
 }
 
+// ─── Restauracion de draft local ───────────────────────────────────
+//
+// evaluarPrecedenciaDraft: decide si el draft puede aplicarse
+// automaticamente o si hace falta decision humana. Criterio duro:
+// auto-restauracion SOLO cuando el servidor no esta mostrando contenido
+// real en ninguna de las 5 secciones. El timestamp del draft nunca
+// autoriza sobrescribir una pantalla con datos; a lo sumo modula el
+// texto del banner.
+
+function _servidorTieneContenidoReal() {
+    // "Contenido real" significa valores, no mera presencia de nodos.
+    // Un input vacio o una fila de nota pre-renderizada sin detalle
+    // cuentan como ausencia.
+
+    // Sabores: al menos un input con valor no vacio
+    const algunSabor = Array.from(document.querySelectorAll('.fl input[type=number]')).some(function(inp) {
+        return inp.value.trim() !== '';
+    });
+    if (algunSabor) return true;
+
+    // VDP: al menos un .vdp-item
+    if (document.querySelectorAll('#vB .vdp-item').length > 0) return true;
+
+    // Consumos: al menos un .con-item
+    if (document.querySelectorAll('#cB .con-item').length > 0) return true;
+
+    // Notas: al menos una .xrow con .nd no vacio (ignorar filas vacias
+    // pre-renderizadas o residuales)
+    const algunaNota = Array.from(document.querySelectorAll('#nB .xrow')).some(function(r) {
+        const nd = r.querySelector('.nd');
+        return nd && nd.value.trim() !== '';
+    });
+    if (algunaNota) return true;
+
+    // Postres: al menos un input con cantidad > 0
+    const algunPostre = Array.from(document.querySelectorAll('.postre-qty')).some(function(inp) {
+        const v = parseInt(inp.value);
+        return !isNaN(v) && v > 0;
+    });
+    if (algunPostre) return true;
+
+    return false;
+}
+
+function evaluarPrecedenciaDraft(backup) {
+    // Retorna: 'auto_restore' | 'ask_user_stale' | 'ask_user_ambiguous'
+    //
+    //   auto_restore: servidor vacio. Unica rama con permiso para aplicar
+    //     aplicarDraftAlDOM sin consentimiento humano explicito.
+    //
+    //   ask_user_stale: servidor con contenido + draft claramente mas
+    //     viejo (>60s de margen). Banner rojo, decision humana.
+    //
+    //   ask_user_ambiguous: servidor con contenido + draft mas nuevo
+    //     o dentro del margen de skew, o sin referencia temporal clara.
+    //     Banner amarillo, decision humana.
+
+    if (!_servidorTieneContenidoReal()) {
+        return 'auto_restore';
+    }
+
+    // Servidor con contenido. Nunca auto-restauracion. El timestamp solo
+    // decide el texto del banner.
+    const MARGEN_SKEW_MS = 60000;
+    if (!TURNO_UPDATED_AT) return 'ask_user_ambiguous';
+    const serverMs = new Date(String(TURNO_UPDATED_AT).replace(' ', 'T')).getTime();
+    if (isNaN(serverMs)) return 'ask_user_ambiguous';
+    const draftMs = backup.ts;
+    if (typeof draftMs !== 'number') return 'ask_user_ambiguous';
+    if (draftMs < serverMs - MARGEN_SKEW_MS) return 'ask_user_stale';
+    return 'ask_user_ambiguous';
+}
+
+// aplicarDraftAlDOM: reemplazo, no mezcla. Fase 1 limpia el DOM de todas
+// las secciones dinamicas y vacia los inputs fijos. Fase 2 aplica el
+// draft. Retorna true si todo el contenido del draft llego al DOM, false
+// si alguna seccion tenia datos que no pudieron aplicarse (ej: sabores
+// del draft que ya no existen en el catalogo de la sucursal).
+
+function aplicarDraftAlDOM(backup) {
+    let completo = true;
+
+    // ─── FASE 1 — limpieza ───
+    // Sabores: vaciar TODOS los inputs, no solo los del draft. Un sabor
+    // que estaba en el server pero el operario borro no debe sobrevivir.
+    document.querySelectorAll('.fl').forEach(function(fl) {
+        fl.querySelectorAll('input[type=number]').forEach(function(inp) { inp.value = ''; });
+        fl.classList.remove('done');
+    });
+    // VDP, consumos, notas: eliminar items dinamicos
+    document.querySelectorAll('#vB .vdp-item').forEach(function(it) { it.remove(); });
+    document.querySelectorAll('#cB .con-item').forEach(function(it) { it.remove(); });
+    document.querySelectorAll('#nB .xrow').forEach(function(r) { r.remove(); });
+    // Postres: vaciar
+    document.querySelectorAll('.postre-qty').forEach(function(inp) { inp.value = ''; });
+
+    // ─── FASE 2 — aplicacion desde draft ───
+
+    // 2.a) Sabores
+    if (backup.sabores) {
+        backup.sabores.forEach(function(s) {
+            const nombreEsc = (window.CSS && CSS.escape) ? CSS.escape(s.nombre) : s.nombre;
+            const fl = document.querySelector('.fl[data-n="' + nombreEsc + '"]');
+            if (!fl) {
+                // Sabor del draft que ya no existe en el catalogo
+                completo = false;
+                return;
+            }
+            fl.querySelectorAll('input[type=number]').forEach(function(inp) {
+                const key = inp.dataset.f;
+                const v = s[key];
+                if (v !== null && v !== undefined && v !== '') {
+                    inp.value = v;
+                }
+            });
+            const tieneAlgo = Array.from(fl.querySelectorAll('input[type=number]')).some(function(i) {
+                return i.value.trim();
+            });
+            if (tieneAlgo) fl.classList.add('done');
+        });
+    }
+
+    const x = backup.extras || {};
+
+    // 2.b) VDP — reusar addVDP para preservar data-texto crudo
+    if (x.vdp && x.vdp.length > 0) {
+        const counts = {};
+        x.vdp.forEach(function(v) {
+            const k = v.texto + '\x00' + v.gramos;
+            if (!counts[k]) counts[k] = { texto: v.texto, gramos: v.gramos, qty: 0 };
+            counts[k].qty += 1;
+        });
+        Object.keys(counts).forEach(function(k) {
+            const c = counts[k];
+            addVDP(c.texto, c.gramos);
+            // addVDP crea con qty=1. Ajustamos al valor real contado.
+            const items = document.querySelectorAll('#vB .vdp-item');
+            const lastItem = items[items.length - 1];
+            if (lastItem) {
+                const span = lastItem.querySelector('.qty-n');
+                if (span) span.textContent = c.qty;
+                const vg = lastItem.querySelector('.vdp-g');
+                if (vg) vg.textContent = (c.qty * c.gramos) + 'g';
+            }
+        });
+        updVdpBadge();
+    }
+
+    // 2.c) Consumos — reusar addCon con swap temporal de #conEmpleado
+    if (x.consumos && x.consumos.length > 0) {
+        const counts = {};
+        x.consumos.forEach(function(c) {
+            const k = c.texto + '\x00' + c.gramos + '\x00' + (c.empleado || '');
+            if (!counts[k]) counts[k] = { texto: c.texto, gramos: c.gramos, empleado: c.empleado || '', qty: 0 };
+            counts[k].qty += 1;
+        });
+        const inpEmp = document.getElementById('conEmpleado');
+        if (!inpEmp) {
+            // Inconsistencia de render: el input de empleado no existe.
+            // Marcamos restauracion incompleta y seguimos. Diagnostico
+            // por console, no ruido al operario.
+            console.warn('aplicarDraftAlDOM: #conEmpleado no encontrado; consumos del draft no restaurados');
+            completo = false;
+        } else {
+            const prevEmp = inpEmp.value;
+            try {
+                Object.keys(counts).forEach(function(k) {
+                    const c = counts[k];
+                    if (!c.empleado) {
+                        // Consumo sin empleado: addCon abortaria con toast.
+                        // Marcamos incompleto y saltamos sin llamar addCon.
+                        completo = false;
+                        return;
+                    }
+                    inpEmp.value = c.empleado;
+                    addCon(c.texto, c.gramos);
+                    // Ajustar qty del ultimo item agregado
+                    const items = document.querySelectorAll('#cB .con-item');
+                    const lastItem = items[items.length - 1];
+                    if (lastItem) {
+                        const span = lastItem.querySelector('.qty-n');
+                        if (span) span.textContent = c.qty;
+                        const vg = lastItem.querySelector('.vdp-g');
+                        if (vg) vg.textContent = (c.qty * c.gramos) + 'g';
+                    }
+                });
+            } finally {
+                // Restaurar el valor original del input siempre, aun con excepcion
+                inpEmp.value = prevEmp;
+            }
+            updConBadge();
+        }
+    }
+
+    // 2.d) Notas — reusar addN() + setters directos (no innerHTML)
+    if (x.notas && x.notas.length > 0) {
+        x.notas.forEach(function(n) {
+            addN();
+            const rows = document.querySelectorAll('#nB .xrow');
+            const last = rows[rows.length - 1];
+            if (last) {
+                const sel = last.querySelector('.nc');
+                const inp = last.querySelector('.nd');
+                if (sel) sel.value = n.categoria || 'otro';
+                if (inp) inp.value = n.detalle || '';
+            }
+        });
+    }
+
+    // 2.e) Postres
+    if (x.postres && x.postres.length > 0) {
+        x.postres.forEach(function(p) {
+            const prodEsc = (window.CSS && CSS.escape) ? CSS.escape(p.producto) : p.producto;
+            const inp = document.querySelector('.postre-qty[data-producto="' + prodEsc + '"]');
+            if (inp) {
+                inp.value = p.cantidad;
+            } else {
+                // Postre del draft que ya no esta en el catalogo
+                completo = false;
+            }
+        });
+    }
+
+    return completo;
+}
+
+// ─── Banner persistente de draft ───
+
+function mostrarBannerDraftRestaurado(tipo) {
+    // tipo: 'normal' | 'ask_user_stale' | 'ask_user_ambiguous'
+    if (document.getElementById('draftBanner')) return;
+
+    const estilos = {
+        normal:              { bg: '#fff3cd', border: '#ffc107' },
+        ask_user_stale:      { bg: '#f8d7da', border: '#dc3545' },
+        ask_user_ambiguous:  { bg: '#fff3cd', border: '#ffc107' },
+    };
+    const textos = {
+        normal:              'Se aplico trabajo local no sincronizado. Guarda para enviarlo al servidor, o descarta el borrador local.',
+        ask_user_stale:      'Hay un borrador local anterior a la ultima version del servidor. Puede estar desactualizado.',
+        ask_user_ambiguous:  'Hay un borrador local pendiente. El servidor ya muestra datos; no se puede determinar automaticamente si el borrador es mas reciente.',
+    };
+    const c = estilos[tipo] || estilos.normal;
+
+    const banner = document.createElement('div');
+    banner.id = 'draftBanner';
+    banner.style.cssText =
+        'background:' + c.bg + ';border-bottom:2px solid ' + c.border + ';' +
+        'padding:12px 16px;display:flex;align-items:center;gap:12px;font-size:14px;' +
+        'position:sticky;top:0;z-index:40;flex-wrap:wrap;';
+
+    // Texto con textContent (defensivo, nunca innerHTML)
+    const msg = document.createElement('span');
+    msg.style.flex = '1';
+    msg.style.minWidth = '200px';
+    msg.textContent = textos[tipo] || textos.normal;
+    banner.appendChild(msg);
+
+    // En stale/ambiguous: boton "Usar mi borrador local" + "Descartar borrador local"
+    // En normal (post auto_restore): solo "Descartar borrador local"
+    if (tipo === 'ask_user_stale' || tipo === 'ask_user_ambiguous') {
+        const btnUsar = document.createElement('button');
+        btnUsar.textContent = 'Usar mi borrador local';
+        btnUsar.style.cssText = 'background:#28a745;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+        btnUsar.onclick = function() { confirmarRestauracionManual(); };
+        banner.appendChild(btnUsar);
+    }
+
+    const btnDesc = document.createElement('button');
+    btnDesc.textContent = 'Descartar borrador local';
+    btnDesc.style.cssText = 'background:#dc3545;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+    btnDesc.onclick = function() { descartarDraftLocal(); };
+    banner.appendChild(btnDesc);
+
+    // Ubicacion: entre .top (header operativo) y .wrap (contenedor del turno).
+    // Capa de estado del turno, no notificacion global.
+    const top = document.querySelector('.top');
+    if (top && top.parentNode) {
+        top.insertAdjacentElement('afterend', banner);
+    } else {
+        document.body.insertBefore(banner, document.body.firstChild);
+    }
+
+    // Snapshot del contador de ediciones en el momento de mostrar el
+    // banner. Permite detectar en descartarDraftLocal() si el operario
+    // hizo ediciones DESPUES de ver el banner, para agravar el confirm.
+    _draftBannerVersion = _editVersion;
+}
+
+function confirmarRestauracionManual() {
+    // Usado por el boton "Usar mi borrador local" del banner stale/ambiguous.
+    if (!_draftPendiente) { ocultarBannerDraft(); return; }
+    const backup = _draftPendiente;
+    _draftPendiente = null;
+    _draftRestaurado = true;
+    _draftRestauracionCompleta = aplicarDraftAlDOM(backup);
+    _dirty = true;
+    _editVersion++;
+    // Reemplazar el banner viejo por el banner normal (la aplicacion ya ocurrio)
+    ocultarBannerDraft();
+    mostrarBannerDraftRestaurado('normal');
+    if (!_draftRestauracionCompleta) {
+        setTimeout(function() {
+            toast('Algunas secciones del borrador no se pudieron aplicar. Verifica manualmente.', 'warn');
+        }, 500);
+    }
+}
+
+function descartarDraftLocal() {
+    // Confirm dinamico: si el operario hizo ediciones DESPUES de que
+    // aparecio el banner (_editVersion > _draftBannerVersion), el
+    // descarte destruye tambien esas ediciones. El sistema ya sabe que
+    // eso es cierto — pedir confirmacion generica seria quedarse corto
+    // donde hay evidencia concreta.
+    const huboEdicionesPostBanner = (
+        _draftBannerVersion !== null &&
+        _editVersion > _draftBannerVersion
+    );
+
+    const mensaje = huboEdicionesPostBanner
+        ? ('ATENCION: ademas del borrador local, hiciste cambios en esta ' +
+           'sesion despues de que aparecio el aviso. Si descartas ahora, ' +
+           'tambien se perderan esos cambios no guardados. No se puede deshacer. Confirmas?')
+        : ('Descartar el borrador local? Esta accion no se puede deshacer.');
+
+    if (!confirm(mensaje)) return;
+
+    localStorage.removeItem(_LS_KEY);
+    _draftRestaurado = false;
+    _draftRestauracionCompleta = true;
+    _draftPendiente = null;
+    _draftBannerVersion = null;
+    ocultarBannerDraft();
+    // Recargar para volver al estado del servidor de forma limpia,
+    // especialmente si aplicarDraftAlDOM ya habia modificado el DOM.
+    location.reload();
+}
+
+function ocultarBannerDraft() {
+    // Disciplina: esta funcion solo debe llamarse desde rutas con
+    // certeza de que ya no hay draft pendiente, o en una transicion
+    // inmediata a mostrar otro banner (ver confirmarRestauracionManual).
+    const b = document.getElementById('draftBanner');
+    if (b) b.remove();
+}
+
 // Autoguardado cada 2 minutos — simple disparador de persistTurno en
 // modo silent. Misma semantica de payload, token, dirty-reset y manejo
 // de conflict que el save manual. Fire-and-forget: si falla, el proximo
@@ -1402,12 +1799,45 @@ if (!CONFIRMADO) {
         persistTurno({ silent: true });
     }, 120000);
 
-    // Al cargar: verificar si hay backup local mas reciente que la DB
+    // Al cargar: decidir que hacer con el draft local si existe.
+    //
+    // Regla central: auto-restauracion SOLO si el servidor esta vacio.
+    // Si el servidor muestra cualquier contenido real, la decision
+    // pasa a ser humana via banner. Ver evaluarPrecedenciaDraft().
     const backup = restaurarLocal();
-    if (backup && backup.sabores.length > 0) {
-        const dbCount = document.querySelectorAll('.fl.done').length;
-        if (backup.sabores.length > dbCount) {
-            toast('Hay un borrador local con ' + backup.sabores.length + ' sabores. Guardar para sincronizar.', 'warn');
+    if (backup) {
+        const draftTieneContenido =
+            (backup.sabores && backup.sabores.length > 0) ||
+            (backup.extras && (
+                (backup.extras.vdp      && backup.extras.vdp.length > 0) ||
+                (backup.extras.consumos && backup.extras.consumos.length > 0) ||
+                (backup.extras.notas    && backup.extras.notas.length > 0) ||
+                (backup.extras.postres  && backup.extras.postres.length > 0)
+            ));
+
+        if (draftTieneContenido) {
+            const precedencia = evaluarPrecedenciaDraft(backup);
+
+            if (precedencia === 'auto_restore') {
+                // Servidor vacio: unica rama con auto-aplicacion.
+                _draftRestaurado = true;
+                _draftRestauracionCompleta = aplicarDraftAlDOM(backup);
+                _dirty = true;
+                _editVersion++;
+                mostrarBannerDraftRestaurado('normal');
+                if (!_draftRestauracionCompleta) {
+                    setTimeout(function() {
+                        toast('Algunas secciones del borrador no se pudieron aplicar. Verifica manualmente.', 'warn');
+                    }, 500);
+                }
+            } else {
+                // ask_user_stale o ask_user_ambiguous: jamas aplicar sin
+                // consentimiento humano. Guardamos el backup en
+                // _draftPendiente para que "Usar mi borrador local" pueda
+                // aplicarlo despues, y mostramos el banner correspondiente.
+                _draftPendiente = backup;
+                mostrarBannerDraftRestaurado(precedencia);
+            }
         }
     }
 }
