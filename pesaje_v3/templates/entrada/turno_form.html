@@ -942,54 +942,151 @@ function collectX() {
 
 function toast(msg,t){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show toast-'+t;setTimeout(()=>el.className='toast',3500);}
 
+// ─── Persistencia del turno — UNICA funcion que habla con el backend ───
+//
+// persistTurno es el unico punto de salida hacia /api/guardar-turno.
+// Cualquier disparador de persistencia (boton manual, autosave cada 2min,
+// verAnalisis, confirmarTurno) pasa por aca. El parametro {silent}
+// controla presencia visual, nunca semantica:
+//   - silent=false: usado por el operario. Modifica el boton, muestra
+//     toasts de exito y error, abre dialogo en caso de conflict.
+//   - silent=true: usado por el autosave. No toca el boton, no muestra
+//     nada en exito, deja _dirty=true en caso de conflict o error para
+//     que el proximo save manual despliegue el manejo visible.
+//
+// Guardas de concurrencia frontend:
+//   - _isSaving: impide reentradas. Si entra un save mientras hay otro
+//     en curso, devuelve false inmediato.
+//   - _pendingManualSave: si un click manual cae durante un save en
+//     curso, levanta esta bandera (con toast one-shot) y el finally del
+//     save actual relanza un save visible via setTimeout. Asi el click
+//     del operario nunca se disuelve en un guard silencioso.
+//   - _editVersion snapshot: captura el contador al empezar el fetch.
+//     Si al exito el contador cambio, significa que el operario escribio
+//     durante el save y hay trabajo mas nuevo que el payload enviado.
+//     En ese caso NO se limpia _dirty ni se borra el draft local.
+let _isSaving = false;
+let _pendingManualSave = false;
+
+async function persistTurno({ silent }) {
+    // Guard de reentrada
+    if (_isSaving) {
+        if (!silent) {
+            // Click manual mientras hay un save en curso: levantar bandera
+            // one-shot (no floodear toasts si el operario hace varios clicks).
+            // El finally del save actual va a relanzar un save visible.
+            if (!_pendingManualSave) {
+                toast('Ya se esta guardando, espera un instante...', 'warn');
+            }
+            _pendingManualSave = true;
+        }
+        // silent durante save en curso: no hacer nada. El proximo tick
+        // del interval va a reintentar si _dirty sigue en true.
+        return false;
+    }
+    _isSaving = true;
+
+    const btn = silent ? null : document.getElementById('btnS');
+    if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+    // Snapshot del contador de ediciones ANTES del fetch. Si cambia
+    // durante el save, hubo input humano posterior al payload enviado.
+    const startVersion = _editVersion;
+
+    try {
+        const x = collectX();
+        const payload = {
+            turno_id: TID,
+            updated_at: TURNO_UPDATED_AT,
+            timestamp: clientTS(),
+            sabores: collect(),
+            vdp: x.vdp,
+            consumos: x.consumos,
+            notas: x.notas,
+            postres: x.postres,
+        };
+
+        let r;
+        try {
+            r = await fetch('/entrada/api/guardar-turno', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload),
+            });
+        } catch (e) {
+            if (!silent) toast('Sin conexion: ' + e.message, 'err');
+            return false;
+        }
+
+        let d;
+        try { d = await r.json(); }
+        catch (e) {
+            if (!silent) toast('Error del servidor (' + r.status + ')', 'err');
+            return false;
+        }
+
+        if (!d.ok) {
+            if (d.conflict) {
+                if (!silent) {
+                    toast('Otro usuario modifico este turno. Recarga la pagina.', 'err');
+                    if (confirm('Este turno fue modificado por otra persona. Recargar ahora?')) {
+                        location.reload();
+                    }
+                }
+                // silent con conflict: no tocar _dirty ni _LS_KEY. El proximo
+                // save manual va a disparar el manejo visible.
+            } else {
+                if (!silent) {
+                    toast('Error al guardar: ' + (d.error || 'desconocido'), 'err');
+                }
+            }
+            return false;
+        }
+
+        // EXITO — unica ruta que toca estado compartido del cliente.
+        if (d.updated_at) TURNO_UPDATED_AT = d.updated_at;
+
+        // Chequeo anti-race: si el operario escribio durante el fetch,
+        // hay trabajo mas nuevo en el DOM y en localStorage que el payload
+        // que acabamos de enviar. En ese caso dejamos _dirty=true para
+        // que el proximo ciclo de autosave lo persista, y NO borramos el
+        // draft local porque sigue siendo la red de seguridad del trabajo
+        // mas reciente.
+        const changedDuringSave = (_editVersion !== startVersion);
+        if (!changedDuringSave) {
+            _dirty = false;
+            localStorage.removeItem(_LS_KEY);
+        }
+
+        if (!silent) {
+            const parts = [];
+            if (d.n_sabores) parts.push(d.n_sabores + ' sabores');
+            if (d.n_vdp)      parts.push(d.n_vdp + ' VDP');
+            if (d.n_consumos) parts.push(d.n_consumos + ' consumos');
+            if (d.n_notas)    parts.push(d.n_notas + ' notas');
+            const msg = parts.length ? 'Guardado: ' + parts.join(', ') : 'Guardado';
+            toast(msg, (d.warnings && d.warnings.length) ? 'warn' : 'ok');
+        }
+
+        return true;
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+        _isSaving = false;
+
+        // Si un click manual cayo durante el save en curso, relanzamos
+        // un save visible. Diferido un tick con setTimeout para separar
+        // nitidamente "cerrar este ciclo" de "abrir el siguiente",
+        // evitando cualquier reentrancia teorica en el stack del finally.
+        if (_pendingManualSave) {
+            _pendingManualSave = false;
+            setTimeout(function() { persistTurno({ silent: false }); }, 0);
+        }
+    }
+}
+
+// Wrapper para callers existentes del boton manual, verAnalisis y confirmarTurno.
 async function save() {
-    const btn=document.getElementById('btnS');
-    if(btn){btn.disabled=true; btn.textContent='Guardando...';}
-    let ok=false;
-    try{
-        // Secuencial: primero sabores, despues extras
-        const r1=await fetch('/entrada/api/guardar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,sabores:collect(),timestamp:clientTS(),updated_at:TURNO_UPDATED_AT})});
-        let d1;
-        try{ d1=await r1.json(); }catch(e){ toast('Error del servidor al guardar sabores ('+r1.status+')','err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
-
-        if(!d1.ok){
-            if(d1.conflict) {
-                toast('Otro usuario modifico este turno. Recarga la pagina.','err');
-                if(confirm('Este turno fue modificado por otra persona. Recargar ahora?')) location.reload();
-            } else {
-                toast('Error sabores: '+d1.error,'err');
-            }
-            if(btn){btn.disabled=false;btn.textContent='Guardar';} return false;
-        }
-
-        // Sincronizar token de concurrencia con el valor post-sabores ANTES de
-        // pegarle a extras (sabores ya bumpeo updated_at en el server).
-        if(d1.updated_at) TURNO_UPDATED_AT = d1.updated_at;
-
-        const r2=await fetch('/entrada/api/guardar-extras',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turno_id:TID,updated_at:TURNO_UPDATED_AT,...collectX()})});
-        let d2;
-        try{ d2=await r2.json(); }catch(e){ toast('Error del servidor al guardar extras ('+r2.status+')','err'); if(btn){btn.disabled=false;btn.textContent='Guardar';} return false; }
-
-        if(!d2.ok){
-            if(d2.conflict) {
-                toast('Otro usuario modifico este turno. Recarga la pagina.','err');
-                if(confirm('Este turno fue modificado por otra persona. Recargar ahora?')) location.reload();
-            } else {
-                toast('Error extras: '+d2.error,'err');
-            }
-            if(btn){btn.disabled=false;btn.textContent='Guardar';} return false;
-        }
-
-        ok=true;
-        // Extras bumpea updated_at varias veces (vdp/consumos/notas/postres).
-        // Guardamos el valor final para que el proximo save no dispare un falso 409.
-        if(d2.updated_at) TURNO_UPDATED_AT = d2.updated_at;
-        let p=[d1.n_sabores+' sabores'];
-        if(d2.n_vdp)p.push(d2.n_vdp+' VDP');if(d2.n_consumos)p.push(d2.n_consumos+' consumos');if(d2.n_notas)p.push(d2.n_notas+' notas');
-        toast('Guardado: '+p.join(', '),d1.warnings?.length?'warn':'ok');
-    }catch(e){toast('Sin conexion: '+e.message,'err');}
-    if(btn){btn.disabled=false; btn.textContent='Guardar';}
-    return ok;
+    return persistTurno({ silent: false });
 }
 
 async function verAnalisis() {
@@ -1254,13 +1351,23 @@ stats();
 // Guarda en localStorage como backup inmediato ante cada cambio.
 
 let _dirty = false;
-let _lastAutoSave = Date.now();
+// Contador de ediciones humanas. Se incrementa ante cualquier input del
+// operario. persistTurno() captura el valor al empezar el fetch y lo
+// compara al terminar: si cambio, hubo escritura durante el save y no
+// se debe limpiar _dirty ni borrar el draft local, porque ya hay
+// trabajo mas nuevo que el payload enviado.
+//
+// Nota: si en el futuro se agrega mutacion programatica del DOM (setValue,
+// ajuste automatico de campos, etc) que NO dispare el evento 'input',
+// esa ruta debe tambien incrementar _editVersion o perderemos senal.
+let _editVersion = 0;
 const _LS_KEY = 'pesaje_draft_' + TID;
 
 // Marcar dirty ante cualquier cambio en inputs
 document.addEventListener('input', function(e) {
     if (e.target.matches('input[type="number"], input[type="text"], select')) {
         _dirty = true;
+        _editVersion++;
         guardarLocal();
     }
 });
@@ -1285,27 +1392,15 @@ function restaurarLocal() {
     } catch(e) { return false; }
 }
 
-// Autoguardado al servidor cada 2 minutos
+// Autoguardado cada 2 minutos — simple disparador de persistTurno en
+// modo silent. Misma semantica de payload, token, dirty-reset y manejo
+// de conflict que el save manual. Fire-and-forget: si falla, el proximo
+// tick reintenta mientras _dirty siga en true.
 if (!CONFIRMADO) {
-    setInterval(async function() {
+    setInterval(function() {
         if (!_dirty) return;
-        _dirty = false;
-        const btn = document.getElementById('btnS');
-        const origText = btn ? btn.textContent : '';
-        if (btn) btn.textContent = 'Autoguardando...';
-        try {
-            const r = await fetch('/entrada/api/guardar', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({turno_id: TID, sabores: collect(), timestamp: clientTS()})
-            });
-            const d = await r.json();
-            if (d.ok) {
-                toast('Autoguardado: ' + d.n_sabores + ' sabores', 'ok');
-                localStorage.removeItem(_LS_KEY); // limpio backup local
-            }
-        } catch(e) { /* silencioso, el backup local sigue */ }
-        if (btn) btn.textContent = origText;
-    }, 120000); // 2 minutos
+        persistTurno({ silent: true });
+    }, 120000);
 
     // Al cargar: verificar si hay backup local mas reciente que la DB
     const backup = restaurarLocal();

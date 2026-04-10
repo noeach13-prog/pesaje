@@ -7,12 +7,15 @@ El PIN identifica la sucursal; la sesion recuerda el acceso.
 Rutas /entrada/* — coexiste con el sistema de analisis en /.
 """
 import json
+import logging
 from datetime import date, datetime, timezone, timedelta
 from flask import (
     Blueprint, render_template, request, redirect,
     url_for, jsonify, session,
 )
 from .validacion_entrada import invalidar_cache_mes
+
+logger = logging.getLogger(__name__)
 
 from .db import (
     get_db, obtener_sucursales, verificar_pin, crear_turno,
@@ -264,9 +267,161 @@ def editar_turno(turno_id):
                            postres_cargados=postres_cargados)
 
 
-@entrada_bp.route('/entrada/api/guardar', methods=['POST'])
-def api_guardar():
-    """Guarda sabores. Revalida server-side SIEMPRE."""
+# ─── Guardado atomico del turno ─────────────────────────────────────
+#
+# _guardar_turno_atomico es la funcion interna pura que ejecuta el save
+# completo como UNA sola transaccion. api_guardar_turno es un wrapper
+# fino sobre ella que traduce entre HTTP y dominio.
+#
+# Invariante estructural: turnos.updated_at se escribe EXACTAMENTE una
+# vez por save, dentro de _guardar_turno_atomico. Ningun helper toca
+# ese campo (ver docstring de guardar_sabores en db.py y el test
+# test_helpers_aislados_no_bumpean_updated_at).
+#
+# Contrato con los tests:
+#   - Errores de dominio (404/400/409) se devuelven como tupla, no raise.
+#   - Errores genuinos (excepcion en un helper) hacen rollback y RE-LANZAN.
+#     El wrapper Flask los traduce a 500. No se los oculta bajo (500, {...})
+#     porque son fallas de programacion, no errores previstos.
+
+def _guardar_turno_atomico(db, sucursal_id: int, turno_id: int, payload: dict):
+    """
+    Ejecuta un save completo de un turno como una sola transaccion.
+
+    Secuencia:
+      1. Valida que el turno exista, pertenezca a sucursal_id y este en borrador.
+      2. Chequea optimistic lock contra payload['updated_at'] una sola vez.
+      3. Llama a los 5 helpers (sabores, vdp, consumos, notas, postres) con
+         commit=False dentro de un solo try/except.
+      4. Escribe turnos.updated_at una sola vez al final. Unica escritura
+         de ese campo durante save en todo el codigo.
+      5. Hace un unico db.commit() al final del bloque transaccional.
+         Ante excepcion en cualquier helper: rollback total y re-raise.
+         El wrapper Flask convierte la excepcion en 500.
+      6. Post-commit: registra actividad del dispositivo en log de auditoria.
+         Si esa escritura falla, se logea con logger.exception pero no se
+         propaga: el save ya esta persistido y valido.
+
+    Jerarquizacion explicita (cambio de conducta vs. api_guardar viejo):
+      Antes, un fallo en registrar_actividad abortaba el save entero. Eso
+      era un acoplamiento incorrecto: subordinaba el dato primario del
+      turno a una metadata secundaria. La nueva semantica es:
+        - turno = dato primario. Si se guarda, queda guardado.
+        - log_actividad = metadata secundaria. Best-effort, no fatal.
+      Si alguna vez la auditoria pasa a tener valor normativo o legal, no
+      alcanzaria con este esquema: habria que rediseñarla para que no
+      dependa de una helper que commitea por su cuenta como side effect.
+      Hoy, para este sistema, la decision es correcta.
+
+    Pura respecto de Flask: no toca request, session, jsonify.
+    Recibe la conexion db abierta y NO la cierra.
+
+    Retorna (status_code, body_dict):
+      (200, {'ok': True,  'warnings': [...], 'n_sabores': N, 'updated_at': '...'})
+      (400, {'ok': False, 'error': '...'})                    # turno confirmado
+      (404, {'ok': False, 'error': '...'})                    # turno no encontrado
+      (409, {'ok': False, 'error': '...', 'conflict': True,   # optimistic lock
+             'server_updated': '...'})
+
+    Excepciones no atrapadas (RuntimeError, OperationalError, etc.) se
+    propagan al caller despues de rollback.
+    """
+    # 1) Validar turno (dominio)
+    turno = db.execute(
+        "SELECT * FROM turnos WHERE id = ?", (turno_id,)
+    ).fetchone()
+    if not turno or turno['sucursal_id'] != sucursal_id:
+        return (404, {
+            'ok': False,
+            'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.',
+        })
+    if turno['estado'] == 'confirmado':
+        return (400, {'ok': False, 'error': 'Turno ya confirmado'})
+
+    # 2) Optimistic lock (dominio)
+    client_updated = payload.get('updated_at', '')
+    server_updated = (
+        turno.get('updated_at', '') if hasattr(turno, 'get') else turno['updated_at']
+    )
+    if client_updated and server_updated and client_updated != server_updated:
+        return (409, {
+            'ok': False,
+            'error': 'Este turno fue modificado por otra persona. Recarga la pagina antes de guardar.',
+            'conflict': True,
+            'server_updated': server_updated,
+        })
+
+    # 3) Bloque transaccional unico
+    sabores = payload.get('sabores', [])
+    try:
+        warnings = guardar_sabores(db, turno_id, sabores, commit=False)
+        guardar_vdp(db, turno_id, payload.get('vdp', []), commit=False)
+        guardar_consumos(db, turno_id, payload.get('consumos', []), commit=False)
+        guardar_notas(db, turno_id, payload.get('notas', []), commit=False)
+        guardar_postres(db, turno_id, payload.get('postres', []), commit=False)
+
+        # Unica escritura de turnos.updated_at durante save.
+        db.execute(
+            "UPDATE turnos SET updated_at = datetime('now') WHERE id = ?",
+            (turno_id,),
+        )
+
+        # Unico commit de toda la operacion.
+        db.commit()
+    except Exception:
+        try:
+            db._conn.rollback()
+        except Exception:
+            pass
+        raise
+
+    # 4) Post-commit: actividad de auditoria (best-effort, no fatal)
+    #    Fuera del bloque transaccional porque registrar_actividad hace su
+    #    propio db.commit(). Si falla, se logea y se sigue.
+    ts = payload.get('timestamp', '')
+    if ts:
+        try:
+            registrar_actividad(db, turno_id, ts, 'guardar', f'{len(sabores)} sabores')
+        except Exception:
+            logger.exception(
+                "No se pudo registrar actividad para turno %s (save ya persistido)",
+                turno_id,
+            )
+
+    # 5) Releer updated_at final y armar respuesta
+    turno_new = db.execute(
+        "SELECT updated_at FROM turnos WHERE id = ?", (turno_id,)
+    ).fetchone()
+    new_updated = turno_new['updated_at'] if turno_new else ''
+
+    # Counts de secciones extras — preservan el toast resumen del frontend
+    # que antes se armaba con la respuesta de api_guardar_extras.
+    vdp_payload = payload.get('vdp', [])
+    consumos_payload = payload.get('consumos', [])
+    notas_payload = payload.get('notas', [])
+    postres_payload = payload.get('postres', [])
+
+    return (200, {
+        'ok': True,
+        'warnings': warnings,
+        'n_sabores': len(sabores),
+        'n_vdp': len([v for v in vdp_payload if (v.get('texto') or '').strip()]),
+        'n_consumos': len([c for c in consumos_payload if (c.get('texto') or '').strip()]),
+        'n_notas': len([n for n in notas_payload if (n.get('detalle') or '').strip()]),
+        'n_postres': len([p for p in postres_payload if p.get('cantidad')]),
+        'updated_at': new_updated,
+    })
+
+
+@entrada_bp.route('/entrada/api/guardar-turno', methods=['POST'])
+def api_guardar_turno():
+    """Wrapper HTTP de _guardar_turno_atomico.
+
+    Traduce entre Flask (request, session, jsonify) y la funcion interna
+    pura. Atrapa excepciones genuinas y las convierte en 500. Los errores
+    de dominio (404/400/409) ya vienen como tupla desde la funcion interna
+    y solo pasan por jsonify.
+    """
     sid, _ = _sucursal_activa()
     if not sid:
         return jsonify({'ok': False, 'error': 'No autenticado'}), 401
@@ -276,61 +431,24 @@ def api_guardar():
         return jsonify({'ok': False, 'error': 'JSON vacio'}), 400
 
     turno_id = payload.get('turno_id')
-    sabores = payload.get('sabores', [])
-
     if not turno_id:
         return jsonify({'ok': False, 'error': 'turno_id requerido'}), 400
 
     db = get_db()
-    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
-    if not turno or turno['sucursal_id'] != sid:
-        db.close()
-        return jsonify({'ok': False, 'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.'}), 404
-
-    if turno['estado'] == 'confirmado':
-        db.close()
-        return jsonify({'ok': False, 'error': 'Turno ya confirmado'}), 400
-
-    # Bloqueo optimista: verificar que nadie modificó el turno desde que se abrió
-    client_updated = payload.get('updated_at', '')
-    server_updated = turno.get('updated_at', '')
-    if client_updated and server_updated and client_updated != server_updated:
+    try:
+        status, body = _guardar_turno_atomico(db, sid, turno_id, payload)
+    except Exception as e:
+        logger.exception("Fallo no previsto en api_guardar_turno turno=%s", turno_id)
         db.close()
         return jsonify({
             'ok': False,
-            'error': 'Este turno fue modificado por otra persona. Recarga la pagina antes de guardar.',
-            'conflict': True,
-            'server_updated': server_updated,
-        }), 409
+            'error': f'Error al guardar: {str(e)[:200]}',
+        }), 500
 
-    try:
-        warnings = guardar_sabores(db, turno_id, sabores)
-
-        # Registrar actividad con timestamp del dispositivo
-        ts = payload.get('timestamp', '')
-        if ts:
-            registrar_actividad(db, turno_id, ts, 'guardar', f'{len(sabores)} sabores')
-
-        # Leer updated_at nuevo para bloqueo optimista del cliente
-        turno_new = db.execute("SELECT updated_at FROM turnos WHERE id = ?", (turno_id,)).fetchone()
-        new_updated = turno_new['updated_at'] if turno_new else ''
-
-        db.close()
+    db.close()
+    if status == 200:
         invalidar_cache_mes(sid)
-
-        return jsonify({
-            'ok': True,
-            'warnings': warnings,
-            'n_sabores': len(sabores),
-            'updated_at': new_updated,
-        })
-    except Exception as e:
-        try:
-            db._conn.rollback()
-        except Exception:
-            pass
-        db.close()
-        return jsonify({'ok': False, 'error': f'Error al guardar: {str(e)[:200]}'}), 500
+    return jsonify(body), status
 
 
 @entrada_bp.route('/entrada/api/sabores-previos/<fecha>')
@@ -577,87 +695,8 @@ def historial():
                            mes=mes, meses=meses, resumenes=resumenes)
 
 
-# ─── APIs: VDP, Consumos, Notas, Agregar sabor ──────────────────────
-
-def _verificar_turno_editable(turno_id):
-    """Helper: verifica sesion + pertenencia + estado borrador. Retorna (db, turno) o (None, error_response)."""
-    sid, _ = _sucursal_activa()
-    if not sid:
-        return None, (jsonify({'ok': False, 'error': 'No autenticado'}), 401)
-    db = get_db()
-    turno = db.execute("SELECT * FROM turnos WHERE id = ?", (turno_id,)).fetchone()
-    if not turno or turno['sucursal_id'] != sid:
-        db.close()
-        return None, (jsonify({'ok': False, 'error': 'Turno no encontrado. Recargar la pagina e intentar de nuevo.'}), 404)
-    if turno['estado'] == 'confirmado':
-        db.close()
-        return None, (jsonify({'ok': False, 'error': 'Turno ya confirmado'}), 400)
-    return db, turno
-
-
-@entrada_bp.route('/entrada/api/guardar-extras', methods=['POST'])
-def api_guardar_extras():
-    """Guarda VDP + consumos + notas de un turno."""
-    payload = request.get_json()
-    if not payload:
-        return jsonify({'ok': False, 'error': 'JSON vacio'}), 400
-
-    turno_id = payload.get('turno_id')
-    if not turno_id:
-        return jsonify({'ok': False, 'error': 'turno_id requerido'}), 400
-
-    db, turno_or_err = _verificar_turno_editable(turno_id)
-    if db is None:
-        return turno_or_err
-    turno = turno_or_err  # cuando db != None, turno_or_err es el turno
-
-    # Bloqueo optimista: mismo check que api_guardar. El cliente debe enviar
-    # el updated_at que recibio en la respuesta de /api/guardar (no el del load).
-    client_updated = payload.get('updated_at', '')
-    server_updated = turno.get('updated_at', '') if hasattr(turno, 'get') else turno['updated_at']
-    if client_updated and server_updated and client_updated != server_updated:
-        db.close()
-        return jsonify({
-            'ok': False,
-            'error': 'Este turno fue modificado por otra persona. Recarga la pagina antes de guardar.',
-            'conflict': True,
-            'server_updated': server_updated,
-        }), 409
-
-    vdp = payload.get('vdp', [])
-    consumos = payload.get('consumos', [])
-    notas = payload.get('notas', [])
-    postres = payload.get('postres', [])
-
-    try:
-        guardar_vdp(db, turno_id, vdp)
-        guardar_consumos(db, turno_id, consumos)
-        guardar_notas(db, turno_id, notas)
-        guardar_postres(db, turno_id, postres)
-        db.commit()
-
-        # Leer updated_at final (tras todos los bumps internos) para que
-        # el cliente se mantenga sincronizado con el estado real del servidor.
-        turno_new = db.execute("SELECT updated_at FROM turnos WHERE id = ?", (turno_id,)).fetchone()
-        new_updated = turno_new['updated_at'] if turno_new else ''
-        db.close()
-    except Exception as e:
-        try:
-            db._conn.rollback()
-        except Exception:
-            pass
-        db.close()
-        return jsonify({'ok': False, 'error': f'Error al guardar extras: {str(e)[:200]}'}), 500
-
-    return jsonify({
-        'ok': True,
-        'n_vdp': len([v for v in vdp if (v.get('texto') or '').strip()]),
-        'n_consumos': len([c for c in consumos if (c.get('texto') or '').strip()]),
-        'n_notas': len([n for n in notas if (n.get('detalle') or '').strip()]),
-        'n_postres': len([p for p in postres if p.get('cantidad')]),
-        'updated_at': new_updated,
-    })
-
+# ─── APIs: Agregar sabor ────────────────────────────────────────────
+# (VDP, consumos, notas y postres se guardan como parte de api_guardar_turno.)
 
 @entrada_bp.route('/entrada/api/agregar-sabor', methods=['POST'])
 def api_agregar_sabor():
@@ -1140,7 +1179,14 @@ def api_carga_masiva():
 
         tid = crear_turno(db, sid, fecha, tipo)
         warnings = guardar_sabores(db, tid, sabores)
-        db.execute("UPDATE turnos SET estado='confirmado' WHERE id=?", (tid,))
+        # Compensacion post-refactor: guardar_sabores ya no bumpea updated_at
+        # adentro (ver docstring en db.py). Para preservar el invariante
+        # informal "cualquier operacion sobre un turno actualiza updated_at",
+        # bumpeamos aqui explicitamente junto con el cambio de estado.
+        db.execute(
+            "UPDATE turnos SET estado='confirmado', updated_at=datetime('now') WHERE id=?",
+            (tid,),
+        )
         db.commit()
         resultados.append({'fecha': fecha, 'label': label, 'turno_id': tid, 'n_sabores': len(sabores)})
 

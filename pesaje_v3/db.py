@@ -639,11 +639,20 @@ def crear_turno(db, sucursal_id: int, fecha: str,
 
 
 def guardar_sabores(db: sqlite3.Connection, turno_id: int,
-                    sabores: List[dict]) -> List[str]:
+                    sabores: List[dict], commit: bool = True) -> List[str]:
     """
     Guarda/reemplaza todos los sabores de un turno.
     Revalida server-side antes de insertar.
     Retorna lista de warnings (vacía = todo limpio).
+
+    commit=True por default para callsites directos (ej: api_carga_masiva).
+    El orquestador _guardar_turno_atomico llama con commit=False para
+    mantener una sola transacción sobre las 5 secciones.
+
+    Invariante: este helper NO escribe turnos.updated_at. Ese campo es
+    responsabilidad exclusiva del orquestador durante save (ver
+    _guardar_turno_atomico en web_entrada.py). Test:
+    test_helpers_aislados_no_bumpean_updated_at.
     """
     warnings = []
 
@@ -688,12 +697,8 @@ def guardar_sabores(db: sqlite3.Connection, turno_id: int,
             ),
         )
 
-    # Actualizar updated_at del turno
-    db.execute(
-        "UPDATE turnos SET updated_at = datetime('now') WHERE id = ?",
-        (turno_id,),
-    )
-    db.commit()
+    if commit:
+        db.commit()
     return warnings
 
 
@@ -1075,8 +1080,11 @@ def listar_stocks(db, sucursal_id: int) -> List[dict]:
     return [_to_dict(r) for r in rows]
 
 
-def guardar_postres(db, turno_id: int, postres: List[dict]):
-    """Guarda postres de un turno. postres: [{producto, cantidad}]"""
+def guardar_postres(db, turno_id: int, postres: List[dict], commit: bool = True):
+    """Guarda postres de un turno. postres: [{producto, cantidad}]
+
+    commit/updated_at: ver docstring de guardar_sabores.
+    """
     db.execute("DELETE FROM postres_turno WHERE turno_id = ?", (turno_id,))
     for p in postres:
         producto = (p.get('producto') or '').strip()
@@ -1093,8 +1101,8 @@ def guardar_postres(db, turno_id: int, postres: List[dict]):
             "INSERT INTO postres_turno (turno_id, producto, cantidad) VALUES (?, ?, ?)",
             (turno_id, producto, cantidad),
         )
-    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def obtener_postres(db, turno_id: int) -> List[dict]:
@@ -1106,8 +1114,11 @@ def obtener_postres(db, turno_id: int) -> List[dict]:
     return [_to_dict(r) for r in rows]
 
 
-def guardar_vdp(db: sqlite3.Connection, turno_id: int, items: List[dict]):
-    """Guarda VDP (ventas despues del peso). items: [{texto, gramos}]"""
+def guardar_vdp(db: sqlite3.Connection, turno_id: int, items: List[dict], commit: bool = True):
+    """Guarda VDP (ventas despues del peso). items: [{texto, gramos}]
+
+    commit/updated_at: ver docstring de guardar_sabores.
+    """
     db.execute("DELETE FROM vdp_turno WHERE turno_id = ?", (turno_id,))
     for item in items:
         texto = (item.get('texto') or '').strip()
@@ -1122,12 +1133,15 @@ def guardar_vdp(db: sqlite3.Connection, turno_id: int, items: List[dict]):
             "INSERT INTO vdp_turno (turno_id, texto, gramos) VALUES (?, ?, ?)",
             (turno_id, texto, gramos),
         )
-    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
-    db.commit()
+    if commit:
+        db.commit()
 
 
-def guardar_consumos(db: sqlite3.Connection, turno_id: int, items: List[dict]):
-    """Guarda consumos internos. items: [{texto, gramos, empleado}]"""
+def guardar_consumos(db: sqlite3.Connection, turno_id: int, items: List[dict], commit: bool = True):
+    """Guarda consumos internos. items: [{texto, gramos, empleado}]
+
+    commit/updated_at: ver docstring de guardar_sabores.
+    """
     db.execute("DELETE FROM consumo_turno WHERE turno_id = ?", (turno_id,))
     for item in items:
         texto = (item.get('texto') or '').strip()
@@ -1143,12 +1157,15 @@ def guardar_consumos(db: sqlite3.Connection, turno_id: int, items: List[dict]):
             "INSERT INTO consumo_turno (turno_id, texto, gramos, empleado) VALUES (?, ?, ?, ?)",
             (turno_id, texto, gramos, empleado),
         )
-    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
-    db.commit()
+    if commit:
+        db.commit()
 
 
-def guardar_notas(db: sqlite3.Connection, turno_id: int, notas: List[dict]):
-    """Guarda notas de caja. notas: [{categoria, detalle}]"""
+def guardar_notas(db: sqlite3.Connection, turno_id: int, notas: List[dict], commit: bool = True):
+    """Guarda notas de caja. notas: [{categoria, detalle}]
+
+    commit/updated_at: ver docstring de guardar_sabores.
+    """
     db.execute("DELETE FROM notas_turno WHERE turno_id = ?", (turno_id,))
     for nota in notas:
         cat = (nota.get('categoria') or '').strip()
@@ -1161,5 +1178,5 @@ def guardar_notas(db: sqlite3.Connection, turno_id: int, notas: List[dict]):
             "INSERT INTO notas_turno (turno_id, categoria, detalle) VALUES (?, ?, ?)",
             (turno_id, cat, det),
         )
-    db.execute("UPDATE turnos SET updated_at = datetime('now') WHERE id = ?", (turno_id,))
-    db.commit()
+    if commit:
+        db.commit()
