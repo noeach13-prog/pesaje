@@ -1238,6 +1238,10 @@ function updConBadge() {
         total += parseInt(span.textContent) * parseInt(span.dataset.gunit);
     });
     document.getElementById('conBadge').textContent = items.length ? items.length + ' (' + total + 'g)' : '0';
+    // Embudo semantico: addCon, conQty y el remove inline pasan por aca.
+    // _marcarDirty respeta la compuerta _suspendDirtyTracking que se activa
+    // durante aplicarDraftAlDOM() para no pisar el draft restaurado.
+    _marcarDirty();
 }
 
 function addConCustom() {
@@ -1266,8 +1270,17 @@ function updVdpBadge() {
         total += parseInt(span.textContent) * parseInt(span.dataset.gunit);
     });
     document.getElementById('vdpBadge').textContent = items.length ? items.length + ' (' + total + 'g)' : '0';
+    // Embudo semantico: addVDP, vdpQty y el remove inline pasan por aca.
+    // _marcarDirty respeta la compuerta _suspendDirtyTracking que se activa
+    // durante aplicarDraftAlDOM() para no pisar el draft restaurado.
+    _marcarDirty();
 }
-function addN(){document.getElementById('nB').insertAdjacentHTML('beforeend','<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad">Novedad</option><option value="reclamo">Reclamo</option><option value="faltante">Faltante</option><option value="otro">Otro</option></select><input type="text" class="nd" placeholder="Detalle..." style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove()">&times;</button></div>');}
+// addN agrega una row de nota. El input .nd de detalle y el select .nc
+// de categoria DISPARAN evento 'input' nativo cuando el operario los toca,
+// asi que el listener global ya los marca. Pero la mera creacion de la
+// row vacia (tap en "+") no dispara nada, ni tampoco el boton remove.
+// Ambos se cubren explicitamente aqui.
+function addN(){document.getElementById('nB').insertAdjacentHTML('beforeend','<div class="xrow" style="flex-wrap:wrap;"><select class="nc"><option value="novedad">Novedad</option><option value="reclamo">Reclamo</option><option value="faltante">Faltante</option><option value="otro">Otro</option></select><input type="text" class="nd" placeholder="Detalle..." style="flex:1;min-width:140px;"><button class="rm" onclick="this.parentElement.remove();_marcarDirty()">&times;</button></div>');_marcarDirty();}
 async function addFlav(){const inp=document.getElementById('newFlav'),n=inp.value.trim();if(!n)return;const r=await fetch('/entrada/api/agregar-sabor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n})});const d=await r.json();if(d.ok){toast(d.nombre_norm+' agregado. Recarga para verlo.','ok');inp.value='';}else toast(d.error,'err');}
 
 function pedirDesbloqueo() {
@@ -1414,6 +1427,33 @@ let _draftRestauracionCompleta = true;
 let _draftPendiente = null;
 let _draftBannerVersion = null;
 
+// Compuerta para suprimir _marcarDirty() durante mutaciones programaticas
+// del DOM (ej: aplicarDraftAlDOM). Las mutaciones humanas (taps en botones
+// de VDP/consumos) DEBEN marcar dirty; las programaticas NO, porque si lo
+// hicieran escribirian al localStorage un snapshot intermedio del DOM
+// mientras esta a medio reconstruir, pisando el draft original con una
+// version degradada. Esto es particularmente critico en restauracion
+// parcial donde el draft contiene datos que no se pudieron aplicar y que
+// hay que preservar literales hasta que el save exitoso los cubra.
+let _suspendDirtyTracking = false;
+
+// Marca al sistema como "hay trabajo local no sincronizado" y persiste el
+// draft a localStorage. Se llama desde todos los mutadores humanos que no
+// disparan el evento 'input' del listener global: taps en botones VDP
+// (addVDP, vdpQty, remove inline), taps en botones consumos (addCon,
+// conQty, remove inline), y botones de notas (addN, remove inline).
+//
+// Los mutadores que SI disparan 'input' nativo (inputs de sabores, inputs
+// de postre-qty, inputs .nd de detalle de nota, select .nc de categoria)
+// ya estan cubiertos por el listener global que llama guardarLocal()
+// directamente. Esta funcion es para cerrar el hueco de los que NO.
+function _marcarDirty() {
+    if (_suspendDirtyTracking) return;
+    _dirty = true;
+    _editVersion++;
+    guardarLocal();
+}
+
 // Marcar dirty ante cualquier cambio en inputs
 document.addEventListener('input', function(e) {
     if (e.target.matches('input[type="number"], input[type="text"], select')) {
@@ -1436,9 +1476,22 @@ function restaurarLocal() {
         const raw = localStorage.getItem(_LS_KEY);
         if (!raw) return false;
         const data = JSON.parse(raw);
-        // Solo restaurar si es reciente (< 24hs) y tiene datos
+        // Solo restaurar si es reciente (< 24hs)
         if (Date.now() - data.ts > 86400000) { localStorage.removeItem(_LS_KEY); return false; }
-        if (!data.sabores || data.sabores.length === 0) return false;
+        // Tiene contenido en CUALQUIERA de las 5 secciones. La guarda anterior
+        // solo miraba sabores y descartaba drafts validos que tenian unicamente
+        // VDP/consumos/notas/postres — exactamente el escenario que el bug
+        // de "VDP/consumos no marcan dirty" deja como caso comun ahora que
+        // ese hueco esta cerrado.
+        const hayContenido =
+            (data.sabores && data.sabores.length > 0) ||
+            (data.extras && (
+                (data.extras.vdp      && data.extras.vdp.length > 0) ||
+                (data.extras.consumos && data.extras.consumos.length > 0) ||
+                (data.extras.notas    && data.extras.notas.length > 0) ||
+                (data.extras.postres  && data.extras.postres.length > 0)
+            ));
+        if (!hayContenido) return false;
         return data;
     } catch(e) { return false; }
 }
@@ -1523,7 +1576,20 @@ function evaluarPrecedenciaDraft(backup) {
 // del draft que ya no existen en el catalogo de la sucursal).
 
 function aplicarDraftAlDOM(backup) {
+    // Activar la compuerta para que las llamadas internas a updVdpBadge,
+    // updConBadge y addN (via addVDP/addCon/addN reusados durante la
+    // fase 2) NO disparen _marcarDirty() ni guardarLocal(). Sin esto,
+    // cada item agregado escribiria al localStorage un snapshot del DOM
+    // a medio reconstruir, pisando el draft original con una version
+    // intermedia. Particularmente critico en restauracion parcial donde
+    // el draft contiene datos no aplicables que hay que preservar.
+    //
+    // try/finally garantiza que la compuerta se libere aunque alguna
+    // llamada lance una excepcion. Si no se liberara, el sistema entero
+    // quedaria sordo a cualquier mutacion humana posterior.
+    _suspendDirtyTracking = true;
     let completo = true;
+    try {
 
     // ─── FASE 1 — limpieza ───
     // Sabores: vaciar TODOS los inputs, no solo los del draft. Un sabor
@@ -1666,6 +1732,12 @@ function aplicarDraftAlDOM(backup) {
         });
     }
 
+    } finally {
+        // Liberar la compuerta sin importar si hubo excepcion en la fase 1
+        // o en la fase 2. Si esto no se ejecutara, el sistema entero
+        // quedaria sordo a mutaciones humanas posteriores.
+        _suspendDirtyTracking = false;
+    }
     return completo;
 }
 
