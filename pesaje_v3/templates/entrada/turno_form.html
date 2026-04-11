@@ -259,6 +259,22 @@ body {
 .toast.show { display: block; animation: fade 3.5s forwards; }
 .toast-ok { background: var(--green); } .toast-warn { background: var(--orange); } .toast-err { background: var(--red); }
 @keyframes fade { 0%,70%{opacity:1} 100%{opacity:0} }
+
+/* Linea de estado del trabajo. Una sola pregunta visible: "Mi trabajo
+   esta guardado?". Cuatro estados, sin zonas grises. Ver
+   _calcularEstadoSistema() en JS. */
+.estado-sistema {
+    position: sticky; top: 0; z-index: 35;
+    padding: 10px 16px; font-size: 0.92rem; font-weight: 700;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 2px solid; transition: background 0.2s;
+}
+.estado-sistema .estado-icono { font-size: 1.2rem; line-height: 1; }
+.estado-sistema .estado-version { font-size: 0.82rem; font-weight: 600; opacity: 0.85; }
+.estado-sistema[data-color="verde"]    { background: #d6efdc; color: #1a4727; border-bottom-color: #2f8a4a; }
+.estado-sistema[data-color="amarillo"] { background: #fff3cd; color: #6d5300; border-bottom-color: #d4a700; }
+.estado-sistema[data-color="naranja"]  { background: #ffe3c4; color: #7a3d00; border-bottom-color: #e67e00; }
+.estado-sistema[data-color="rojo"]     { background: #f8d7da; color: #6b1b22; border-bottom-color: #c0303a; }
 @media (min-width: 820px) {
     .wrap { padding-left: 18px; padding-right: 18px; }
     .prod-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -278,12 +294,22 @@ body {
         <div><h1>{{ data.sucursal.nombre }}</h1><div class="sub">{{ data.nombre_hoja }}{% if data.turno.estado == 'confirmado' %} <span style="background:#2f6a41;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.65rem;">CONFIRMADO</span>{% endif %}</div></div>
         <div style="display:flex;gap:12px;align-items:center;">
             <span class="sub" id="stats">0</span>
-            <a href="/entrada/seleccion">Salir</a>
+            <a href="/entrada/seleccion" id="linkSalir">Salir</a>
         </div>
     </div>
     <div class="prog"><div class="prog-fill" id="prog" style="width:0%"></div></div>
 </div>
 <div id="toast" class="toast"></div>
+
+<!-- Linea de estado del trabajo. Ciudadano de primera clase de la UI:
+     siempre visible, una sola pregunta: "Mi trabajo esta guardado?".
+     Las cuatro definiciones (verde/amarillo/naranja/rojo) estan en
+     _calcularEstadoSistema() en el script al final. -->
+<div id="estadoSistema" class="estado-sistema" data-color="verde">
+    <span class="estado-icono">●</span>
+    <span class="estado-texto">Todo guardado en el sistema</span>
+    <span class="estado-version" id="estadoVersion" hidden>· hay una mejora disponible</span>
+</div>
 
 <div class="wrap">
     <!-- Panel de estado del turno -->
@@ -1014,34 +1040,48 @@ async function persistTurno({ silent }) {
                 body: JSON.stringify(payload),
             });
         } catch (e) {
-            if (!silent) toast('Sin conexion: ' + e.message, 'err');
+            // NetworkError u offline. El draft local sigue siendo la red de
+            // seguridad — el operario puede seguir cargando.
+            _lastFetchError = 'network';
+            _renderEstadoSistema();
+            if (!silent) toast('Sin internet. Tu trabajo esta guardado aca, esperando.', 'err');
             return false;
         }
 
         let d;
         try { d = await r.json(); }
         catch (e) {
-            if (!silent) toast('Error del servidor (' + r.status + ')', 'err');
+            _lastFetchError = 'server';
+            _renderEstadoSistema();
+            if (!silent) toast('El sistema tuvo un problema. Intenta de nuevo en un minuto.', 'err');
             return false;
         }
 
         if (!d.ok) {
             if (d.conflict) {
+                _lastFetchError = 'conflict';
+                _renderEstadoSistema();
                 if (!silent) {
-                    toast('Otro usuario modifico este turno. Recarga la pagina.', 'err');
-                    if (confirm('Este turno fue modificado por otra persona. Recargar ahora?')) {
+                    toast('Otra persona tambien guardo este turno. Mira el aviso antes de seguir.', 'err');
+                    if (confirm('Otra persona tambien guardo este turno. ¿Recargar ahora para ver lo que hay?')) {
                         location.reload();
                     }
                 }
                 // silent con conflict: no tocar _dirty ni _LS_KEY. El proximo
                 // save manual va a disparar el manejo visible.
             } else {
+                _lastFetchError = 'server';
+                _renderEstadoSistema();
                 if (!silent) {
-                    toast('Error al guardar: ' + (d.error || 'desconocido'), 'err');
+                    toast('No se pudo guardar: ' + (d.error || 'el sistema tuvo un problema'), 'err');
                 }
             }
             return false;
         }
+
+        // El fetch fue exitoso a nivel HTTP y dominio. Limpiamos cualquier
+        // error previo (sin red, server, conflict) que estaba colgado.
+        _lastFetchError = null;
 
         // EXITO — unica ruta que toca estado compartido del cliente.
         if (d.updated_at) TURNO_UPDATED_AT = d.updated_at;
@@ -1067,6 +1107,11 @@ async function persistTurno({ silent }) {
             _draftPendiente = null;
             _draftBannerVersion = null;
             ocultarBannerDraft();
+            _renderEstadoSistema();
+            // Si hay una version nueva esperando, este es el momento seguro
+            // para aplicarla: no hay nada en juego, el operario acaba de
+            // ver su toast de exito. La funcion difiere el reload 1.5s.
+            _aplicarVersionNuevaSiSegura();
         } else {
             // No tocar localStorage ni el banner. El draft sigue pendiente.
             // Si fue por !draftIntactamenteRestaurado sin cambios nuevos,
@@ -1076,8 +1121,9 @@ async function persistTurno({ silent }) {
                 _dirty = true;
             }
             if (!silent && !draftIntactamenteRestaurado) {
-                toast('Guardado parcial: hay secciones del borrador local que no se pudieron aplicar y siguen pendientes. El borrador sigue preservado.', 'warn');
+                toast('Guardado parcial: quedaron cosas pendientes de guardar. Tu trabajo sigue aca.', 'warn');
             }
+            _renderEstadoSistema();
         }
 
         if (!silent) {
@@ -1427,6 +1473,18 @@ let _draftRestauracionCompleta = true;
 let _draftPendiente = null;
 let _draftBannerVersion = null;
 
+// Estado del ultimo fetch al backend (para la linea de estado permanente).
+//   null      = todo bien
+//   'network' = NetworkError, sin red
+//   'conflict'= 409, hay conflict pendiente de decision humana
+//   'server'  = 5xx u otro error del server (no afecta semaforo, solo toast)
+let _lastFetchError = null;
+
+// Version del deploy actual y bandera de mejora disponible (para
+// reload diferido sin imponer al operario).
+let _versionInicial = null;
+let _versionNuevaDisponible = false;
+
 // Compuerta para suprimir _marcarDirty() durante mutaciones programaticas
 // del DOM (ej: aplicarDraftAlDOM). Las mutaciones humanas (taps en botones
 // de VDP/consumos) DEBEN marcar dirty; las programaticas NO, porque si lo
@@ -1452,6 +1510,139 @@ function _marcarDirty() {
     _dirty = true;
     _editVersion++;
     guardarLocal();
+    _renderEstadoSistema();
+}
+
+// ─── Linea de estado del trabajo ──────────────────────────────────────
+//
+// Una sola pregunta visible: "Mi trabajo esta guardado?".
+// Cuatro estados, sin zonas grises. Definicion exhaustiva, prioridad
+// ROJO > NARANJA > AMARILLO > VERDE.
+//
+// VERDE  = todo guardado
+// AMARILLO = hay trabajo cargado por guardar (incluye draft pendiente
+//            de decision humana en el banner)
+// NARANJA = sin red, trabajo a salvo en localStorage
+// ROJO    = otra persona tambien guardo, decision humana requerida (409 activo)
+//
+// Esta funcion NO miente. Si una de las definiciones se vuelve verdadera
+// pero la linea sigue mostrando otro color, es bug del calculo o de la
+// llamada a _renderEstadoSistema(), no del operario.
+
+function _calcularEstadoSistema() {
+    // Prioridad 1 — ROJO: hay un conflict de otra persona pendiente
+    if (_lastFetchError === 'conflict' && _draftPendiente !== null) {
+        return {
+            color: 'rojo',
+            texto: 'Otra persona tambien guardo. Mira el aviso antes de seguir.'
+        };
+    }
+    // Prioridad 2 — NARANJA: sin red. El trabajo esta a salvo localmente.
+    if (_lastFetchError === 'network') {
+        return {
+            color: 'naranja',
+            texto: 'Sin internet. Tu trabajo esta guardado aca, esperando.'
+        };
+    }
+    // Prioridad 3 — AMARILLO: hay cambios pendientes de mandar al sistema
+    if (_dirty || _draftRestaurado || _draftPendiente !== null) {
+        return {
+            color: 'amarillo',
+            texto: _textoAmarillo()
+        };
+    }
+    // Prioridad 4 — VERDE: nada pendiente, ningun error en curso
+    return {
+        color: 'verde',
+        texto: 'Todo guardado en el sistema'
+    };
+}
+
+function _textoAmarillo() {
+    if (_draftPendiente && !_draftRestaurado) {
+        // Hay un draft que el operario todavia no aplico ni descarto
+        return 'Tenes trabajo cargado de antes. Mira el aviso amarillo arriba.';
+    }
+    // Hay cambios en el DOM que todavia no se mandaron al sistema.
+    // Contar para que el operario sepa cuanto.
+    const sabores = Array.from(document.querySelectorAll('.fl')).filter(function(f) {
+        return Array.from(f.querySelectorAll('input[type=number]')).some(function(i) {
+            return i.value.trim() !== '';
+        });
+    }).length;
+    const vdp = document.querySelectorAll('#vB .vdp-item').length;
+    const con = document.querySelectorAll('#cB .con-item').length;
+    const notas = Array.from(document.querySelectorAll('#nB .xrow')).filter(function(r) {
+        const nd = r.querySelector('.nd');
+        return nd && nd.value.trim() !== '';
+    }).length;
+    const partes = [];
+    if (sabores) partes.push(sabores + (sabores === 1 ? ' sabor' : ' sabores'));
+    if (vdp)     partes.push(vdp + (vdp === 1 ? ' venta' : ' ventas'));
+    if (con)     partes.push(con + (con === 1 ? ' consumo' : ' consumos'));
+    if (notas)   partes.push(notas + (notas === 1 ? ' nota' : ' notas'));
+    if (partes.length === 0) return 'Tenes cambios sin guardar';
+    return 'Tenes ' + partes.join(', ') + ' por guardar — toca Guardar abajo';
+}
+
+function _renderEstadoSistema() {
+    const el = document.getElementById('estadoSistema');
+    if (!el) return;
+    const s = _calcularEstadoSistema();
+    el.dataset.color = s.color;
+    const txt = el.querySelector('.estado-texto');
+    if (txt) txt.textContent = s.texto;
+    // Sub-mensaje de version nueva: visible discretamente al lado del estado.
+    // Solo si hay una mejora detectada Y el estado actual no es ROJO (no
+    // queremos competir con un conflict urgente).
+    const ver = el.querySelector('.estado-version');
+    if (ver) {
+        if (_versionNuevaDisponible && s.color !== 'rojo') {
+            ver.hidden = false;
+            ver.textContent = (s.color === 'verde')
+                ? '· Hay una mejora disponible'
+                : '· Hay una mejora disponible (se aplica despues de guardar)';
+        } else {
+            ver.hidden = true;
+        }
+    }
+}
+
+// ─── Deteccion de version nueva ──────────────────────────────────────
+//
+// Subordinada al estado del trabajo: jamas impone reload mientras hay
+// dirty o draft pendiente. La version nueva se detecta, se anuncia
+// discretamente, y se aplica solo en el momento seguro: despues de un
+// save exitoso con seguroBorrarDraft === true. Si el operario nunca
+// termina su sesion, la version nueva espera silenciosamente.
+
+async function _checkVersionNueva() {
+    try {
+        const r = await fetch('/version', { cache: 'no-store' });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (_versionInicial === null) {
+            _versionInicial = d.v;
+        } else if (d.v && d.v !== _versionInicial) {
+            if (!_versionNuevaDisponible) {
+                _versionNuevaDisponible = true;
+                _renderEstadoSistema();
+            }
+        }
+    } catch (e) { /* offline o error: ignorar, reintentar luego */ }
+}
+
+function _aplicarVersionNuevaSiSegura() {
+    // Llamado desde el bloque de exito de persistTurno() cuando
+    // seguroBorrarDraft === true. Si hay una version nueva esperando
+    // y no quedan datos pendientes, recargamos.
+    if (!_versionNuevaDisponible) return;
+    // Defensa adicional: que no haya dirty ni draft despues del save
+    if (_dirty || _draftRestaurado || _draftPendiente) return;
+    // Diferimos un tick para que el toast del save exitoso alcance a verse
+    setTimeout(function() {
+        location.reload();
+    }, 1500);
 }
 
 // Marcar dirty ante cualquier cambio en inputs
@@ -1772,6 +1963,50 @@ function aplicarDraftAlDOM(backup) {
 
 // ─── Banner persistente de draft ───
 
+// Resumen en lenguaje humano de lo que hay en el draft ACTUAL (post
+// auto_restore) o en el draft PENDIENTE (pre decision). Devuelve algo
+// como "3 sabores, 4 ventas y 1 consumo". Si el draft esta vacio,
+// devuelve "algunos datos" como fallback.
+function _resumenDelDraftActual(tipo) {
+    let sabores = 0, vdp = 0, con = 0, notas = 0, postres = 0;
+    if (tipo === 'normal') {
+        // Post auto_restore: los datos estan en el DOM
+        sabores = Array.from(document.querySelectorAll('.fl')).filter(function(f) {
+            return Array.from(f.querySelectorAll('input[type=number]')).some(function(i) { return i.value.trim(); });
+        }).length;
+        vdp = document.querySelectorAll('#vB .vdp-item').length;
+        con = document.querySelectorAll('#cB .con-item').length;
+        notas = Array.from(document.querySelectorAll('#nB .xrow')).filter(function(r) {
+            const nd = r.querySelector('.nd'); return nd && nd.value.trim();
+        }).length;
+        postres = Array.from(document.querySelectorAll('.postre-qty')).filter(function(i) {
+            return parseInt(i.value) > 0;
+        }).length;
+    } else if (_draftPendiente) {
+        // Pre decision: leer del backup pendiente
+        const b = _draftPendiente;
+        sabores = (b.sabores || []).length;
+        const x = b.extras || {};
+        // Para VDP/consumos contamos items unicos (agrupados por texto+gramos)
+        const vdpUnicos = new Set((x.vdp || []).map(function(v){ return v.texto + '|' + v.gramos; }));
+        vdp = vdpUnicos.size;
+        const conUnicos = new Set((x.consumos || []).map(function(c){ return c.texto + '|' + c.gramos + '|' + (c.empleado||''); }));
+        con = conUnicos.size;
+        notas = (x.notas || []).length;
+        postres = (x.postres || []).length;
+    }
+    const partes = [];
+    if (sabores) partes.push(sabores + (sabores === 1 ? ' sabor' : ' sabores'));
+    if (vdp)     partes.push(vdp + (vdp === 1 ? ' venta' : ' ventas'));
+    if (con)     partes.push(con + (con === 1 ? ' consumo' : ' consumos'));
+    if (notas)   partes.push(notas + (notas === 1 ? ' nota' : ' notas'));
+    if (postres) partes.push(postres + (postres === 1 ? ' postre' : ' postres'));
+    if (partes.length === 0) return 'algunos datos';
+    if (partes.length === 1) return partes[0];
+    if (partes.length === 2) return partes[0] + ' y ' + partes[1];
+    return partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
+}
+
 function mostrarBannerDraftRestaurado(tipo) {
     // tipo: 'normal' | 'ask_user_stale' | 'ask_user_ambiguous'
     if (document.getElementById('draftBanner')) return;
@@ -1781,10 +2016,15 @@ function mostrarBannerDraftRestaurado(tipo) {
         ask_user_stale:      { bg: '#f8d7da', border: '#dc3545' },
         ask_user_ambiguous:  { bg: '#fff3cd', border: '#ffc107' },
     };
+    // Lenguaje humano: el banner habla de "trabajo cargado", no de
+    // "borrador local". Y muestra concretamente cuanto hay en juego
+    // (sabores/ventas/consumos/notas/postres) en lugar de hablar de
+    // "borrador" en abstracto.
+    const resumen = _resumenDelDraftActual(tipo);
     const textos = {
-        normal:              'Se aplico trabajo local no sincronizado. Guarda para enviarlo al servidor, o descarta el borrador local.',
-        ask_user_stale:      'Hay un borrador local anterior a la ultima version del servidor. Puede estar desactualizado.',
-        ask_user_ambiguous:  'Hay un borrador local pendiente. El servidor ya muestra datos; no se puede determinar automaticamente si el borrador es mas reciente.',
+        normal:              'Recuperamos tu trabajo cargado de antes (' + resumen + '). Toca Guardar abajo para mandarlo al sistema.',
+        ask_user_stale:      'Tenes trabajo cargado de hace un rato (' + resumen + '). Mientras tanto otra persona tambien guardo. ¿Que hacemos?',
+        ask_user_ambiguous:  'Tenes trabajo cargado por mandar al sistema (' + resumen + '). El servidor ya muestra cosas. ¿Que queres hacer?',
     };
     const c = estilos[tipo] || estilos.normal;
 
@@ -1802,19 +2042,19 @@ function mostrarBannerDraftRestaurado(tipo) {
     msg.textContent = textos[tipo] || textos.normal;
     banner.appendChild(msg);
 
-    // En stale/ambiguous: boton "Usar mi borrador local" + "Descartar borrador local"
-    // En normal (post auto_restore): solo "Descartar borrador local"
+    // En stale/ambiguous: boton "Ver mi trabajo" (verde, primario) + "Empezar de cero" (rojo)
+    // En normal (post auto_restore): solo "Empezar de cero"
     if (tipo === 'ask_user_stale' || tipo === 'ask_user_ambiguous') {
         const btnUsar = document.createElement('button');
-        btnUsar.textContent = 'Usar mi borrador local';
-        btnUsar.style.cssText = 'background:#28a745;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+        btnUsar.textContent = 'Ver mi trabajo cargado';
+        btnUsar.style.cssText = 'background:#28a745;color:#fff;padding:10px 18px;border:none;border-radius:6px;cursor:pointer;font-size:15px;font-weight:700;';
         btnUsar.onclick = function() { confirmarRestauracionManual(); };
         banner.appendChild(btnUsar);
     }
 
     const btnDesc = document.createElement('button');
-    btnDesc.textContent = 'Descartar borrador local';
-    btnDesc.style.cssText = 'background:#dc3545;color:#fff;padding:8px 14px;border:none;border-radius:4px;cursor:pointer;font-size:14px;';
+    btnDesc.textContent = 'Empezar de cero';
+    btnDesc.style.cssText = 'background:#dc3545;color:#fff;padding:10px 18px;border:none;border-radius:6px;cursor:pointer;font-size:14px;';
     btnDesc.onclick = function() { descartarDraftLocal(); };
     banner.appendChild(btnDesc);
 
@@ -1834,7 +2074,7 @@ function mostrarBannerDraftRestaurado(tipo) {
 }
 
 function confirmarRestauracionManual() {
-    // Usado por el boton "Usar mi borrador local" del banner stale/ambiguous.
+    // Usado por el boton "Ver mi trabajo cargado" del banner stale/ambiguous.
     if (!_draftPendiente) { ocultarBannerDraft(); return; }
     const backup = _draftPendiente;
     _draftPendiente = null;
@@ -1842,12 +2082,15 @@ function confirmarRestauracionManual() {
     _draftRestauracionCompleta = aplicarDraftAlDOM(backup);
     _dirty = true;
     _editVersion++;
+    // Salimos de un posible estado rojo (conflict) si veniamos de uno
+    _lastFetchError = null;
     // Reemplazar el banner viejo por el banner normal (la aplicacion ya ocurrio)
     ocultarBannerDraft();
     mostrarBannerDraftRestaurado('normal');
+    _renderEstadoSistema();
     if (!_draftRestauracionCompleta) {
         setTimeout(function() {
-            toast('Algunas secciones del borrador no se pudieron aplicar. Verifica manualmente.', 'warn');
+            toast('Algunas cosas no se pudieron poner en pantalla. Revisa antes de guardar.', 'warn');
         }, 500);
     }
 }
@@ -1864,10 +2107,10 @@ function descartarDraftLocal() {
     );
 
     const mensaje = huboEdicionesPostBanner
-        ? ('ATENCION: ademas del borrador local, hiciste cambios en esta ' +
-           'sesion despues de que aparecio el aviso. Si descartas ahora, ' +
-           'tambien se perderan esos cambios no guardados. No se puede deshacer. Confirmas?')
-        : ('Descartar el borrador local? Esta accion no se puede deshacer.');
+        ? ('ATENCION: ademas del trabajo de antes, cargaste cosas nuevas ' +
+           'despues de ver el aviso. Si borras todo ahora, tambien se ' +
+           'pierden esos cambios. No se puede deshacer. ¿Confirmas?')
+        : ('¿Borrar todo el trabajo cargado y empezar de cero? No se puede deshacer.');
 
     if (!confirm(mensaje)) return;
 
@@ -1876,6 +2119,7 @@ function descartarDraftLocal() {
     _draftRestauracionCompleta = true;
     _draftPendiente = null;
     _draftBannerVersion = null;
+    _lastFetchError = null;
     ocultarBannerDraft();
     // Recargar para volver al estado del servidor de forma limpia,
     // especialmente si aplicarDraftAlDOM ya habia modificado el DOM.
@@ -1928,19 +2172,93 @@ if (!CONFIRMADO) {
                 mostrarBannerDraftRestaurado('normal');
                 if (!_draftRestauracionCompleta) {
                     setTimeout(function() {
-                        toast('Algunas secciones del borrador no se pudieron aplicar. Verifica manualmente.', 'warn');
+                        toast('Algunas cosas no se pudieron poner en pantalla. Revisa antes de guardar.', 'warn');
                     }, 500);
                 }
             } else {
                 // ask_user_stale o ask_user_ambiguous: jamas aplicar sin
                 // consentimiento humano. Guardamos el backup en
-                // _draftPendiente para que "Usar mi borrador local" pueda
-                // aplicarlo despues, y mostramos el banner correspondiente.
+                // _draftPendiente para que el boton de ver el trabajo
+                // pueda aplicarlo despues.
                 _draftPendiente = backup;
                 mostrarBannerDraftRestaurado(precedencia);
             }
         }
     }
+
+    // Render inicial de la linea de estado: refleja lo que quedo despues
+    // de evaluar el draft (verde si nada pendiente, amarillo si quedo
+    // dirty/draftRestaurado/draftPendiente).
+    _renderEstadoSistema();
+
+    // Arrancar el ciclo de deteccion de version nueva. Primer check al
+    // momento (captura la version inicial) y despues cada 5 minutos.
+    // El reload se difiere hasta despues de un save exitoso seguro.
+    _checkVersionNueva();
+    setInterval(_checkVersionNueva, 300000);
+
+    // Interceptar el link "Salir" del header para advertir si hay
+    // trabajo sin guardar. Red de seguridad ultima contra perdida de
+    // trabajo por navegacion accidental.
+    const linkSalir = document.getElementById('linkSalir');
+    if (linkSalir) {
+        linkSalir.addEventListener('click', function(e) {
+            // Nada pendiente → salir directo, sin molestar
+            if (!_dirty && !_draftRestaurado && !_draftPendiente) return;
+            // Hay algo pendiente → interceptar y preguntar
+            e.preventDefault();
+            _mostrarDialogoSalir();
+        });
+    }
+}
+
+// Dialogo de confirmacion al salir con cambios sin guardar. Tres opciones:
+// 1) Guardar y salir (verde, primario)
+// 2) Volver al turno (gris, neutral)
+// 3) Salir sin guardar (link feo aposta, ultima fila)
+function _mostrarDialogoSalir() {
+    if (document.getElementById('dialogoSalir')) return;
+    const resumen = _textoAmarillo();
+    const overlay = document.createElement('div');
+    overlay.id = 'dialogoSalir';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML =
+        '<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;padding:24px 22px;box-shadow:0 20px 60px rgba(0,0,0,0.35);">' +
+            '<div style="font-size:42px;text-align:center;margin-bottom:8px;">⚠️</div>' +
+            '<div style="font-size:1.15rem;font-weight:800;text-align:center;margin-bottom:10px;color:#6d5300;">¡Pará!</div>' +
+            '<div style="font-size:0.98rem;line-height:1.45;text-align:center;margin-bottom:22px;color:#333;">' +
+                '<span id="dlgSalirResumen"></span>' +
+            '</div>' +
+            '<button id="dlgBtnGuardarSalir" style="display:block;width:100%;background:#2f8a4a;color:#fff;padding:14px;border:none;border-radius:8px;cursor:pointer;font-size:1rem;font-weight:800;margin-bottom:10px;">GUARDAR Y SALIR</button>' +
+            '<button id="dlgBtnVolver" style="display:block;width:100%;background:#eee;color:#333;padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:0.95rem;font-weight:700;margin-bottom:16px;">Volver al turno</button>' +
+            '<div style="text-align:center;">' +
+                '<a href="#" id="dlgLinkSalirSinGuardar" style="color:#999;font-size:0.82rem;text-decoration:underline;">Salir sin guardar (perdés el trabajo)</a>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    // Texto del resumen usando textContent para evitar inyeccion
+    document.getElementById('dlgSalirResumen').textContent = resumen;
+    // Handlers
+    document.getElementById('dlgBtnGuardarSalir').addEventListener('click', async function() {
+        const ok = await persistTurno({ silent: false });
+        if (ok) {
+            // Dar tiempo al toast de exito y salir
+            setTimeout(function() { window.location.href = '/entrada/seleccion'; }, 800);
+        }
+        // Si fallo el save, el toast de error ya aparecio. Dejamos el dialogo
+        // cerrado porque el operario necesita ver el toast y decidir.
+        document.getElementById('dialogoSalir').remove();
+    });
+    document.getElementById('dlgBtnVolver').addEventListener('click', function() {
+        document.getElementById('dialogoSalir').remove();
+    });
+    document.getElementById('dlgLinkSalirSinGuardar').addEventListener('click', function(e) {
+        e.preventDefault();
+        // Ultima confirmacion dura antes de destruir trabajo
+        if (confirm('¿Seguro que queres salir SIN GUARDAR? Vas a perder todo el trabajo que cargaste.')) {
+            window.location.href = '/entrada/seleccion';
+        }
+    });
 }
 </script>
 </body>

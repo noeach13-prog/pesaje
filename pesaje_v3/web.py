@@ -24,6 +24,30 @@ app.secret_key = os.environ.get('SECRET_KEY', 'pesaje-dev-key-cambiar-en-prod')
 app.permanent_session_lifetime = timedelta(days=30)  # sesion dura 30 dias
 _outputs: dict = {}
 
+# Version del deploy actual. Se usa para que el frontend detecte cuando hay
+# una version nueva disponible y avise al operario sin imponer reload.
+# Prioridad de fuente: variable de entorno (Railway) > timestamp del archivo.
+def _compute_deploy_version():
+    v = os.environ.get('RAILWAY_DEPLOYMENT_ID') or os.environ.get('GIT_SHA') or os.environ.get('SOURCE_VERSION')
+    if v:
+        return v[:12]
+    try:
+        return str(int(os.path.getmtime(__file__)))
+    except Exception:
+        return 'unknown'
+
+DEPLOY_VERSION = _compute_deploy_version()
+
+
+@app.route('/version')
+def version_endpoint():
+    """Devuelve la version del deploy actual. El frontend la consulta
+    cada N minutos y si difiere de la que recibio al cargar la pagina,
+    levanta una bandera interna para sugerir actualizar al operario
+    en el proximo momento seguro (post save exitoso, no antes)."""
+    from flask import jsonify
+    return jsonify({'v': DEPLOY_VERSION})
+
 # Logging de errores a stderr (visible en Railway logs)
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
