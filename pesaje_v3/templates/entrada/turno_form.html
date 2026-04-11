@@ -1540,6 +1540,35 @@ function _servidorTieneContenidoReal() {
     return false;
 }
 
+// Parsear timestamp del server de forma robusta entre backends.
+//
+// SQLite con datetime('now') devuelve formato "YYYY-MM-DD HH:MM:SS" en
+// hora UTC, SIN sufijo de zona horaria. Si lo pasamos directo a new Date(),
+// JavaScript lo interpreta como hora LOCAL del navegador, lo que en
+// Argentina (UTC-3) genera un offset falso de 3 horas: el server "parece"
+// estar 3h en el futuro respecto del Date.now() del cliente, y cualquier
+// draft recien creado aparece como "ask_user_stale" cuando en realidad es
+// del mismo instante.
+//
+// Postgres con CURRENT_TIMESTAMP, serializado por _pg_row_to_dict via
+// .isoformat(), produce un string con offset explicito ("+00:00" o "Z").
+// Ese caso JavaScript lo parsea bien por si solo.
+//
+// Esta funcion detecta si hay offset y, si no lo hay, fuerza UTC sumando
+// 'Z' al final. El bug fue introducido en a0ff81c (evaluarPrecedenciaDraft)
+// y se manifiesta con cualquier draft local frente a un server con
+// contenido cuando el navegador no esta en UTC.
+function _parseServerTimestamp(s) {
+    if (!s) return NaN;
+    s = String(s);
+    // Si ya tiene offset (Z, +HH:MM o -HH:MM al final), parsear directo
+    if (/[Zz]$|[+-]\d{2}:?\d{2}$/.test(s)) {
+        return new Date(s).getTime();
+    }
+    // Sin offset (formato SQLite): asumir UTC explicitamente
+    return new Date(s.replace(' ', 'T') + 'Z').getTime();
+}
+
 function evaluarPrecedenciaDraft(backup) {
     // Retorna: 'auto_restore' | 'ask_user_stale' | 'ask_user_ambiguous'
     //
@@ -1561,7 +1590,7 @@ function evaluarPrecedenciaDraft(backup) {
     // decide el texto del banner.
     const MARGEN_SKEW_MS = 60000;
     if (!TURNO_UPDATED_AT) return 'ask_user_ambiguous';
-    const serverMs = new Date(String(TURNO_UPDATED_AT).replace(' ', 'T')).getTime();
+    const serverMs = _parseServerTimestamp(TURNO_UPDATED_AT);
     if (isNaN(serverMs)) return 'ask_user_ambiguous';
     const draftMs = backup.ts;
     if (typeof draftMs !== 'number') return 'ask_user_ambiguous';
