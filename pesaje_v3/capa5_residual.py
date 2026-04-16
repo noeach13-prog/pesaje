@@ -215,9 +215,12 @@ def _timeline_sabor(nombre: str, datos: DatosDia) -> List[str]:
         s = tc.sabores.get(nombre)
         if s:
             ab = s.abierta or 0
+            cel = s.celiaca or 0
             cerr = [int(c) for c in s.cerradas]
             ent = [int(e) for e in s.entrantes]
             parts = [f'ab={ab}']
+            if cel:
+                parts.append(f'cel={cel}')
             if cerr:
                 parts.append(f'cerr={cerr}')
             if ent:
@@ -228,9 +231,12 @@ def _timeline_sabor(nombre: str, datos: DatosDia) -> List[str]:
     d = datos.turno_dia.sabores.get(nombre)
     if d:
         ab = d.abierta or 0
+        cel = d.celiaca or 0
         cerr = [int(c) for c in d.cerradas]
         ent = [int(e) for e in d.entrantes]
         parts = [f'ab={ab}']
+        if cel:
+            parts.append(f'cel={cel}')
         if cerr:
             parts.append(f'cerr={cerr}')
         if ent:
@@ -241,9 +247,12 @@ def _timeline_sabor(nombre: str, datos: DatosDia) -> List[str]:
     n = datos.turno_noche.sabores.get(nombre)
     if n:
         ab = n.abierta or 0
+        cel = n.celiaca or 0
         cerr = [int(c) for c in n.cerradas]
         ent = [int(e) for e in n.entrantes]
         parts = [f'ab={ab}']
+        if cel:
+            parts.append(f'cel={cel}')
         if cerr:
             parts.append(f'cerr={cerr}')
         if ent:
@@ -259,9 +268,12 @@ def _timeline_sabor(nombre: str, datos: DatosDia) -> List[str]:
         s = tc.sabores.get(nombre)
         if s:
             ab = s.abierta or 0
+            cel = s.celiaca or 0
             cerr = [int(c) for c in s.cerradas]
             ent = [int(e) for e in s.entrantes]
             parts = [f'ab={ab}']
+            if cel:
+                parts.append(f'cel={cel}')
             if cerr:
                 parts.append(f'cerr={cerr}')
             if ent:
